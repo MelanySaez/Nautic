@@ -1,0 +1,24 @@
+# Core library with computer vision models and authentication
+git+ssh://git@github.com/AaronDLF/nautic_core.git@v1.0.3
+
+# Web framework
+fastapi
+uvicorn[standard]
+
+# Data validation
+pydantic
+pydantic-settings
+
+# File handling
+python-multipart
+pillow
+
+# Authentication and security
+python-jose[cryptography]
+passlib[bcrypt]
+
+# Data processing
+numpy
+
+# HTTP client
+httpx
