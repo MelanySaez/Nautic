@@ -4,13 +4,10 @@ Shared dependencies for the API
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from typing import TYPE_CHECKING, Optional
-import os
+from typing import TYPE_CHECKING
 
-# Lazy imports to avoid loading heavy ML dependencies until needed
 if TYPE_CHECKING:
-    from core_engine.auth import AuthManager
-    from core_engine.vision.image_processor import ImageProcessor
+    from app.auth_manager import CustomAuthManager
 
 from app.config import settings
 
@@ -31,10 +28,10 @@ def get_auth_manager():
 
     if _auth_manager is None:
         try:
-            # Lazy import - only import when needed
-            from core_engine.auth import AuthManager
+            # Use custom auth manager with user management
+            from app.auth_manager import CustomAuthManager
 
-            _auth_manager = AuthManager(
+            _auth_manager = CustomAuthManager(
                 secret_key=settings.secret_key,
                 access_token_expire_minutes=settings.access_token_expire_minutes,
             )
@@ -121,7 +118,7 @@ def is_auth_available() -> bool:
 
 async def verify_token(
     credentials: HTTPAuthorizationCredentials = Depends(security),
-    auth_manager=Depends(get_auth_manager),
+    auth_manager: "CustomAuthManager" = Depends(get_auth_manager),
 ) -> dict:
     """
     Dependency to verify JWT token

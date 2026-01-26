@@ -1,6 +1,7 @@
 """
 Application configuration
 """
+
 from typing import Optional
 from pydantic_settings import BaseSettings
 
@@ -9,7 +10,7 @@ class Settings(BaseSettings):
     """Application configuration"""
 
     # API
-    app_name: str = "Nautic Core API"
+    app_name: str = "Nautic API"
     app_version: str = "1.0.0"
     app_description: str = "Authentication and image processing API"
 

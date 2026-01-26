@@ -1,11 +1,13 @@
 """
 Pydantic models for the API
 """
+
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List
 
 
 # ==================== AUTHENTICATION MODELS ====================
+
 
 class UserRegister(BaseModel):
     username: str
@@ -29,6 +31,7 @@ class UserProfile(BaseModel):
 
 
 # ==================== VISION MODELS ====================
+
 
 class Detection(BaseModel):
     class_id: int
