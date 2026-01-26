@@ -1,5 +1,5 @@
 # Core library with computer vision models and authentication
-git+ssh://git@github.com/AaronDLF/nautic_core.git@v1.0.3
+git+ssh://git@github.com/AaronDLF/nautic_core.git@v1.0.4
 
 # Web framework
 fastapi
