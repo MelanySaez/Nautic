@@ -1,0 +1,11 @@
+{
+  "dependencies": {
+    "html5-qrcode": "^2.3.8",
+    "react-router-dom": "^7.4.0",
+    "sweetalert2": "^11.23.0"
+  },
+  "devDependencies": {
+    "@craco/craco": "^7.1.0",
+    "axios": "^1.11.0"
+  }
+}

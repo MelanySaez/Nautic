@@ -1,0 +1,78 @@
+/* Backdrop genérico */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.4);
+  display: flex;
+  justify-content: center;
+  align-items: center; /* valor por defecto; modal-sheet lo cambia */
+  z-index: 999; /* por encima del navbar */
+}
+
+/* Offset bajo el navbar para modales tipo "sheet" */
+:root {
+  --navbar-h: 64px; /* ajusta si tu navbar es más alto */
+}
+
+.modal-backdrop.modal-sheet {
+  align-items: flex-start;           /* alinear arriba */
+  padding: calc(var(--navbar-h) + 16px) 16px 24px; /* margen superior bajo navbar */
+}
+
+/* Panel responsive (reemplaza usos de modal-lg/center-modal) */
+.modal-panel {
+  width: min(920px, 92vw);   /* desktop grande y fluido */
+  max-height: 85vh;
+  overflow: auto;
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.2);
+}
+
+/* Tamaño pequeño heredado (confirm delete) */
+.modal-sm {
+  width: min(480px, 92vw);
+}
+
+/* Contenido del modal */
+.modal-header, .modal-footer {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--tb-border, #e6e6e6);
+}
+.modal-footer { border-bottom: 0; border-top: 1px solid var(--tb-border, #e6e6e6); }
+.modal-title { margin: 0; font-size: 1.05rem; }
+.modal-body { padding: 16px; }
+
+/* Mejoras responsive para móviles */
+@media (max-width: 540px) {
+  .modal-panel {
+    width: 100vw;
+    max-height: calc(100vh - var(--navbar-h) - 24px);
+    border-radius: 10px; /* si prefieres full-bleed: 0 */
+  }
+  .modal-header, .modal-body, .modal-footer {
+    padding: 12px;
+  }
+}
+
+/* Botón de acciones en la tabla de cargos: asegurar hit-area */
+.table .btn-group .tb-btn.tb-btn-sm {
+  padding: 6px 8px;
+}
+
+.tb-field-inline {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.form-inline-gap .tb-input {
+  flex: 1;
+  min-width: 220px;
+}
+
+.btn-group-gap {
+  display: flex;
+  gap: 8px;
+}

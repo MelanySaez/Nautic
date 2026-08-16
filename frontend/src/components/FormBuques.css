@@ -1,0 +1,187 @@
+/* =========================
+   Tarjeta y hero (look Tabler)
+   ========================= */
+.buque-form-card{
+  border:1px solid var(--tblr-border-color, rgba(98,105,118,.16));
+  border-radius:12px;
+  box-shadow:0 6px 22px rgba(87,100,126,.12);
+}
+
+/* Hero con overlay y botón flotante */
+.buque-form-hero{
+  position:relative;
+  background-size:cover;
+  background-position:center;
+  min-height:240px;
+  border:1px solid rgba(98,105,118,.16);
+}
+.buque-form-hero .hero-action{
+  position:absolute; top:12px; left:12px;
+  display:inline-flex; align-items:center; gap:8px;
+  padding:6px 12px; border-radius:999px; font-size:14px; color:#1f2937;
+  background:rgba(255,255,255,.94); border:1px solid rgba(98,105,118,.22);
+  box-shadow:0 2px 8px rgba(31,41,55,.12);
+  transition:transform .15s, box-shadow .15s, background .15s;
+}
+.buque-form-hero .hero-action:hover{
+  transform:translateY(-1px);
+  box-shadow:0 6px 16px rgba(31,41,55,.18);
+  background:#fff;
+}
+
+/* Wrapper con look similar a la “ronda-card” */
+.buque-form-wrapper{ background:var(--tblr-bg-surface, #fff); }
+
+/* =========================
+   Secciones / tarjetas internas
+   ========================= */
+.section-card{
+  border:1px solid rgba(98,105,118,.16);
+  border-radius:.75rem;
+  background:var(--tblr-bg-surface, #fff);
+}
+.section-card + .section-card{ margin-top:1rem; }
+.section-header{
+  padding:.75rem 1rem;
+  border-bottom:1px solid rgba(98,105,118,.12);
+}
+.section-body{ padding:1rem; }
+
+/* =========================
+   Controles: segmented & chips
+   ========================= */
+.segmented{ display:flex; gap:6px; }
+.segmented-item{
+  border:1px solid rgba(98,105,118,.24);
+  background:#fff; padding:6px 10px; border-radius:8px; font-size:.9rem;
+}
+.segmented-item.active{ background:#edf2ff; border-color:#748ffc; color:#2f3e9e; }
+
+.days-wrap{ display:flex; gap:6px; flex-wrap:wrap; }
+.day-chip{
+  min-width:36px; height:36px; border-radius:10px;
+  border:1px solid rgba(98,105,118,.24);
+  background:#fff; display:inline-flex; align-items:center; justify-content:center;
+}
+.day-chip.active{ background:#dbeafe; border-color:#60a5fa; color:#0b4fb7; }
+
+/* =========================
+   Dropzone
+   ========================= */
+.dropzone{
+  border:1.5px dashed rgba(98,105,118,.35);
+  border-radius:12px; padding:18px; display:flex; align-items:center; gap:12px;
+  background:#f8fafc; text-align:left;
+}
+.dz-icon{
+  width:40px; height:40px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center; background:#eef2ff;
+}
+.dz-title{ font-weight:600; }
+.dz-sub{ font-size:.8rem; color:#6b7280; }
+.dz-btn{ margin-left:.5rem; }
+
+/* =========================
+   Tabla / lista de documentos
+   ========================= */
+.doc-table{ border:1px solid rgba(98,105,118,.16); border-radius:12px; overflow:hidden; }
+.doc-head, .doc-row{
+  display:grid;
+  grid-template-columns: 1fr 220px 140px; /* nombre | tipo | acciones */
+  gap:12px; padding:10px 12px;
+}
+.doc-head{ background:#f1f5f9; font-weight:600; color:#334155; }
+.doc-head > :last-child{ text-align:right; }
+.doc-row{ border-top:1px solid rgba(98,105,118,.12); align-items:center; }
+.doc-row:hover{ background:#f8fafc; }
+
+.doc-name .title{ font-weight:600; }
+.doc-name .meta{ font-size:.82rem; color:#6b7280; }
+
+.doc-type{ display:flex; align-items:center; gap:10px; }
+
+/* Select “Tipo” con estilo pill + caret custom */
+.doc-type-select{
+  min-width:150px; max-width:200px;
+  height:36px; padding:6px 34px 6px 12px;
+  border-radius:999px; border:1px solid rgba(98,105,118,.24);
+  background:
+    #fff
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='rgb(71,85,105)'><path d='M6 9l6 6 6-6'/></svg>")
+    no-repeat right 10px center/16px;
+  appearance:none; font-weight:600; color:#0f172a;
+}
+.doc-type-select:focus{
+  outline:none; border-color:#748ffc; box-shadow:0 0 0 3px rgba(116,143,252,.2);
+}
+
+/* Badges de tipo */
+.doc-badge{
+  display:inline-block; padding:4px 8px; border-radius:8px;
+  font-size:.75rem; font-weight:700; border:1px solid transparent;
+}
+.badge-plan{ background:#e7f0ff; color:#1e40af; border-color:#c7dcff; }
+.badge-plano{ background:#fff2cf; color:#7a5400; border-color:#ffe7a3; }
+.badge-manual{ background:#e6fffa; color:#065f46; border-color:#bdfbe7; }
+.badge-certificado{ background:#fef2f2; color:#991b1b; border-color:#fde3e3; }
+.badge-procedimiento{ background:#eef2ff; color:#3730a3; border-color:#dbe4ff; }
+.badge-especificación{ background:#f1f5f9; color:#0f172a; border-color:#e2e8f0; }
+/* fallback */
+[class*="badge-"]{ text-transform:none; }
+
+/* Acciones alineadas a la derecha y centradas verticalmente */
+.doc-actions{
+  display:flex; justify-content:flex-end; align-items:center; gap:8px; height:100%;
+}
+
+/* Botones de acción */
+.icon-btn{
+  display:inline-flex; align-items:center; justify-content:center;
+  width:34px; height:34px; border-radius:10px;
+  border:1px solid rgba(98,105,118,.25);
+  background:#fff;
+  transition:background .15s, transform .15s, box-shadow .15s;
+}
+.icon-btn:hover{ background:#f1f5f9; transform:translateY(-1px); box-shadow:0 4px 12px rgba(31,41,55,.12); }
+.icon-btn.danger{ border-color:#fecaca; }
+.icon-btn.danger:hover{ background:#fef2f2; }
+
+/* =========================
+   Modo oscuro
+   ========================= */
+:root[data-bs-theme="dark"] .buque-form-card{
+  border-color:rgba(98,105,118,.28);
+  box-shadow:0 10px 28px rgba(0,0,0,.45);
+}
+:root[data-bs-theme="dark"] .buque-form-hero{ border-color:rgba(98,105,118,.28); }
+:root[data-bs-theme="dark"] .buque-form-hero .hero-action{
+  background:rgba(15,23,42,.86); color:#e2e8f0; border-color:rgba(98,105,118,.35);
+}
+
+:root[data-bs-theme="dark"] .section-card,
+:root[data-bs-theme="dark"] .buque-form-hero{ background:#0b1220; }
+:root[data-bs-theme="dark"] .buque-form-wrapper{ background:#0b1220; }
+
+:root[data-bs-theme="dark"] .dropzone{ background:#0f172a; border-color:rgba(98,105,118,.35); }
+:root[data-bs-theme="dark"] .segmented-item{ background:#0f172a; color:#e2e8f0; }
+:root[data-bs-theme="dark"] .segmented-item.active{ background:#1d2a62; border-color:#4c6ef5; color:#e3e9ff; }
+:root[data-bs-theme="dark"] .day-chip{ background:#0f172a; color:#e2e8f0; }
+:root[data-bs-theme="dark"] .day-chip.active{ background:#1e3a8a; border-color:#3b82f6; }
+
+:root[data-bs-theme="dark"] .doc-head{ background:#0f172a; color:#cbd5e1; }
+:root[data-bs-theme="dark"] .doc-row:hover{ background:#0b1220; }
+:root[data-bs-theme="dark"] .icon-btn{ background:#0b1220; border-color:rgba(98,105,118,.32); }
+:root[data-bs-theme="dark"] .icon-btn:hover{ background:#0f172a; }
+:root[data-bs-theme="dark"] .doc-type-select{
+  background-color:#0f172a; color:#e2e8f0; border-color:rgba(98,105,118,.35);
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='rgb(148,163,184)'><path d='M6 9l6 6 6-6'/></svg>");
+}
+
+/* =========================
+   Responsivo
+   ========================= */
+@media (max-width: 576px){
+  .doc-head, .doc-row{ grid-template-columns: 1fr; }
+  .doc-actions{ justify-content:flex-start; margin-top:6px; }
+  .doc-type{ flex-wrap:wrap; }
+}

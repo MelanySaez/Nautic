@@ -1,0 +1,114 @@
+/* Professional fullscreen preview modal */
+.pm-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15,23,42,0.70);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  z-index: 1400;
+  animation: pm-fade .18s ease;
+}
+@keyframes pm-fade { from { opacity:0; } to { opacity:1; } }
+
+.pm-shell {
+  margin: 0;
+  background: var(--pm-bg, #0f172a);
+  color: var(--pm-text, #e2e8f0);
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 10px 40px rgba(0,0,0,.4);
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif;
+}
+
+.pm-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: linear-gradient(90deg,#1e293b,#0f172a);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  user-select: none;
+}
+.pm-title {
+  font-size: 14px;
+  font-weight: 600;
+  max-width: 340px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pm-spacer { flex:1; }
+
+/* (Grupos de botones eliminados en versión simplificada) */
+
+.pm-btn {
+  background: #1e293b;
+  border: 1px solid rgba(255,255,255,0.12);
+  color: #e2e8f0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background .15s, border-color .15s, transform .15s;
+}
+.pm-btn:hover:not(:disabled) { background:#334155; }
+.pm-btn:active:not(:disabled) { transform: translateY(1px); }
+.pm-btn:disabled { opacity:.45; cursor: not-allowed; }
+.pm-btn.active { background:#475569; border-color:#64748b; }
+.pm-btn.pm-close { background:#dc2626; border-color:#b91c1c; }
+.pm-btn.pm-close:hover { background:#ef4444; }
+
+.pm-content {
+  position: relative;
+  flex:1;
+  overflow: auto;
+  background: radial-gradient(circle at 30% 30%, #1e293b, #0f172a);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 16px 24px;
+}
+/* Ajustes de contenido simplificado */
+
+.pm-img-wrapper { display:inline-block; }
+.pm-img { display:block; max-width:100%; height:auto; box-shadow:0 4px 20px rgba(0,0,0,.35); border:1px solid rgba(255,255,255,0.08); border-radius:4px; }
+
+.pm-pdf-wrapper { width:100%; height:100%; display:flex; align-items:center; justify-content:center; }
+.pm-pdf-frame { width:100%; height:100%; border:none; background:#111827; }
+.pm-loading-overlay { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; background:rgba(15,23,42,0.55); backdrop-filter:blur(2px); font-size:13px; letter-spacing:.3px; }
+.pm-spinner { width:42px; height:42px; border:4px solid rgba(255,255,255,0.25); border-top-color:#3b82f6; border-radius:50%; animation: pm-spin 1s linear infinite; }
+@keyframes pm-spin { to { transform: rotate(360deg);} }
+
+/* Fallback cuando Chrome bloquea el iframe */
+.pm-pdf-fallback { width:100%; height:100%; display:flex; align-items:center; justify-content:center; padding:32px 16px; }
+.pm-pdf-fallback-box { max-width:420px; width:100%; background:#1e293b; border:1px solid #334155; border-radius:14px; padding:28px 26px; text-align:center; box-shadow:0 6px 24px rgba(0,0,0,.35); }
+.pm-pdf-fallback-box p { margin:0 0 16px; font-size:15px; font-weight:500; color:#e2e8f0; }
+.pm-actions-row { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; }
+.pm-pdf-fallback-box .pm-btn { background:#334155; border-color:#475569; min-width:130px; }
+.pm-pdf-fallback-box .pm-btn:hover { background:#475569; }
+
+.pm-empty { color:#94a3b8; font-size:14px; }
+
+/* Scrollbars subtle */
+.pm-content::-webkit-scrollbar { width:10px; height:10px; }
+.pm-content::-webkit-scrollbar-track { background:rgba(255,255,255,0.05); }
+.pm-content::-webkit-scrollbar-thumb { background:#334155; border-radius:6px; }
+.pm-content::-webkit-scrollbar-thumb:hover { background:#475569; }
+
+@media (max-width: 640px) {
+  .pm-toolbar { flex-wrap: wrap; gap:6px; }
+  .pm-title { max-width: 100%; }
+}
+
+/* Variante simple (ya representada por markup, se deja para extensiones futuras) */
+.pm-toolbar-simple { letter-spacing: .2px; }

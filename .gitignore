@@ -1,0 +1,106 @@
+# Node modules
+node_modules/
+frontend/node_modules/
+
+# pnpm — uso personal local; el team usa npm + package-lock.json
+pnpm-lock.yaml
+frontend/pnpm-lock.yaml
+.npmrc
+frontend/.npmrc
+pnpm-workspace.yaml
+frontend/pnpm-workspace.yaml
+
+# Python cache files
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+.Python
+
+# Environment variables
+.env
+
+# Virtual environments
+.venv/
+env/
+venv/
+
+# Django
+*.log
+db.sqlite3
+db.sqlite3-journal
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Build outputs
+build/
+dist/
+*.egg-info/
+
+# Coverage reports
+htmlcov/
+.coverage
+.coverage.*
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+**/data.cache/
+**/data.cache
+**/.cache/
+
+# Chatbot cache
+chatbot/data/.cache/
+
+chatbot/data/.cache/
+
+# Large documents / uploads (excluded from repo)
+chatbot/data/data/
+media/
+
+# Editor / LSP local config
+pyrightconfig.json
+
+# pyenv local version file (específico de la máquina)
+.python-version
+
+# Celery
+celerybeat-schedule
+celerybeat-schedule.db
+celerybeat.pid
+celery.pid
+
+# Pytest / coverage
+.pytest_cache/
+pytest.ini
+
+# Type checkers / linters cache
+.mypy_cache/
+.ruff_cache/
+.dmypy.json
+
+# Django collectstatic output
+staticfiles/
+static_root/
+
+# React — archivos locales de entorno (CRA/Vite)
+frontend/.env.local
+frontend/.env.development.local
+frontend/.env.test.local
+frontend/.env.production.local
+frontend/coverage/
+
+# uv
+.uv/
+
+# Archivos temporales de proceso
+*.pid

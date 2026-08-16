@@ -1,0 +1,923 @@
+/* ===== iOS-style enhancements for RondaEquipo ===== */
+/* Mantiene la estructura del grid 2x2 y el fondo de página original */
+
+/* === iOS Color Variables === */
+:root {
+  --ios-blue: #007AFF;
+  --ios-blue-hover: #0051D0;
+  --ios-green: #34C759;
+  --ios-red: #FF3B30;
+  --ios-gray: #F2F2F7;
+  --ios-dark-gray: #1C1C1E;
+  --ios-border: rgba(0, 0, 0, 0.1);
+  --ios-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  --ios-shadow-hover: 0 4px 12px rgba(0, 0, 0, 0.15);
+  --ios-transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+:root[data-bs-theme="dark"] {
+  --ios-blue: #0A84FF;
+  --ios-green: #30D158;
+  --ios-red: #FF453A;
+  --ios-gray: #1C1C1E;
+  --ios-border: rgba(255, 255, 255, 0.1);
+  --ios-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --ios-shadow-hover: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+/* === Enhanced container card with iOS glassmorphism === */
+.ronda-card {
+  background: rgba(255, 255, 255, 0.95) !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  border-radius: 20px !important;
+  box-shadow: var(--ios-shadow-hover) !important;
+  transition: var(--ios-transition);
+}
+
+:root[data-bs-theme="dark"] .ronda-card {
+  background: rgba(28, 28, 30, 0.95) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* === iOS-style status bar === */
+.container:has(.ronda-card) .d-flex.justify-content-between {
+  background: rgba(52, 199, 89, 0.1);
+  border: 1px solid rgba(52, 199, 89, 0.2);
+  border-radius: 16px !important;
+  padding: 12px 16px !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+:root[data-bs-theme="dark"] .container:has(.ronda-card) .d-flex.justify-content-between {
+  background: rgba(48, 209, 88, 0.15);
+  border-color: rgba(48, 209, 88, 0.3);
+}
+
+/* === Enhanced parameter cards with iOS styling === */
+.param-card {
+  background: rgba(255, 255, 255, 0.9) !important;
+  border: 1px solid var(--ios-border) !important;
+  border-radius: 16px !important;
+  padding: 16px !important;
+  box-shadow: var(--ios-shadow);
+  transition: var(--ios-transition);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.param-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--ios-shadow-hover);
+  border-color: var(--ios-blue);
+}
+
+:root[data-bs-theme="dark"] .param-card {
+  background: rgba(44, 44, 46, 0.9) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+:root[data-bs-theme="dark"] .param-card:hover {
+  border-color: var(--ios-blue);
+}
+
+/* === iOS-style thumbnail with rounded corners === */
+.param-thumb {
+  width: 76px;
+  height: 76px;
+  border-radius: 16px !important;
+  object-fit: cover;
+  border: 1px solid var(--ios-border) !important;
+  background: var(--ios-gray);
+  cursor: pointer;
+  display: block;
+  transition: var(--ios-transition);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.param-thumb:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.param-thumb--placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(0, 0, 0, 0.4);
+  font-size: 20px;
+  background: rgba(0, 0, 0, 0.05);
+}
+
+:root[data-bs-theme="dark"] .param-thumb {
+  background: var(--ios-dark-gray);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+:root[data-bs-theme="dark"] .param-thumb--placeholder {
+  color: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* === iOS-style form inputs === */
+.floating-with-unit .form-control {
+  height: 44px !important;
+  min-height: 44px !important;
+  font-size: 16px !important;
+  color: #1d1d1f;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--ios-border) !important;
+  border-radius: 12px 0 0 12px !important;
+  transition: var(--ios-transition);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.floating-with-unit .form-control:focus {
+  border-color: var(--ios-blue) !important;
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1) !important;
+  background: rgba(255, 255, 255, 1);
+}
+
+.floating-with-unit .input-group-text {
+  height: 44px !important;
+  min-height: 44px !important;
+  padding: 12px 16px !important;
+  font-size: 14px !important;
+  background: rgba(0, 0, 0, 0.05);
+  color: #1d1d1f;
+  border: 1px solid var(--ios-border) !important;
+  border-left: 0 !important;
+  border-radius: 0 12px 12px 0 !important;
+  font-weight: 500;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/* === Out of range styling === */
+.form-control.is-out-range {
+  border-color: var(--ios-red) !important;
+  box-shadow: 0 0 0 3px rgba(255, 59, 48, 0.1) !important;
+  background: rgba(255, 59, 48, 0.05);
+}
+
+.form-control.is-out-range:focus {
+  border-color: var(--ios-red) !important;
+  box-shadow: 0 0 0 3px rgba(255, 59, 48, 0.2) !important;
+}
+
+/* === Enhanced floating labels === */
+.floating-with-unit .form-floating > label {
+  color: rgba(0, 0, 0, 0.6) !important;
+  padding-bottom: 12px !important;
+  font-size: 16px !important;
+  font-weight: 500;
+  transition: var(--ios-transition);
+}
+
+.floating-with-unit .form-floating > .form-control:focus ~ label {
+  color: var(--ios-blue) !important;
+  transform: scale(0.85) translateY(-0.5rem) translateX(0.15rem);
+}
+
+.floating-with-unit .form-floating > .form-control:not(:placeholder-shown) ~ label {
+  transform: scale(0.85) translateY(-0.5rem) translateX(0.15rem);
+}
+
+/* === iOS-style min/max hints === */
+.minmax-hint {
+  font-size: 13px !important;
+  color: rgba(0, 0, 0, 0.5);
+  margin-top: 8px !important;
+  padding-left: 4px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+/* === Enhanced buttons with iOS styling === */
+.btn {
+  border-radius: 12px !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.02em;
+  transition: var(--ios-transition);
+  box-shadow: var(--ios-shadow);
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--ios-shadow-hover);
+}
+
+.btn-primary {
+  background-color: var(--ios-blue) !important;
+  border-color: var(--ios-blue) !important;
+}
+
+.btn-primary:hover {
+  background-color: var(--ios-blue-hover) !important;
+  border-color: var(--ios-blue-hover) !important;
+}
+
+.btn-secondary {
+  background-color: rgba(0, 0, 0, 0.05) !important;
+  border-color: transparent !important;
+  color: var(--ios-blue) !important;
+}
+
+.btn-secondary:hover {
+  background-color: rgba(0, 122, 255, 0.1) !important;
+  color: var(--ios-blue-hover) !important;
+}
+
+/* === iOS-style form inputs (date, time, text) === */
+.form-control:not(.floating-with-unit .form-control) {
+  height: 44px;
+  padding: 12px 16px;
+  font-size: 16px;
+  border-radius: 12px !important;
+  border: 1px solid var(--ios-border) !important;
+  background: rgba(255, 255, 255, 0.9);
+  transition: var(--ios-transition);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.form-control:not(.floating-with-unit .form-control):focus {
+  border-color: var(--ios-blue) !important;
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1) !important;
+  background: rgba(255, 255, 255, 1);
+}
+
+/* === iOS-style form labels === */
+.form-label {
+  font-weight: 500 !important;
+  color: #1d1d1f;
+  font-size: 15px;
+  margin-bottom: 8px !important;
+}
+
+/* === iOS-style alert === */
+.alert {
+  border-radius: 16px !important;
+  border: none !important;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.alert-info {
+  background: rgba(0, 122, 255, 0.1) !important;
+  color: var(--ios-blue) !important;
+}
+
+/* === Dark mode support === */
+:root[data-bs-theme="dark"] .floating-with-unit .form-control {
+  background: rgba(58, 58, 60, 0.9);
+  color: #f2f2f7;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+:root[data-bs-theme="dark"] .floating-with-unit .form-control:focus {
+  background: rgba(58, 58, 60, 1);
+  border-color: var(--ios-blue) !important;
+}
+
+:root[data-bs-theme="dark"] .floating-with-unit .input-group-text {
+  background: rgba(255, 255, 255, 0.05);
+  color: #f2f2f7;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+:root[data-bs-theme="dark"] .floating-with-unit .form-floating > label {
+  color: rgba(255, 255, 255, 0.6) !important;
+}
+
+:root[data-bs-theme="dark"] .floating-with-unit .form-floating > .form-control:focus ~ label {
+  color: var(--ios-blue) !important;
+}
+
+:root[data-bs-theme="dark"] .minmax-hint {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+:root[data-bs-theme="dark"] .form-control:not(.floating-with-unit .form-control) {
+  background: rgba(58, 58, 60, 0.9);
+  color: #f2f2f7;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+:root[data-bs-theme="dark"] .form-control:not(.floating-with-unit .form-control):focus {
+  background: rgba(58, 58, 60, 1);
+  border-color: var(--ios-blue) !important;
+}
+
+:root[data-bs-theme="dark"] .form-label {
+  color: #f2f2f7;
+}
+
+:root[data-bs-theme="dark"] .btn-secondary {
+  background-color: rgba(255, 255, 255, 0.05) !important;
+  color: var(--ios-blue) !important;
+}
+
+:root[data-bs-theme="dark"] .btn-secondary:hover {
+  background-color: rgba(10, 132, 255, 0.2) !important;
+}
+
+:root[data-bs-theme="dark"] .alert-info {
+  background: rgba(10, 132, 255, 0.15) !important;
+  color: var(--ios-blue) !important;
+}
+
+/* === Maintain grid structure === */
+.param-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(2, 1fr);
+}
+
+@media (max-width: 576px) {
+  .param-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  
+  .param-card {
+    padding: 12px !important;
+  }
+  
+  .param-thumb {
+    width: 64px;
+    height: 64px;
+  }
+}
+
+/* === Modal enhancements === */
+.modal-content {
+  border-radius: 20px !important;
+  border: none !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+}
+
+:root[data-bs-theme="dark"] .modal-content {
+  background: rgba(28, 28, 30, 0.95);
+}
+
+.modal-header {
+  border-bottom: 1px solid var(--ios-border) !important;
+  padding: 20px 24px 16px !important;
+}
+
+.modal-body {
+  padding: 20px 24px !important;
+}
+
+.modal-footer {
+  border-top: 1px solid var(--ios-border) !important;
+  padding: 16px 24px 20px !important;
+}
+
+/* === Success badge for existing round === */
+.text-success {
+  color: var(--ios-green) !important;
+  font-weight: 500;
+}
+
+/* === Enhanced typography === */
+h4, h5, h6 {
+  font-weight: 600 !important;
+  letter-spacing: -0.02em;
+}
+
+.small, small {
+  font-weight: 500;
+}
+
+/* === iOS-style photo capture section === */
+.foto-preview {
+  border: 2px solid var(--ios-border);
+  border-radius: 12px !important;
+  box-shadow: var(--ios-shadow);
+  transition: var(--ios-transition);
+}
+
+.foto-preview:hover {
+  transform: scale(1.05);
+  box-shadow: var(--ios-shadow-hover);
+}
+
+:root[data-bs-theme="dark"] .foto-preview {
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* === iOS-style camera button === */
+.btn-outline-primary {
+  background: rgba(0, 122, 255, 0.1) !important;
+  border-color: var(--ios-blue) !important;
+  color: var(--ios-blue) !important;
+  font-weight: 600 !important;
+  border-radius: 10px !important;
+  padding: 8px 16px !important;
+  font-size: 14px !important;
+  transition: var(--ios-transition);
+}
+
+.btn-outline-primary:hover {
+  background: rgba(0, 122, 255, 0.2) !important;
+  border-color: var(--ios-blue-hover) !important;
+  color: var(--ios-blue-hover) !important;
+  transform: translateY(-1px);
+  box-shadow: var(--ios-shadow-hover);
+}
+
+.btn-outline-danger {
+  background: rgba(255, 59, 48, 0.1) !important;
+  border-color: var(--ios-red) !important;
+  color: var(--ios-red) !important;
+  font-weight: 600 !important;
+  border-radius: 10px !important;
+  padding: 8px 16px !important;
+  font-size: 14px !important;
+  transition: var(--ios-transition);
+}
+
+.btn-outline-danger:hover {
+  background: rgba(255, 59, 48, 0.2) !important;
+  border-color: var(--ios-red) !important;
+  color: var(--ios-red) !important;
+  transform: translateY(-1px);
+  box-shadow: var(--ios-shadow-hover);
+}
+
+/* === iOS-style hour meter input === */
+input[type="number"] {
+  height: 44px !important;
+  padding: 12px 16px !important;
+  font-size: 16px !important;
+  border-radius: 12px !important;
+  border: 1px solid var(--ios-border) !important;
+  background: rgba(255, 255, 255, 0.9) !important;
+  transition: var(--ios-transition);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+input[type="number"]:focus {
+  border-color: var(--ios-blue) !important;
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1) !important;
+  background: rgba(255, 255, 255, 1) !important;
+  outline: none;
+}
+
+:root[data-bs-theme="dark"] input[type="number"] {
+  background: rgba(58, 58, 60, 0.9) !important;
+  color: #f2f2f7 !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+:root[data-bs-theme="dark"] input[type="number"]:focus {
+  background: rgba(58, 58, 60, 1) !important;
+  border-color: var(--ios-blue) !important;
+}
+
+/* === iOS-style textarea for observations === */
+textarea.form-control {
+  min-height: 88px !important;
+  padding: 12px 16px !important;
+  font-size: 16px !important;
+  border-radius: 12px !important;
+  border: 1px solid var(--ios-border) !important;
+  background: rgba(255, 255, 255, 0.9) !important;
+  transition: var(--ios-transition);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  resize: vertical;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+textarea.form-control:focus {
+  border-color: var(--ios-blue) !important;
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1) !important;
+  background: rgba(255, 255, 255, 1) !important;
+  outline: none;
+}
+
+:root[data-bs-theme="dark"] textarea.form-control {
+  background: rgba(58, 58, 60, 0.9) !important;
+  color: #f2f2f7 !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+:root[data-bs-theme="dark"] textarea.form-control:focus {
+  background: rgba(58, 58, 60, 1) !important;
+  border-color: var(--ios-blue) !important;
+}
+
+/* === Photo status indicators === */
+.text-success {
+  color: var(--ios-green) !important;
+  font-weight: 600 !important;
+}
+
+/* === Enhanced button sizes === */
+.btn-sm {
+  padding: 6px 12px !important;
+  font-size: 13px !important;
+  border-radius: 8px !important;
+  font-weight: 600 !important;
+}
+
+/* === Photo section layout === */
+.d-flex.gap-2 {
+  gap: 8px !important;
+}
+
+.d-flex.align-items-center.gap-2 {
+  gap: 8px !important;
+}
+
+/* === Responsive adjustments for photo section === */
+@media (max-width: 768px) {
+  .foto-preview {
+    width: 50px !important;
+    height: 50px !important;
+  }
+  
+  .btn-sm {
+    padding: 4px 8px !important;
+    font-size: 12px !important;
+  }
+  
+  .col-md-3 .d-flex {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .col-md-3 .d-flex .btn {
+    margin-bottom: 4px;
+  }
+}
+
+/* === Camera SweetAlert Modal Styles === */
+.camera-swal-popup {
+  background: rgba(255, 255, 255, 0.98) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border: none !important;
+  border-radius: 20px !important;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3) !important;
+  overflow: hidden !important;
+  padding: 0 !important;
+}
+
+/* Variante estrecha para la cámara (forzada desde JS) */
+.camera-swal-popup.narrow {
+  width: auto !important;
+  max-width: 540px !important;
+  margin: 0 auto !important;
+}
+
+:root[data-bs-theme="dark"] .camera-swal-popup {
+  background: rgba(28, 28, 30, 0.98) !important;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6) !important;
+}
+
+.camera-swal-close {
+  background: transparent !important;
+  border: none !important;
+  width: auto !important;
+  height: auto !important;
+  padding: 4px 8px !important;
+  color: var(--ios-blue) !important;
+  font-size: 20px !important;
+  font-weight: 600 !important;
+  line-height: 1 !important;
+  top: 8px !important;
+  right: 10px !important;
+  transition: color .18s ease, transform .18s ease;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+/* Se eliminó ::after para evitar doble X; se usará el contenido nativo de SweetAlert */
+
+.camera-swal-close {
+  font-size: 26px !important; /* Ajuste tras remover pseudo-elemento */
+  font-weight: 400 !important;
+}
+
+.camera-swal-close:hover {
+  color: var(--ios-blue-hover) !important;
+  transform: scale(1.08);
+}
+
+.camera-swal-close:active {
+  transform: scale(.95);
+  color: var(--ios-blue) !important;
+}
+
+.camera-swal-close:focus-visible {
+  outline: 2px solid rgba(0,122,255,.55) !important;
+  outline-offset: 2px !important;
+  border-radius: 6px !important;
+}
+
+:root[data-bs-theme="dark"] .camera-swal-close {
+  color: var(--ios-blue) !important;
+}
+
+:root[data-bs-theme="dark"] .camera-swal-close:hover {
+  color: var(--ios-blue-hover) !important;
+}
+
+.camera-capture-container {
+  width: 100%;
+  max-width: 620px; /* reducido; la variante .narrow baja aún más */
+  background: rgba(255, 255, 255, 0.98);
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+}
+
+.camera-capture-container.narrow {
+  max-width: 500px;
+}
+
+:root[data-bs-theme="dark"] .camera-capture-container {
+  background: rgba(28, 28, 30, 0.98);
+}
+
+.camera-header {
+  background: linear-gradient(135deg, var(--ios-blue), #0051D0);
+  color: white;
+  padding: 20px 24px;
+  text-align: center;
+}
+
+.camera-title {
+  font-weight: 600;
+  font-size: 18px;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.camera-body {
+  background: #000;
+  position: relative;
+  /* Altura más compacta: mínimo 260px, preferente 45vh, máximo 340px */
+  min-height: clamp(260px, 45vh, 340px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.camera-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 400px;
+  background: linear-gradient(135deg, #1a1a1a, #2d2d2d);
+  color: #fff;
+  text-align: center;
+  padding: 40px;
+}
+
+.camera-placeholder-icon {
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 16px;
+}
+
+.camera-placeholder-text {
+  font-size: 16px;
+  font-weight: 500;
+  margin-bottom: 24px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.camera-start-btn {
+  background: var(--ios-blue) !important;
+  border: none !important;
+  border-radius: 12px !important;
+  padding: 12px 24px !important;
+  font-weight: 600 !important;
+  font-size: 16px !important;
+  transition: var(--ios-transition) !important;
+  box-shadow: 0 4px 12px rgba(0, 122, 255, 0.3) !important;
+}
+
+.camera-start-btn:hover {
+  background: var(--ios-blue-hover) !important;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 122, 255, 0.4) !important;
+}
+
+.camera-view {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.camera-video {
+  width: 100%;
+  height: auto;
+  max-height: 55vh; /* reducido para menor ocupación vertical */
+  object-fit: cover;
+  border-radius: 0;
+  display: block;
+}
+
+/* Estado de visibilidad para evitar mostrar cuadro negro antes de ready */
+.camera-video.hidden {
+  opacity: 0;
+  transition: opacity .25s ease;
+}
+.camera-video.visible {
+  opacity: 1;
+  transition: opacity .25s ease;
+}
+
+.camera-switch-btn {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: rgba(0, 0, 0, 0.7) !important;
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  border-radius: 50% !important;
+  width: 44px !important;
+  height: 44px !important;
+  color: white !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: var(--ios-transition) !important;
+  z-index: 10;
+}
+
+.camera-switch-btn:hover {
+  background: rgba(0, 122, 255, 0.8) !important;
+  transform: scale(1.1);
+}
+
+.camera-footer {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid var(--ios-border);
+  padding: 20px 24px;
+  border-radius: 0 0 20px 20px;
+}
+
+:root[data-bs-theme="dark"] .camera-footer {
+  background: rgba(28, 28, 30, 0.95);
+  border-top-color: rgba(255, 255, 255, 0.1);
+}
+
+.camera-controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.camera-control-btn {
+  border-radius: 12px !important;
+  padding: 10px 20px !important;
+  font-weight: 600 !important;
+  font-size: 14px !important;
+  transition: var(--ios-transition) !important;
+  display: flex;
+  align-items: center;
+  min-width: 120px;
+  justify-content: center;
+}
+
+.camera-capture-btn {
+  background: var(--ios-blue) !important;
+  border: none !important;
+  border-radius: 50px !important;
+  width: 64px !important;
+  height: 64px !important;
+  padding: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-shadow: 0 4px 12px rgba(0, 122, 255, 0.3) !important;
+  transition: var(--ios-transition) !important;
+  min-width: auto !important;
+}
+
+.camera-capture-btn:hover {
+  background: var(--ios-blue-hover) !important;
+  transform: scale(1.05);
+  box-shadow: 0 6px 20px rgba(0, 122, 255, 0.4) !important;
+}
+
+.camera-capture-btn svg {
+  margin: 0 !important;
+}
+
+/* Camera icon for button */
+.camera-icon {
+  margin-right: 6px !important;
+}
+
+.camera-btn {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+
+/* Responsive adjustments for camera modal */
+@media (max-width: 768px) {
+  .camera-capture-container {
+    border-radius: 16px !important;
+  }
+  
+  .camera-header {
+    padding: 16px 20px !important;
+  }
+  
+  .camera-title {
+    font-size: 16px !important;
+  }
+  
+  .camera-placeholder {
+    min-height: 300px;
+    padding: 30px 20px;
+  }
+  
+  .camera-video {
+    max-height: 45vh;
+  }
+  
+  .camera-controls {
+    gap: 12px;
+  }
+  
+  .camera-control-btn {
+    min-width: 100px;
+    font-size: 13px !important;
+    padding: 8px 16px !important;
+  }
+  
+  .camera-capture-btn {
+    width: 56px !important;
+    height: 56px !important;
+  }
+  
+  .camera-switch-btn {
+    width: 40px !important;
+    height: 40px !important;
+    top: 12px !important;
+    right: 12px !important;
+  }
+}
+
+@media (max-width: 576px) {
+  .camera-controls {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .camera-control-btn {
+    width: 100%;
+    min-width: auto;
+  }
+}
+
+/* Body class when camera modal is open */
+.camera-swal-open {
+  overflow: hidden !important;
+}
+
+/* Animation for camera modal appearance */
+.camera-capture-container {
+  animation: cameraModalSlideIn 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+@keyframes cameraModalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}

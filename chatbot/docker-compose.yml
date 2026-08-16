@@ -1,0 +1,164 @@
+# docker-compose.yml (Compose v2: sin clave 'version')
+
+volumes:
+  db_storage:
+  n8n_storage:
+  qdrant_data:
+  ollama_data:
+
+services:
+  postgres:
+    image: postgres:16
+    restart: always
+    env_file:
+      - .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - db_storage:/var/lib/postgresql/data
+      # Opcional: si mantienes este init, recuerda que SOLO corre con volumen vacío.
+      - ./init-data.sh:/docker-entrypoint-initdb.d/init-data.sh:ro
+    ports:
+      - "5433:5432"  # host:container
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\" || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Job de bootstrap que garantiza la existencia de n8n_user y permisos necesarios
+  db-bootstrap:
+    image: postgres:16
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    env_file:
+      - .env
+    entrypoint: ["/bin/sh","-lc"]
+    # NOTA Windows: procura que este bloque quede con saltos de línea LF.
+    command: |
+      echo "Esperando a Postgres..."
+      until pg_isready -h postgres -p 5432 -U "$POSTGRES_USER" >/dev/null 2>&1; do sleep 1; done
+
+      echo "Creando/actualizando rol ${POSTGRES_NON_ROOT_USER} y permisos (idempotente)..."
+      # 1) Crear/Alinear rol con LOGIN y contraseña
+      psql "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}" <<SQL
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '${POSTGRES_NON_ROOT_USER}') THEN
+          CREATE ROLE ${POSTGRES_NON_ROOT_USER} WITH LOGIN PASSWORD '${POSTGRES_NON_ROOT_PASSWORD}';
+        ELSE
+          ALTER ROLE ${POSTGRES_NON_ROOT_USER} WITH LOGIN PASSWORD '${POSTGRES_NON_ROOT_PASSWORD}';
+        END IF;
+      END $$;
+      SQL
+
+      # 2) Permitir conectar a la base objetivo (DB)
+      psql "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/postgres" <<SQL
+      GRANT CONNECT ON DATABASE ${POSTGRES_DB} TO ${POSTGRES_NON_ROOT_USER};
+      SQL
+
+      # 3) Permisos en esquema public de la DB objetivo (sin \connect; hacemos otra invocación)
+      psql "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}" <<SQL
+      GRANT USAGE, CREATE ON SCHEMA public TO ${POSTGRES_NON_ROOT_USER};
+      GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO ${POSTGRES_NON_ROOT_USER};
+      GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO ${POSTGRES_NON_ROOT_USER};
+      ALTER DEFAULT PRIVILEGES FOR USER ${POSTGRES_USER} IN SCHEMA public
+        GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO ${POSTGRES_NON_ROOT_USER};
+      ALTER DEFAULT PRIVILEGES FOR USER ${POSTGRES_USER} IN SCHEMA public
+        GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO ${POSTGRES_NON_ROOT_USER};
+      SQL
+    # Si prefieres, puedes montar un SQL propio:
+    # volumes:
+    #   - ./db/bootstrap.sql:/scripts/bootstrap.sql:ro
+
+  n8n:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    env_file:
+      - .env
+    environment:
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: postgres
+      DB_POSTGRESDB_PORT: "5432"
+      DB_POSTGRESDB_DATABASE: ${POSTGRES_DB}
+      DB_POSTGRESDB_USER: ${POSTGRES_NON_ROOT_USER}
+      DB_POSTGRESDB_PASSWORD: ${POSTGRES_NON_ROOT_PASSWORD}
+      N8N_HOST: localhost
+      N8N_PORT: "5678"
+      N8N_PROTOCOL: http
+      N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: "true"
+      GENERIC_TIMEZONE: ${GENERIC_TIMEZONE:-America/Bogota}
+      N8N_DIAGNOSTICS_ENABLED: ${N8N_DIAGNOSTICS_ENABLED:-false}
+      N8N_VERSION_NOTIFICATIONS_ENABLED: ${N8N_VERSION_NOTIFICATIONS_ENABLED:-false}
+      N8N_PERSONALIZATION_ENABLED: ${N8N_PERSONALIZATION_ENABLED:-false}
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
+    ports:
+      - "5678:5678"
+    volumes:
+      - n8n_storage:/home/node/.n8n
+      - ./data:/home/node
+    depends_on:
+      postgres:
+        condition: service_healthy
+      db-bootstrap:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:5678/healthz >/dev/null 2>&1 || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant1
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      QDRANT__SERVICE__API_KEY: ${API_KEY_QDRANT}
+      QDRANT__LOG_LEVEL: INFO
+      QDRANT__SERVICE__HTTP_PORT: "6333"
+      QDRANT__SERVICE__GRPC_PORT: "6334"
+    ports:
+      - "6333:6333"  # REST
+      - "6334:6334"  # gRPC
+    volumes:
+      - qdrant_data:/qdrant/storage
+      - ./config:/qdrant/config
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:6333/healthz >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  ollama:
+    image: docker.io/ollama/ollama:latest
+    container_name: ollama1
+    pull_policy: always
+    tty: true
+    restart: always
+    environment:
+      OLLAMA_KEEP_ALIVE: 24h
+      OLLAMA_HOST: 0.0.0.0
+    ports:
+      - "7869:11434"
+    volumes:
+      - .:/code
+      - ollama_data:/root/.ollama
+
+  translator:
+    build: ./api
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_started

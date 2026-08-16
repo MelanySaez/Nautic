@@ -1,0 +1,612 @@
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: #f1f5f9;
+  color: #003366;
+  margin: 0;
+  padding: 0;
+  font-size: 14px;
+}
+
+
+.titulo {
+  font-size: 20px;
+  font-weight: 700;
+  color: #003366;
+  text-align: start;
+  margin-bottom: 1rem;
+}
+
+/* Tabla moderna */
+.tabla-parametros {
+  display: flex;
+  flex-direction: column;
+  gap: .2rem;
+}
+
+.tabla-header {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr) auto;
+  font-weight: 600;
+  color: #003366;
+  padding: 0 0.5rem;
+  border-radius: 0.5rem;
+  font-size: 0.95rem;
+}
+
+.tabla-fila {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr) auto;
+  background-color: transparent;
+  padding: 0.2rem;
+  align-items: center;
+  gap: 0.5rem;
+  border-bottom: 1px solid #e5e5e5;
+}
+
+/* Inputs embebidos */
+.tabla-fila input[type="text"],
+.tabla-fila input[type="number"] {
+  background-color: transparent;
+  border: none;
+  padding: 0.3rem 0.75rem;
+  font-size: 14px;
+  color: #003366;
+  transition: background-color 0.2s ease;
+}
+
+.tabla-fila input:focus {
+  border-bottom: 1px solid #003366;
+  outline: none;
+}
+
+.tabla-fila input:disabled {
+  color: #6b7280;
+}
+
+/* Acciones */
+.acciones {
+  display: flex;
+  gap: 0.4rem;
+  width: 80px;
+}
+
+.acciones-col {
+  text-align: center;
+}
+
+/* Botones */
+.tabla-fila button {
+  height: 28px;
+  width: 28px;
+  border: none;
+  border-radius: 2rem;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.btn-agregar {
+    background-color: #003366;
+    color: white;
+    border-radius: 0.3rem;
+    outline: none;
+    padding: 0.4rem;
+    width: 180px;
+    border: none;
+}
+
+/* Estilo cuando está activa explícitamente */
+.btn-agregar.activo {
+  border: 1px solid #003366;
+  color: #003366;
+  background-color: transparent;
+}
+
+.btn-agregar:hover {
+  background-color: #003366;
+  color: white;
+}
+
+.btn-editar {
+  background-color: #003366;
+  color: #fff;
+}
+.btn-editar:hover {
+  background-color: #002244;
+}
+
+.btn-eliminar, .btn-cancelar{
+  background-color: #922b21;
+  color: #fff;
+}
+
+.btn-eliminar:hover, .btn-cancelar:hover{
+  background-color: #922b21;
+}
+
+/* Responsive tabla */
+@media (max-width: 768px) {
+  .tabla-header,
+  .tabla-fila {
+    grid-template-columns: 1fr;
+  }
+
+  .acciones {
+    justify-content: start;
+    margin-top: 0.5rem;
+  }
+}
+
+.tabla-fila,
+.tabla-header {
+  display: grid;
+  grid-template-columns: 1.5fr 0.8fr 1fr 1fr auto;
+  align-items: center;
+  gap: 0; /* eliminamos el gap para que no interfiera con los bordes */
+  margin-bottom: 0;
+}
+
+.tabla-fila input {
+  width: 100%;
+  padding: 6px 8px;
+  font-size: 0.9rem;
+  border-left: 1px solid #ccc;
+}
+
+.tabla-fila input:first-of-type {
+  border-left: none; /* quitamos borde en el primer input */
+}
+
+
+.tabla-fila:hover{
+  transform: translateY(-2px);
+  transition: transform 0.1s ease;
+  background-color: #f8f9fa;
+}
+
+.tabla-fila.activo {
+  background-color: #e5e7eb; /* o cualquier color de resalte que desees */
+  border-radius: 0.3rem;
+
+}
+
+.tabla-fila.activo input{
+  color: #313030;
+}
+
+.acciones {
+  display: flex;
+  gap: 0.4rem;
+  justify-content: center;
+}
+
+.acciones button {
+  padding: 6px 8px;
+}
+
+.desglose-subsistemas {
+  padding: 1rem;
+  background: #fff;
+  border-radius: 8px;
+}
+
+.filtros {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  flex-direction: row;
+}
+
+.filtros select {
+  padding: 6px;
+  font-size: 0.95rem;
+  width: 50%
+}
+
+.subsistemas-lista ul {
+  list-style: none;
+  padding-left: 0;
+}
+
+.subsistemas-lista li {
+  padding: 4px 0;
+  border-bottom: 1px solid #ddd;
+}
+
+.tabla-header span{
+  color: #6b7280;
+  font-size: .78rem;
+}
+
+.modal-parametro {
+  position: fixed;
+  z-index: 50;
+  top: 0; left: 0; right: 0; bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.28);
+  z-index: 50;
+}
+.modal-content {
+  background: white;
+  border-radius: 1rem;
+  padding: 2rem 2.5rem;
+  box-shadow: 0 10px 32px rgba(0,0,0,0.16);
+  min-width: 320px;
+  max-width: 94vw;
+  position: relative;
+  z-index: 100;
+  animation: modal-fade-in 0.23s;
+}
+@keyframes modal-fade-in {
+  from { transform: scale(0.94); opacity: 0;}
+  to { transform: scale(1); opacity: 1;}
+}
+.modal-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.1rem 1.3rem;
+  margin-bottom: 2rem;
+}
+.modal-form-grid input {
+  padding: 0.7rem 1rem;
+  border-radius: 0.5rem;
+  border: 1px solid #bbb;
+  font-size: 1rem;
+  background: #fafbff;
+}
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.btn-agregar-parametro{
+  background: #003366;
+  color: white;
+  border: none;
+  border-radius: 0.3rem;
+  padding: 0.2rem 0.4rem;
+  font-weight: 500;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-left: 1.5rem;
+  height: 32px;
+}
+
+.btn-grupo {
+    background: #e6e7eb;
+    border: none;
+    color: #6b7280;
+    padding: 0.45rem 1rem;
+    border-radius: 0.3rem;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+    transition: background 0.2s, color 0.2s, box-shadow 0.15s;
+}
+
+.btn-grupo.activo {
+  background: #003366;
+  color: white;
+  box-shadow: 0 3px 14px rgba(0,24,104,0.09);
+  outline: none;
+}
+
+
+.btn-grupo:hover {
+  background: rgb(194, 195, 197);
+  color: #38393D;
+  box-shadow: 0 3px 14px rgba(0,24,104,0.09);
+  outline: none;
+}
+
+.grupo-btn-row {
+  margin-bottom: 0.7rem;
+}
+
+.bold{
+  font-weight: 800;
+  padding: 0;
+  margin: 0;
+}
+
+.modal-dialog{
+  max-width: 85%;
+}
+
+.tabla-fila.editing input {
+    border-bottom: 1px solid #003366;
+    outline: none;           
+}
+
+.tabla-header,
+.tabla-fila {
+  display: grid;
+  grid-template-columns: 1.5fr 0.8fr 1fr 1fr auto;
+  align-items: center;
+  column-gap: 12px;   /* ← separa columnas */
+  margin-bottom: 0;
+}
+
+:root[data-bs-theme="dark"] body {
+  background-color: #111827; /* fondo oscuro */
+  color: #f3f4f6; /* texto claro */
+}
+
+:root[data-bs-theme="dark"] .titulo {
+  color: #f9fafb;
+}
+
+:root[data-bs-theme="dark"] .tabla-header {
+  background-color: #1f2937; /* gris oscuro para cabecera */
+  color: #f9fafb;            /* texto claro */
+}
+
+:root[data-bs-theme="dark"] .tabla-header span {
+  color: #f9fafb; /* texto blanco igual que el resto */
+}
+
+
+:root[data-bs-theme="dark"] .tabla-fila {
+  border-bottom: 1px solid #374151;
+}
+
+:root[data-bs-theme="dark"] .tabla-fila input[type="text"],
+:root[data-bs-theme="dark"] .tabla-fila input[type="number"] {
+  background-color: transparent;
+  color: #e5e7eb;
+}
+
+:root[data-bs-theme="dark"] .tabla-fila input:focus {
+  border-bottom: 1px solid #60a5fa;
+}
+
+:root[data-bs-theme="dark"] .tabla-fila input:disabled {
+  color: #9ca3af;
+}
+
+:root[data-bs-theme="dark"] .tabla-fila:hover {
+  background-color: #1f2937;
+}
+
+:root[data-bs-theme="dark"] .tabla-fila.activo {
+  background-color: #374151;
+}
+
+:root[data-bs-theme="dark"] .tabla-fila.activo input {
+  color: #f9fafb;
+}
+
+:root[data-bs-theme="dark"] .btn-agregar {
+  background-color: #2563eb;
+  color: white;
+}
+:root[data-bs-theme="dark"] .btn-agregar.activo {
+  border: 1px solid #60a5fa;
+  color: #60a5fa;
+}
+:root[data-bs-theme="dark"] .btn-agregar:hover {
+  background-color: #1d4ed8;
+}
+
+:root[data-bs-theme="dark"] .btn-editar {
+  background-color: #9ca3af;
+}
+:root[data-bs-theme="dark"] .btn-editar:hover {
+  background-color: #7e8083;
+}
+
+:root[data-bs-theme="dark"] .btn-eliminar,
+:root[data-bs-theme="dark"] .btn-cancelar {
+  background-color: #b91c1c;
+}
+:root[data-bs-theme="dark"] .btn-eliminar:hover,
+:root[data-bs-theme="dark"] .btn-cancelar:hover {
+  background-color: #991b1b;
+}
+
+:root[data-bs-theme="dark"] .desglose-subsistemas {
+  background: #1f2937;
+}
+
+:root[data-bs-theme="dark"] .subsistemas-lista li {
+  border-bottom: 1px solid #374151;
+}
+
+:root[data-bs-theme="dark"] .modal-content {
+  background: #1f2937;
+  color: #f3f4f6;
+}
+:root[data-bs-theme="dark"] .modal-form-grid input {
+  background: #111827;
+  color: #f3f4f6;
+  border: 1px solid #374151;
+}
+
+:root[data-bs-theme="dark"] .btn-grupo {
+  background: #374151;
+  color: #f3f4f6;
+}
+:root[data-bs-theme="dark"] .btn-grupo.activo {
+  background: #2563eb;
+  color: white;
+}
+:root[data-bs-theme="dark"] .btn-grupo:hover {
+  background: #4b5563;
+}
+
+
+/* =========================
+   LAYOUT BÁSICO (sin color)
+   ========================= */
+.seleccion-container { flex: 1; max-width: 50%; }
+.seleccion-header {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem;
+}
+
+.swap-col { display: flex; justify-content: space-between; align-items: stretch; align-items: center; }
+.btn-swap {
+  background-color: #e5e5e5; color: #666; border: none; height: 30%;
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+  margin: 0 8px; width: 24px; border-radius: 4px;
+}
+.btn-swap i { font-size: 1rem; }
+
+.rel-panel {
+  flex: 1; max-width: 50%; max-height: 100%; overflow-y: auto;
+  background: #ffffff; /* equivalente a bg-white */
+  box-shadow: 0 4px 10px rgba(123,115,235,.473);
+}
+.relacion-header {
+  display: flex; justify-content: space-between; align-items: center;
+  height: 32px; margin-bottom: 1rem;
+}
+
+.texto-resaltado { color: #003366; font-weight: 700; }
+
+/* Fila de botones de grupo de la columna derecha */
+.grupo-btn-row--rel {
+  display: flex; gap: .5rem; margin-bottom: .7rem; justify-content: space-between;
+}
+
+/* Botón filtros y su contenedor */
+.filtros-wrapper { position: relative; }
+.btn-filtros {
+  background: #c2c3c5; border: none; color: #38393D; border-radius: .3rem;
+  padding: 7px 10px; display: flex; align-items: center; font-size: 1rem; cursor: pointer;
+}
+.btn-filtros i { font-size: 14px; }
+
+/* Dropdown filtros */
+.dropdown-filtros {
+  position: absolute; right: 0; top: 120%;
+  background: #fff; box-shadow: 0 4px 16px rgba(0,0,0,0.10);
+  border-radius: 8px; padding: 1rem; z-index: 999; min-width: 220px;
+}
+.dropdown-filtros label {
+  font-weight: 600; font-size: .95rem; margin-bottom: 3px; display: block;
+}
+.dropdown-filtros select {
+  width: 100%; padding: 6px 8px; border-radius: 8px;
+  border: 1px solid #cbd5e1; background: #fff; color: #003366; font-size: .95rem;
+}
+
+/* =========================
+   MODO OSCURO — overrides
+   ========================= */
+:root[data-bs-theme="dark"] .btn-swap {
+  background-color: #374151; color: #e5e7eb;
+}
+
+:root[data-bs-theme="dark"] .rel-panel {
+  background-color: #1f2937 !important;    /* gana sobre bg-white */
+  color: #e5e7eb;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.6);
+}
+:root[data-bs-theme="dark"] .rel-panel .titulo { color: #f9fafb; }
+:root[data-bs-theme="dark"] .rel-panel p { color: #e5e7eb; }
+
+:root[data-bs-theme="dark"] .texto-resaltado { color: #60a5fa; }
+
+:root[data-bs-theme="dark"] .btn-filtros {
+  background: #4b5563 !important; color: #e5e7eb !important; border: none !important;
+}
+:root[data-bs-theme="dark"] .dropdown-filtros {
+  background: #374151 !important;
+  box-shadow: 0 4px 16px rgba(0,0,0,.35) !important;
+  color: #e5e7eb;
+}
+:root[data-bs-theme="dark"] .dropdown-filtros label { color: #e5e7eb; }
+:root[data-bs-theme="dark"] .dropdown-filtros select {
+  background: #111827; color: #f3f4f6; border: 1px solid #374151;
+}
+
+/* Checkboxes dentro del panel (mejor visibilidad en oscuro) */
+:root[data-bs-theme="dark"] .rel-panel input[type="checkbox"] { accent-color: #60a5fa; }
+
+/* Scrollbar discreto en oscuro */
+:root[data-bs-theme="dark"] .rel-panel::-webkit-scrollbar { width: 10px; }
+:root[data-bs-theme="dark"] .rel-panel::-webkit-scrollbar-thumb {
+  background: #374151; border-radius: 8px;
+}
+
+:root[data-bs-theme="dark"] .tabla-fila.editing input {
+    border-bottom: 1px solid white;
+    outline: none;           
+}
+
+
+.page-title { font-weight: 600; }
+
+/* fila de relación: checkbox + texto */
+.rel-row{
+  display: flex;
+  align-items: center;           /* ambos centrados verticalmente */
+  gap: .6rem;                    /* separación entre check y texto */
+  margin-bottom: .25rem;
+  cursor: pointer;               /* toda la fila clickeable (label) */
+}
+
+/* el texto ocupa el espacio restante y envuelve líneas sin meterse bajo el check */
+.rel-col-text{
+  flex: 1 1 auto;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+/* afina el check para que no “salte” verticalmente */
+.rel-row .form-check-input{
+  margin-top: 0;
+}
+/* Columna izquierda: convertirla en columna con header fijo y cuerpo scrollable */
+.seleccion-container {
+  flex: 1;
+  max-width: 50%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;              /* crucial para que el hijo con overflow funcione dentro del flex */
+}
+
+.seleccion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: .75rem;
+  flex: 0 0 auto;
+}
+
+/* 👇 El contenido debajo del header scrollea */
+.seleccion-body {
+  flex: 1 1 auto;
+  min-height: 0;              /* crucial en flex layouts */
+  overflow-y: auto;
+  padding-right: .25rem;      /* pequeño espacio para que no tape la barra de scroll */
+}
+
+/* Scrollbar claro */
+.seleccion-body::-webkit-scrollbar { width: 10px; }
+.seleccion-body::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 8px;
+}
+
+/* Scrollbar en modo oscuro */
+:root[data-bs-theme="dark"] .seleccion-body::-webkit-scrollbar-thumb {
+  background: #374151;
+}
+
+/* (ya lo tienes) Deshabilitar el scroll global cuando la vista está montada */
+body.no-scroll { overflow: hidden; }
+
+

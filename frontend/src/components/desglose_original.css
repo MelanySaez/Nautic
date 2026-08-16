@@ -1,0 +1,414 @@
+.buque-card {
+    width: 100%;
+    height: 260px; /* 🔹 Altura fija para las tarjetas */
+    background-color: white;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    overflow: hidden;
+    transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+    cursor: pointer;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+
+/* 🔹 Efecto hover */
+.buque-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+}
+
+/* 🔹 Imagen del buque */
+.buque-card img {
+    width: 100%;
+    height: 140px; /* 🔹 Ajuste de altura fija para la imagen */
+    object-fit: cover;
+}
+
+/* 🔹 Banner de estado del buque */
+.buque-etapa {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background-color: #003366;
+    color: white;
+    font-size: 10px;
+    font-weight: bold;
+    padding: 4px 8px;
+    border-radius: 5px;
+    text-transform: uppercase;
+}
+
+/* 🔹 Contenedor del contenido */
+.buque-card .card-body {
+    flex-grow: 1; /* 🔹 Permite que el contenido crezca de manera uniforme */
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start; /* 🔹 Mantiene el texto alineado arriba */
+    width: -webkit-fill-available;
+}
+
+/* 🔹 Título del buque */
+.buque-card .card-title {
+    font-size: 14px;
+    font-weight: bold;
+    color: #003366;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+    line-height: 1.2;
+    height: 38px;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    white-space: normal;
+    text-align: left;
+}
+
+/* 🔹 Descripción del buque */
+.buque-card .card-text {
+    font-size: 12px;
+    color: #333;
+    line-height: 1.3;
+    max-height: 45px; /* 🔹 Limita la descripción a 3 líneas */
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 3; /* 🔹 Máximo 3 líneas */
+    -webkit-box-orient: vertical;
+    white-space: normal;
+    text-overflow: ellipsis;
+    text-align: justify;
+    font-weight: 400;
+}
+
+/* 🔹 Animación de desvanecimiento de los buques */
+#buquesContainer {
+    transition: opacity 0.2s ease-in-out;
+}
+
+
+/* Contenedor de la tarjeta */
+.card-container {
+    width: 240px;
+    height: 175px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Estilos para las tarjetas */
+.card {
+    width: 100%;
+    height: 100%;
+    background-color: white;
+    box-shadow: 0 4px 10px rgba(123, 115, 235, 0.473);
+    border-radius: 8px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    color: #003366;
+    font-weight: bold;
+    cursor: pointer;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    position: relative;
+}
+
+.card img {
+    width: 100%;
+    height: 122px;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    object-fit: cover;
+}
+
+.grupo-card .overlay-text {
+    position: absolute;
+    top: 62%;
+    left: 20%;
+    transform: translate(-50%, -50%); /* Ajuste para centrar */
+    color: white; /* Texto blanco */
+    font-size: 40px; /* Ajusta el tamaño según necesidad */
+    font-weight: bold; /* Texto en negrita */
+    pointer-events: none; /* Evita que el texto interfiera con clics en la imagen */
+}
+
+/* Título del equipo */
+.card h1 {
+    font-size: 12px;
+    color: #003366;
+    margin: 0;
+    font-weight: 800;
+    text-transform: uppercase;
+    text-align: center;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px;
+    line-height: 1.1; /* Reduce el espacio entre líneas */
+    word-spacing: -1px; /* Opcional: ajusta el espaciado entre palabras */
+}
+
+#equiposContainer .card:hover {
+    transform: translateY(-5px); /* Efecto de levantar la tarjeta */
+    box-shadow: 0 8px 16px rgba(123, 115, 235, 0.473);
+}
+
+/* Texto sobre la imagen (Referencia numérica) */
+#equiposContainer .overlay-text {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: rgba(255, 255, 255, 0.8);
+    padding: 5px 10px;
+    border-radius: 5px;
+    font-size: 14px;
+    font-weight: bold;
+    color: #003366;
+}
+
+/* 🔹 Contenedor de Selección de Grupo + Filtros */
+#grupoFiltrosContainer {
+    background-color: transparent; /* 🔹 Inicia con fondo transparente */
+    padding: 0;
+    border-radius: 8px;
+    transition: all 0.5s ease-in-out;
+}
+
+/* 🔥 Cuando se contrae, cambia el fondo a blanco */
+#grupoFiltrosContainer.contraido {
+    background-color: white;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    padding: 20px !important;
+}
+
+#grupoContainer {
+    flex-wrap: nowrap;
+    justify-content: space-between;
+    width: 100%;
+    gap: 10px;
+}
+
+
+
+/* 🔹 Estilos para las tarjetas de selección de grupo */
+.grupo-card {
+    width: 260px;
+    height: 200px;
+    background-color: white;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: center;
+    cursor: pointer;
+    transition: all 0.5s ease-in-out;
+    position: relative;
+}
+
+/* 🔹 Imágenes dentro de las tarjetas */
+.grupo-card img {
+    width: 100%;
+    height: 150px;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    transition: height 0.5s ease-in-out, opacity 0.5s ease-in-out;
+}
+
+/* 🔥 Cuando se selecciona un grupo */
+
+.grupo-card.contraido {
+    width: 100%;
+    height: 50px;
+    flex-direction: row;
+    justify-content: flex-start;
+    align-items: center;
+    padding: 10px;
+    box-shadow: none;
+    background-color: #E6E7EB;
+    color: white;
+    flex-wrap: wrap;
+    border: none;
+}
+
+/* 🔥 Oculta la imagen */
+.grupo-card.contraido img {
+    height: 0;
+    opacity: 0;
+}
+
+/* 🔥 Ajuste del overlay-text */
+.grupo-card.contraido .overlay-text {
+    position: static;
+    transform: none;
+    font-size: 18px;
+    color: #38393D;
+    margin-right: 10px;
+}
+
+/* 🔥 Ajuste del texto */
+.grupo-card.contraido p {
+    font-size: 14px;
+    margin: 0;
+    color: #38393D;
+}
+
+/* 🔹 Contenedor de filtros (oculto al inicio) */
+#barraFiltros {
+    display: none;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.5s ease-in-out, transform 0.5s ease-in-out;
+}
+
+/* 🔥 Mostrar la barra de filtros cuando está activa */
+#barraFiltros.mostrar {
+    display: flex;
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* 🔹 Contenedor de equipos (oculto al inicio) */
+#contenidoEquipos {
+    display: none;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.5s ease-in-out, transform 0.5s ease-in-out;
+}
+
+/* 🔥 Mostrar contenido cuando está activo */
+#contenidoEquipos.mostrar {
+    display: block;
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.grupo-card p{
+    text-transform: uppercase;
+    margin-bottom: 0;
+    margin-top: 0.5rem;
+}
+
+#barraFiltros select, #barraFiltros input {
+    font-size: 14px;
+}
+
+/* 🔹 Ajustes cuando está contraído */
+.grupo-card.contraido.seleccionado {
+    background-color: #033364 !important; /* 🔹 Azul más oscuro */
+    color: white !important;
+}
+
+/* 🔥 Ajuste del texto para el grupo seleccionado */
+.grupo-card.seleccionado p,
+.grupo-card.seleccionado .overlay-text {
+    color: white !important;
+}
+
+.grupo-card.contraido:hover{
+    background-color: rgb(194, 195, 197);
+}
+
+
+
+/* =========================================================
+   MODO OSCURO (no altera el modo claro)
+   Activa con: <html data-bs-theme="dark"> … </html>
+   (alternativa: añadir clase .dark al <html> o <body>)
+   ========================================================= */
+
+/* ---------- Cards genéricas de equipos (.card) ---------- */
+:root[data-bs-theme="dark"] .card,
+.dark .card {
+  background-color: #1f2937;            /* fondo oscuro */
+  color: #e5e7eb;                       /* texto claro */
+  box-shadow: 0 6px 18px rgba(0,0,0,.5);
+}
+
+:root[data-bs-theme="dark"] #equiposContainer .card:hover,
+.dark #equiposContainer .card:hover {
+  box-shadow: 0 10px 24px rgba(0,0,0,.6);
+  transform: translateY(-5px);
+}
+
+/* Título del equipo dentro de la card */
+:root[data-bs-theme="dark"] .card h1,
+.dark .card h1 {
+  color: #e5e7eb;
+}
+
+/* Etiqueta de referencia sobre la imagen (overlay) */
+:root[data-bs-theme="dark"] #equiposContainer .overlay-text,
+.dark #equiposContainer .overlay-text {
+  background: rgba(17, 24, 39, 0.85);   /* oscuro translúcido */
+  color: #e5e7eb;                       /* contraste inverso */
+}
+
+/* ---------- Contenedor de selección + filtros ---------- */
+/* Cuando se contrae, en claro usas blanco; en oscuro, fondo oscuro */
+:root[data-bs-theme="dark"] #grupoFiltrosContainer.contraido,
+.dark #grupoFiltrosContainer.contraido {
+  background-color: #111827;            /* pedido: #111827 */
+  box-shadow: 0 6px 18px rgba(0,0,0,.45);
+}
+
+/* ---------- Tarjetas de selección de grupo (.grupo-card) ---------- */
+:root[data-bs-theme="dark"] .grupo-card,
+.dark .grupo-card {
+  background-color: #1f2937;
+  box-shadow: 0 6px 18px rgba(0,0,0,.5);
+  color: #e5e7eb;
+}
+
+/* Estado contraído (equivalente a tu #E6E7EB en claro, pero oscuro) */
+:root[data-bs-theme="dark"] .grupo-card.contraido,
+.dark .grupo-card.contraido {
+  background-color: #1f2937;
+  color: #e5e7eb;
+  box-shadow: none;
+  border: none;
+}
+
+/* Overlay "200/300/500" cuando está contraído */
+:root[data-bs-theme="dark"] .grupo-card.contraido .overlay-text,
+.dark .grupo-card.contraido .overlay-text {
+  color: #e5e7eb;
+}
+
+/* Texto del nombre del grupo cuando está contraído */
+:root[data-bs-theme="dark"] .grupo-card.contraido p,
+.dark .grupo-card.contraido p {
+  color: #e5e7eb;
+}
+
+/* Hover del estado contraído (equivalente a tu gris claro) */
+:root[data-bs-theme="dark"] .grupo-card.contraido:hover,
+.dark .grupo-card.contraido:hover {
+  background-color: #374151;
+}
+
+/* Seleccionado (mantén tu azul, textos blancos) */
+:root[data-bs-theme="dark"] .grupo-card.contraido.seleccionado,
+.dark .grupo-card.contraido.seleccionado {
+  background-color: #2563eb !important;
+  color: #ffffff !important;
+}
+
+:root[data-bs-theme="dark"] .grupo-card.seleccionado p,
+:root[data-bs-theme="dark"] .grupo-card.seleccionado .overlay-text,
+.dark .grupo-card.seleccionado p,
+.dark .grupo-card.seleccionado .overlay-text {
+  color: #ffffff !important;
+}
+
+/* ---------- Contenedor de la tarjeta (tamaños intactos) ---------- */
+/* (no cambia en dark; lo incluyo para claridad) */
+:root[data-bs-theme="dark"] .card-container,
+.dark .card-container {
+  /* sin cambios de tamaño/posición; solo hereda colores */
+}

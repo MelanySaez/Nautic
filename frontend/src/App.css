@@ -1,0 +1,263 @@
+.App {
+  text-align: center;
+}
+
+.container-xl {
+  max-width: 95% !important;
+}
+
+.App-logo {
+  height: 40vmin;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .App-logo {
+    animation: App-logo-spin infinite 20s linear;
+  }
+}
+
+.App-header {
+  background-color: #282c34;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(10px + 2vmin);
+  color: white;
+}
+
+.App-link {
+  color: #61dafb;
+}
+
+@keyframes App-logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  margin: 0;
+  padding: 0;
+  background-color: #F5F5F5 !important;
+}
+
+
+nav {
+  background-color: white;
+  color: white;
+  padding: 10px;
+}
+
+.navbar .nav-link{
+  font-weight: 500;
+  font-size: 14px;
+  color: rgb(107, 114, 128);
+  border-radius: 0;
+}
+
+.navbar .nav-link:hover {
+  color: rgb(17, 24, 39);
+  border-bottom: 2px solid rgb(209, 213, 219);
+}
+
+.navbar .nav-link:focus {
+  color: rgb(17, 24, 39);
+  border-bottom: 2px solid rgb(67, 56, 202);
+}
+
+/* Estado activo */
+.navbar .nav-link.active {
+  color: rgb(17, 24, 39);
+  border-bottom: 2px solid rgb(67, 56, 202);
+  border-top: 0;
+  border-right: 0;
+  border-left: 0;
+}
+
+.Titulo{
+  color: #003366;
+  font-weight: bold;
+  font-size: 20px;
+}
+
+.Subtitulo{
+  color: #003366;
+  font-weight: 200;
+  font-size: 20px;
+}
+
+.btn-azul{
+  background-color: #033364 !important;
+  color: white !important;
+}
+
+/* ============================
+   MODO OSCURO GLOBAL
+   ============================ */
+:root[data-bs-theme="dark"],
+.dark {
+  /* Fondo general */
+  background-color: #111827;
+}
+
+:root[data-bs-theme="dark"] body,
+.dark body {
+  background-color: #111827 !important;
+  color: #f3f4f6; /* texto claro */
+}
+
+/* Navbar en modo oscuro */
+:root[data-bs-theme="dark"] nav,
+.dark nav {
+  background-color: #1f2937; /* gris oscuro */
+  color: #f3f4f6;
+}
+
+:root[data-bs-theme="dark"] .navbar .nav-link,
+.dark .navbar .nav-link {
+  color: #d1d5db; /* gris claro */
+}
+
+:root[data-bs-theme="dark"] .navbar .nav-link:hover,
+.dark .navbar .nav-link:hover {
+  color: #ffffff;
+  border-bottom: 2px solid #4b5563; /* gris medio */
+}
+
+:root[data-bs-theme="dark"] .navbar .nav-link:focus,
+.dark .navbar .nav-link:focus {
+  color: #ffffff;
+  border-bottom: 2px solid rgb(67, 56, 202); /* mantiene tu azul */
+}
+
+:root[data-bs-theme="dark"] .navbar .nav-link.active,
+.dark .navbar .nav-link.active {
+  color: #ffffff;
+  border-bottom: 2px solid rgb(67, 56, 202);
+}
+
+/* Títulos y subtítulos */
+:root[data-bs-theme="dark"] .Titulo,
+.dark .Titulo {
+  color: white;
+}
+
+:root[data-bs-theme="dark"] .Subtitulo,
+.dark .Subtitulo {
+  color: #93c5fd; /* azul más suave */
+}
+
+/* Botón azul */
+:root[data-bs-theme="dark"] .btn-azul,
+.dark .btn-azul {
+  background-color: #2563eb !important; /* azul vivo */
+  color: white !important;
+}
+
+/* ============================
+   Interruptor de tema (Navbar) - Switch animado
+   ============================ */
+.theme-switch .switch {
+  font-size: 14px; /* más pequeño */
+  position: relative;
+  display: inline-block;
+  width: 3.2em; /* antes 4em */
+  height: 1.8em; /* antes 2.2em */
+  border-radius: 30px;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.08);
+}
+.theme-switch .switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.theme-switch .slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #2a2a2a; /* noche */
+  transition: 0.4s;
+  border-radius: 30px;
+  overflow: hidden;
+}
+.theme-switch .switch input:checked + .slider { background-color: #00a6ff; /* día */ }
+.theme-switch .slider:before {
+  position: absolute;
+  content: "";
+  height: 1em;
+  width: 1em;
+  border-radius: 20px;
+  left: 0.45em;
+  bottom: 0.4em;
+  transition: 0.4s;
+  transition-timing-function: cubic-bezier(0.81, -0.04, 0.38, 1.5);
+  box-shadow: inset 8px -4px 0px 0px #fff; /* luna */
+  background: transparent;
+}
+.theme-switch .switch input:checked + .slider {
+  background-color: #00a6ff; /* día */
+}
+.theme-switch .switch input:checked + .slider:before {
+  transform: translateX(1.35em);
+  box-shadow: inset 12px -4px 0px 12px #ffcf48; /* sol */
+}
+.theme-switch .star {
+  background-color: #fff;
+  border-radius: 50%;
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  transition: all 0.4s;
+}
+.theme-switch .star_1 { left: 2.0em; top: 0.4em; }
+.theme-switch .star_2 { left: 1.7em; top: 1.0em; }
+.theme-switch .star_3 { left: 2.5em; top: 0.8em; }
+.theme-switch .switch input:checked ~ .slider .star { opacity: 0; }
+.theme-switch .cloud {
+  width: 2.8em;
+  position: absolute;
+  bottom: -1.1em;
+  left: -0.9em;
+  opacity: 0;
+  transition: all 0.4s;
+}
+.theme-switch .switch input:checked ~ .slider .cloud { opacity: 1; }
+
+/* Ajustes de contrastes con tema oscuro/claro */
+:root[data-bs-theme="dark"] .theme-switch .switch { box-shadow: 0 0 0 rgba(0,0,0,0); }
+:root[data-bs-theme="dark"] .theme-switch .slider { background-color: #2a2a2a; }
+
+/* Modal y formularios respetan tema */
+:root[data-bs-theme="dark"] .modal-content { background-color: #111827; color: #f3f4f6; }
+:root[data-bs-theme="dark"] .modal-header { border-color: #374151; }
+:root[data-bs-theme="dark"] .modal-footer { border-color: #374151; }
+:root[data-bs-theme="dark"] .form-control,
+:root[data-bs-theme="dark"] .form-select { background-color: #111827; color: #e5e7eb; border-color: #4b5563; }
+:root[data-bs-theme="dark"] .form-control:focus,
+:root[data-bs-theme="dark"] .form-select:focus { border-color: #818cf8; box-shadow: 0 0 0 0.2rem rgba(99,102,241,0.25); }
+:root[data-bs-theme="dark"] .card { background-color: #0f172a; color: #e5e7eb; border-color: #1f2937; }
+:root[data-bs-theme="dark"] .list-group-item { background-color: #0f172a; color: #e5e7eb; border-color: #1f2937; }
+
+/* Específico del modal de visualizar entrada */
+:root[data-bs-theme="dark"] .entrada-meta .meta-box {
+  background-color: #0f172a;
+  border: 1px solid #1f2937;
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+:root[data-bs-theme="dark"] .entrada-meta .meta-box .label { color: #9ca3af; }
+:root[data-bs-theme="dark"] .entrada-meta .meta-box .value { color: #e5e7eb; }
+:root[data-bs-theme="dark"] .contenido-box {
+  background-color: #0b1220;
+  border: 1px solid #1f2937;
+}

@@ -1,0 +1,78 @@
+/* Contenedor fijo superior derecho */
+.ef-toasts{
+  position:fixed; top:16px; right:16px; z-index:10001 !important;
+  display:flex; flex-direction:column; gap:10px; pointer-events:none;
+}
+
+/* Tarjeta */
+.ef-toast{
+  pointer-events:auto;
+  background:#fff;
+  border:1px solid #e6e9ef;
+  border-radius:12px;
+  padding:10px 12px;
+  min-width:260px; max-width:min(92vw,420px);
+  box-shadow:0 10px 30px rgba(0,0,0,.08);
+  display:flex; align-items:center; gap:10px;
+  position:relative; overflow:hidden;
+  animation:ef-in .3s ease-out, ef-wobble .8s ease-in-out .3s;
+  color:#1f2937; /* color base (se sobreescribe por estado) */
+}
+
+/* Ícono y mensaje heredan el color del estado */
+.ef-toast i{ font-size:18px; color:currentColor; }
+.ef-toast .ef-msg{ font-size:14px; color:currentColor; }
+.ef-toast .btn-close{ margin-left:auto; opacity:.6; }
+
+/* === Colores por estado (todo hereda con currentColor) === */
+.ef-toast.ef-success{ color:#16a34a; }
+.ef-toast.ef-error  { color:#dc2626; }
+.ef-toast.ef-warning{ color:#d97706; }
+.ef-toast.ef-info   { color:#2563eb; }
+
+/* Línea de vida usa el mismo color */
+.ef-line{
+  position:absolute; left:0; bottom:0; height:2px; width:100%;
+  background:currentColor;
+  animation-name:ef-line; animation-timing-function:linear; animation-fill-mode:forwards;
+}
+
+/* Animaciones */
+@keyframes ef-in{ from{ transform:translateY(-10px); opacity:0; } to{ transform:translateY(0); opacity:1; } }
+@keyframes ef-wobble{
+  0%{transform:rotate(0)}20%{transform:rotate(-1.2deg)}40%{transform:rotate(1.2deg)}
+  60%{transform:rotate(-.6deg)}80%{transform:rotate(.6deg)}100%{transform:rotate(0)}
+}
+@keyframes ef-line{ to{ width:0; } }
+
+/* ===================== MODO OSCURO ===================== */
+@media (prefers-color-scheme: dark){
+  .ef-toast{
+    background-color:#0b1220 !important;
+    border-color:#1f2a44 !important;
+    color:#e2e8f0 !important;       /* color base cuando NO hay estado */
+    opacity:1 !important;
+    -webkit-backdrop-filter:none !important; backdrop-filter:none !important;
+    background-image:none !important;
+  }
+  /* Cuando hay estado, el color del estado debe dominar (clases .ef-toast.ef-* ya definen color) */
+  .ef-toast .btn-close{ filter:invert(1) grayscale(100%); opacity:.8; }
+}
+
+/* Activación manual de dark mode */
+.dark .ef-toast, [data-theme="dark"] .ef-toast{
+  background-color:#0b1220 !important;
+  border-color:#1f2a44 !important;
+  color:#e2e8f0 !important;
+  opacity:1 !important;
+  -webkit-backdrop-filter:none !important; backdrop-filter:none !important; background-image:none !important;
+}
+/* En modo oscuro, los colores de estado ya se aplican vía las clases .ef-toast.ef-* */
+.dark .ef-toast .btn-close,
+[data-theme="dark"] .ef-toast .btn-close{ filter:invert(1) grayscale(100%); opacity:.8; }
+
+/* Respeto por reducción de movimiento */
+@media (prefers-reduced-motion: reduce){
+  .ef-toast{ animation:none; }
+  .ef-line{ animation:none; width:100%; }
+}

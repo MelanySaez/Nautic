@@ -1,0 +1,145 @@
+/* Navbar responsive adjustments when nav links wrap to 2 lines before bootstrap collapse kicks in.
+   Goal: reduce horizontal padding and vertically+horizontally center multi-line link text. */
+
+/* High z-index to ensure navbar stays above all other content including sidebars */
+.main-navbar {
+  z-index: 9999 !important;
+  position: relative;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+}
+
+/* Dark mode shadow for navbar */
+:root[data-bs-theme="dark"] .main-navbar {
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
+}
+
+/* Base: keep items compact and aligned */
+.main-navbar .navbar-nav .nav-item { display: flex; align-items: stretch; }
+
+.main-navbar .navbar-nav .nav-link { display:flex; align-items:center; line-height:1.15; padding:.5rem .75rem; min-height:42px; }
+
+/* Avatar usuario navbar */
+.nav-user-avatar-btn { background:transparent; border:none; padding:0; cursor:pointer; display:inline-flex; align-items:center; }
+.nav-avatar-circle { width:38px; height:38px; border-radius:50%; overflow:hidden; border:2px solid rgba(0,0,0,0.08); display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg,#f8fafc,#e2e8f0); position:relative; }
+.nav-avatar-circle img { width:100%; height:100%; object-fit:cover; display:block; }
+.nav-avatar-initials { font-size:13px; font-weight:600; color:#475569; letter-spacing:.5px; }
+[data-bs-theme="dark"] .nav-avatar-circle { border-color:#334155; background:linear-gradient(135deg,#1e293b,#0f172a); }
+[data-bs-theme="dark"] .nav-avatar-initials { color:#cbd5e1; }
+.nav-user-avatar-btn:focus-visible { outline:2px solid #2563eb; outline-offset:2px; border-radius:50%; }
+
+/* Prevent wrapping on very small widths to avoid vertical growth; rely on Bootstrap collapse */
+@media (max-width: 991.98px) {
+  .main-navbar .navbar-nav .nav-link { white-space: nowrap !important; }
+}
+
+/* Slightly reduce padding and font size when width gets tight but before collapse (< 1200px for example) */
+@media (max-width: 1200px) {
+  .main-navbar .navbar-nav .nav-link { padding-left:.55rem; padding-right:.55rem; font-size:13px; min-height:38px; }
+}
+
+/* Even tighter just above collapse breakpoint (>= 992px to avoid conflicting with collapsed menu) */
+@media (max-width: 1050px) and (min-width: 992px) {
+  .main-navbar .navbar-nav .nav-link { font-size:12.5px; padding-left:.5rem; padding-right:.5rem; min-height:36px; }
+}
+
+/* Ensure active & hover underline stays at bottom visually consistent with reduced padding */
+.main-navbar .navbar-nav .nav-link.active,
+.main-navbar .navbar-nav .nav-link:hover,
+.main-navbar .navbar-nav .nav-link:focus {
+  position: relative;
+}
+
+/* Avoid forcing anchors to full width; let Bootstrap flow inline to reduce height */
+.nav-item a { width: auto; }
+
+/* "Más/More" button: keep a stable minimum width so layout can reserve space */
+.main-navbar .navbar-nav .more > .more-toggle { min-width: 72px; text-align: center; }
+.main-navbar .navbar-nav .more { align-items: center; }
+
+/* Keep right controls in one line to avoid vertical growth */
+.main-navbar .navbar-nav.ms-auto .nav-item, .main-navbar .navbar-nav.ms-auto .nav-link, .main-navbar .navbar-nav.ms-auto select { white-space: nowrap !important; }
+
+/* Fixed label width for theme to avoid shifting when text changes */
+.theme-label { min-width: 60px; }
+:root[data-bs-theme="light"] .theme-label { color: var(--bs-body-color); }
+:root[data-bs-theme="dark"] .theme-label { color: var(--bs-body-color); }
+
+/* Ensure dropdown toggles keep same padding across themes */
+.main-navbar .dropdown-toggle { padding-top:.5rem; padding-bottom:.5rem; }
+
+/* Hide overflowed items without changing flow to reduce flicker */
+.main-navbar .navbar-nav .nav-overflow-hidden { position: absolute !important; visibility: hidden !important; pointer-events: none !important; }
+
+/* Keep "Más" in flow but invisible when unused, reserving its width */
+.main-navbar .navbar-nav .more.more--hidden { visibility: hidden; pointer-events: none; }
+/* If you want to avoid multi-line entirely on very tight screens just before collapse, you can optionally ellipsis: */
+/*
+@media (max-width: 1050px) and (min-width: 992px) {
+  .main-navbar .navbar-nav .nav-link {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap !important; // revert if ellipsis approach preferred
+  }
+}
+*/
+
+/* Dark mode alignment keeps same metrics; rely on existing theme colors. */
+
+/* Enhanced iOS dropdown styles for navbar */
+.main-navbar .dropdown-menu.ios-dropdown {
+  margin-top: 3px !important;
+  border: none !important;
+}
+
+/* Nested dropdowns positioning */
+.main-navbar .dropend .dropdown-menu {
+  top: 0 !important;
+  left: 100% !important;
+  margin-left: 8px !important;
+}
+
+/* Smooth animations for nested dropdowns */
+.main-navbar .dropdown-menu {
+  transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94) !important;
+}
+
+/* Prevent dropdown flickering on hover */
+.main-navbar .dropdown:hover .dropdown-menu,
+.main-navbar .dropend:hover .dropdown-menu {
+  display: block;
+}
+
+/* Enhanced hover effects for iOS menu items in navbar */
+.main-navbar .ios-menu-item:hover {
+  background: rgba(0, 122, 255, 0.1) !important;
+  color: #007AFF !important;
+  transform: translateX(4px);
+}
+
+[data-bs-theme="dark"] .main-navbar .ios-menu-item:hover {
+  background: rgba(0, 122, 255, 0.2) !important;
+  color: #64B5F6 !important;
+}
+
+/* Fix for hamburger menu dropdown positioning */
+#navbarActionsMenuBtn + .dropdown-menu {
+  right: 0 !important;
+  left: auto !important;
+  transform: translateX(0) !important;
+}
+
+/* Ensure dropdown stays within viewport */
+@media (max-width: 576px) {
+  #navbarActionsMenuBtn + .dropdown-menu {
+    right: -10px !important;
+    min-width: 280px !important;
+  }
+}
+
+/* Additional safety for very small screens */
+@media (max-width: 400px) {
+  #navbarActionsMenuBtn + .dropdown-menu {
+    right: -20px !important;
+    min-width: 260px !important;
+  }
+}

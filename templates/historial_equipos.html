@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Historial de Equipos{% endblock %}
+
+{% block custom %}
+<link rel="stylesheet" href="{% static 'css/gestion_parametros.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="page-header">
+                <div class="row align-items-center">
+                    <div class="col">
+                        <h2 class="page-title">Historial de Equipos</h2>
+                        <p class="text-muted">Consulta y gestiona el historial de cambios, mantenimiento y configuración de equipos.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Contenedor principal para el componente React -->
+            <div id="historial-equipos-container">
+                <div class="d-flex justify-content-center align-items-center" style="min-height: 400px;">
+                    <div class="text-center">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Cargando...</span>
+                        </div>
+                        <p class="mt-2">Cargando historial de equipos...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Este template será usado principalmente por el frontend React
+    // Si necesitas funcionalidad específica del backend, puedes agregarla aquí
+    console.log('Historial de Equipos - Template cargado');
+</script>
+{% endblock %}

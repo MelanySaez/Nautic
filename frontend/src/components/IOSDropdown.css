@@ -1,0 +1,225 @@
+/* iOS Style Dropdown */
+.ios-dropdown {
+  background: rgba(255, 255, 255, 0.95) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12) !important;
+  padding: 6px !important;
+  min-width: 250px !important;
+  animation: ios-dropdown-appear 0.2s ease-out;
+  overflow: hidden;
+}
+
+[data-bs-theme="dark"] .ios-dropdown {
+  background: rgba(28, 28, 30, 0.95) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3) !important;
+}
+
+@keyframes ios-dropdown-appear {
+  0% {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* iOS Setting Item */
+.ios-setting-item {
+  padding: 12px 16px !important;
+  margin: 3px 0 !important;
+  border-radius: 12px !important;
+  background: rgba(255, 255, 255, 0.7) !important;
+  border: none !important;
+  transition: all 0.2s ease !important;
+}
+
+[data-bs-theme="dark"] .ios-setting-item {
+  background: rgba(44, 44, 46, 0.8) !important;
+}
+
+.ios-setting-item:hover {
+  background: rgba(0, 122, 255, 0.1) !important;
+  transform: translateY(-1px);
+}
+
+[data-bs-theme="dark"] .ios-setting-item:hover {
+  background: rgba(0, 122, 255, 0.2) !important;
+}
+
+/* iOS Setting Label */
+.ios-setting-label {
+  font-weight: 500 !important;
+  font-size: 14px !important;
+  color: var(--bs-body-color) !important;
+  margin-bottom: 0 !important;
+  letter-spacing: -0.02em;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+.ios-setting-icon {
+  width: 16px !important;
+  height: 16px !important;
+  color: var(--bs-body-color) !important;
+  opacity: 0.7 !important;
+}
+
+/* iOS Select */
+.ios-select {
+  background: rgba(255, 255, 255, 0.9) !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  border-radius: 8px !important;
+  padding: 6px 10px !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  transition: all 0.2s ease !important;
+  min-width: 110px !important;
+}
+
+[data-bs-theme="dark"] .ios-select {
+  background: rgba(58, 58, 60, 0.9) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  color: white !important;
+}
+
+.ios-select:focus {
+  border-color: #007AFF !important;
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1) !important;
+  outline: none !important;
+}
+
+/* iOS Divider */
+.ios-divider {
+  margin: 8px 16px !important;
+  border-color: rgba(0, 0, 0, 0.1) !important;
+}
+
+[data-bs-theme="dark"] .ios-divider {
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* iOS Menu Item */
+.ios-menu-item {
+  padding: 10px 16px !important;
+  margin: 2px 0 !important;
+  border-radius: 10px !important;
+  background: transparent !important;
+  border: none !important;
+  transition: all 0.2s ease !important;
+  font-weight: 500 !important;
+  font-size: 14px !important;
+  color: var(--bs-body-color) !important;
+  text-decoration: none !important;
+  display: flex !important;
+  align-items: center !important;
+  width: 100% !important;
+  gap: 10px !important;
+}
+
+.ios-menu-item:hover {
+  background: rgba(0, 122, 255, 0.1) !important;
+  color: #007AFF !important;
+  transform: translateX(4px);
+}
+
+[data-bs-theme="dark"] .ios-menu-item:hover {
+  background: rgba(0, 122, 255, 0.2) !important;
+  color: #64B5F6 !important;
+}
+
+/* Theme Switch Container in iOS Style */
+.ios-theme-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ios-theme-label {
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  color: var(--bs-body-color) !important;
+  opacity: 0.8;
+  min-width: 45px;
+  text-align: right;
+}
+
+/* Prevent dropdown close on internal clicks */
+.dropdown-no-close {
+  pointer-events: auto;
+}
+
+.dropdown-no-close .dropdown-menu {
+  pointer-events: auto;
+}
+
+/* Icons for menu items */
+.ios-menu-icon {
+  width: 16px !important;
+  height: 16px !important;
+  color: var(--bs-body-color) !important;
+  opacity: 0.7 !important;
+  flex-shrink: 0 !important;
+}
+
+/* Smooth transitions */
+.ios-dropdown * {
+  transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+/* Custom scrollbar for dropdown if needed */
+.ios-dropdown::-webkit-scrollbar {
+  width: 6px;
+}
+
+.ios-dropdown::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.ios-dropdown::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+[data-bs-theme="dark"] .ios-dropdown::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Fix tablet dropdown positioning: FORCE dropdowns to appear below navbar */
+.navbar .dropdown-menu {
+  /* Forzar posicionamiento debajo del navbar */
+  transform: translateY(8px) !important;
+  margin-top: 0 !important;
+  top: 100% !important; /* Asegurar que inicie desde el 100% del botón padre */
+}
+
+/* Additional spacing for our custom spaced dropdowns */
+.dropdown-spaced {
+  transform: translateY(10px) !important; /* Gap reducido para dropdowns con spacer */
+}
+
+/* Clase específica para forzar dropdowns debajo del navbar */
+.force-below {
+  position: absolute !important;
+  top: calc(100% + 6px) !important; /* 100% del padre + 8px gap reducido */
+  transform: none !important; /* Remover cualquier transform que interfiera */
+}
+
+/* Para tablets específicamente, separación moderada */
+@media (max-width: 1024px) and (min-width: 768px) {
+  .navbar .dropdown-menu {
+    transform: translateY(12px) !important;
+  }
+  .dropdown-spaced {
+    transform: translateY(14px) !important;
+  }
+  .force-below {
+    top: calc(100% + 8px) !important; /* Espacio moderado en tablets */
+  }
+}

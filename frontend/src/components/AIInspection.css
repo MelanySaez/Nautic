@@ -1,0 +1,483 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   AIInspection.css — Módulo de Inspección IA
+   Palette: Navy #003366 · Accent #206bc4 · BG #f5f7fa · White cards
+   ───────────────────────────────────────────────────────────────────────────── */
+
+/* ── Contenedor principal ── */
+.ai-inspection {
+  padding-top: 1rem;
+}
+
+.ai-inspection .page-title {
+  color: #003366;
+  font-weight: 700;
+  font-size: 1.4rem;
+  letter-spacing: -0.01em;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Cards de buques (selección de embarcación)
+   ───────────────────────────────────────────────────────────────────────────── */
+.ai-buque-card {
+  border: 1.5px solid #e6eaef;
+  border-radius: 12px;
+  background: #fff;
+  cursor: pointer;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.ai-buque-card:hover {
+  border-color: #206bc4;
+  box-shadow: 0 4px 16px rgba(32, 107, 196, 0.14);
+  transform: translateY(-2px);
+}
+
+.ai-buque-card.selected {
+  border-color: #003366 !important;
+  box-shadow: 0 0 0 3px rgba(0, 51, 102, 0.12), 0 4px 16px rgba(0, 51, 102, 0.1);
+  background: #f0f5ff;
+}
+
+.ai-buque-card .card-title {
+  color: #003366;
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Cards de inspecciones (listado/historial)
+   ───────────────────────────────────────────────────────────────────────────── */
+.ai-inspeccion-card {
+  border: 1.5px solid #e6eaef;
+  border-radius: 12px;
+  background: #fff;
+  cursor: pointer;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.ai-inspeccion-card:hover {
+  border-color: #206bc4;
+  box-shadow: 0 6px 20px rgba(32, 107, 196, 0.12);
+  transform: translateY(-3px);
+}
+
+.ai-inspeccion-card .card-title {
+  color: #003366;
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Cuadrícula de secciones del casco
+   ───────────────────────────────────────────────────────────────────────────── */
+.ai-seccion-card {
+  min-height: 72px;
+  border: 1.5px solid #e6eaef;
+  border-radius: 10px;
+  background: #fff;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background-color 0.15s ease,
+    color 0.15s ease,
+    transform 0.15s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.ai-seccion-card .fw-bold {
+  color: #003366;
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  transition: color 0.15s ease;
+}
+
+.ai-seccion-card .text-muted {
+  font-size: 0.68rem;
+  transition: color 0.15s ease;
+}
+
+.ai-seccion-card:hover {
+  border-color: #206bc4 !important;
+  box-shadow: 0 0 0 3px rgba(32, 107, 196, 0.22), 0 4px 14px rgba(32, 107, 196, 0.14);
+  background-color: rgba(32, 107, 196, 0.07);
+  transform: translateY(-1px);
+}
+
+.ai-seccion-card:hover .fw-bold {
+  color: #206bc4;
+}
+
+.ai-seccion-card:hover .text-muted {
+  color: #4a7fc1 !important;
+}
+
+.ai-seccion-card.selected {
+  border-color: #003366 !important;
+  background: #f0f5ff;
+  box-shadow: 0 0 0 3px rgba(0, 51, 102, 0.15), 0 4px 14px rgba(0, 51, 102, 0.1);
+}
+
+.ai-seccion-card.selected .fw-bold {
+  color: #003366;
+}
+
+.ai-seccion-card .badge {
+  font-size: 0.62rem;
+  padding: 2px 7px;
+  border-radius: 20px;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Panel de sección activa (subir fotos)
+   ───────────────────────────────────────────────────────────────────────────── */
+.ai-seccion-panel {
+  border: 1.5px solid #e6eaef;
+  border-radius: 14px;
+  background: #fff;
+  overflow: hidden;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+}
+
+.ai-seccion-panel-header {
+  padding: 1rem 1.25rem 0.75rem;
+  border-bottom: 1px solid #f0f2f5;
+}
+
+.ai-seccion-panel-header h5 {
+  color: #003366;
+  font-weight: 700;
+  font-size: 1rem;
+  margin-bottom: 0.15rem;
+}
+
+.ai-seccion-panel-header p {
+  color: #6b7280;
+  font-size: 0.8rem;
+  margin-bottom: 0;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Foto cards (compacto + completo)
+   ───────────────────────────────────────────────────────────────────────────── */
+.ai-foto-card {
+  border: 1.5px solid #e6eaef;
+  border-radius: 12px;
+  background: #fff;
+  overflow: hidden;
+  transition: box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.ai-foto-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  border-color: #d0d8e4;
+}
+
+.ai-foto-card .card-img-top {
+  border-bottom: none;
+  display: block;
+}
+
+/* Toggle original / anotada */
+.ai-foto-toggle {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-top: 1px solid #f0f2f5;
+  background: #fafbfc;
+}
+
+.ai-foto-toggle .btn {
+  border-radius: 20px;
+  font-size: 0.72rem;
+  padding: 3px 14px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  transition: all 0.15s ease;
+}
+
+.ai-foto-toggle .btn-primary {
+  background-color: #003366;
+  border-color: #003366;
+  color: #fff;
+}
+
+.ai-foto-toggle .btn-primary:hover {
+  background-color: #022855;
+  border-color: #022855;
+}
+
+.ai-foto-toggle .btn-outline-secondary {
+  border-color: #d0d8e4;
+  color: #6b7280;
+}
+
+.ai-foto-toggle .btn-outline-secondary:hover {
+  background-color: #f0f2f5;
+  border-color: #b0bac7;
+  color: #374151;
+}
+
+/* Card compacto (vista subir fotos) */
+.ai-foto-compact {
+  border: 1.5px solid #e6eaef;
+  border-radius: 12px;
+  background: #fff;
+  overflow: hidden;
+  margin-bottom: 10px;
+  transition: box-shadow 0.15s ease;
+}
+
+.ai-foto-compact:hover {
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+}
+
+.ai-foto-compact-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-bottom: 1px solid #f0f2f5;
+  background: #fafbfc;
+}
+
+/* Detección lista */
+.ai-foto-card ul li {
+  padding: 3px 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+  font-size: 0.8rem;
+}
+
+.ai-foto-card ul li:last-child {
+  border-bottom: none;
+}
+
+/* Badge de estado */
+.ai-foto-card .badge,
+.ai-foto-compact .badge {
+  font-size: 0.65rem;
+  padding: 3px 8px;
+  border-radius: 20px;
+  font-weight: 600;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Empty states
+   ───────────────────────────────────────────────────────────────────────────── */
+.ai-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1.5rem;
+  color: #6b7280;
+  text-align: center;
+}
+
+.ai-empty-state p {
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Página de resultados — cabecera de sección
+   ───────────────────────────────────────────────────────────────────────────── */
+.ai-resultados-section-title {
+  color: #003366;
+  font-weight: 700;
+  font-size: 0.9rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid #e6eaef;
+  margin-bottom: 0.75rem;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Botón de subida de foto
+   ───────────────────────────────────────────────────────────────────────────── */
+.ai-btn-upload {
+  background-color: #003366;
+  border-color: #003366;
+  color: #fff !important;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  padding: 6px 16px;
+  transition: background-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ai-btn-upload:hover:not(:disabled),
+.ai-btn-upload:focus:not(:disabled) {
+  background-color: #1a5ca8;
+  border-color: #1a5ca8;
+  color: #fff !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(0, 51, 102, 0.25);
+}
+
+.ai-btn-upload:active:not(:disabled) {
+  background-color: #022855;
+  border-color: #022855;
+  color: #fff !important;
+  transform: scale(0.98);
+}
+
+:root[data-bs-theme="dark"] .ai-btn-upload {
+  background-color: #206bc4;
+  border-color: #206bc4;
+  color: #fff !important;
+}
+
+:root[data-bs-theme="dark"] .ai-btn-upload:hover:not(:disabled),
+:root[data-bs-theme="dark"] .ai-btn-upload:focus:not(:disabled) {
+  background-color: #2d7dd6;
+  border-color: #2d7dd6;
+  color: #fff !important;
+}
+
+.ai-btn-camera {
+  background-color: #1a6b4a;
+  border-color: #1a6b4a;
+  color: #fff !important;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  padding: 6px 16px;
+  transition: background-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ai-btn-camera:hover:not(:disabled),
+.ai-btn-camera:focus:not(:disabled) {
+  background-color: #228b5b;
+  border-color: #228b5b;
+  color: #fff !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(26, 107, 74, 0.25);
+}
+
+.ai-btn-camera:active:not(:disabled) {
+  background-color: #145a3c;
+  border-color: #145a3c;
+  color: #fff !important;
+  transform: scale(0.98);
+}
+
+/* Estado desactivado — anula la opacidad del browser que oculta el texto */
+.ai-btn-upload:disabled,
+.ai-btn-camera:disabled {
+  opacity: 1;
+  background-color: #cbd5e1;
+  border-color: #cbd5e1;
+  color: #64748b !important;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+/* Mensaje de límite de carga concurrente */
+.ai-upload-limit-msg {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  background-color: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fcd34d;
+  white-space: nowrap;
+}
+
+:root[data-bs-theme="dark"] .ai-btn-camera {
+  background-color: #2d9b6a;
+  border-color: #2d9b6a;
+  color: #fff !important;
+}
+
+:root[data-bs-theme="dark"] .ai-btn-camera:hover:not(:disabled),
+:root[data-bs-theme="dark"] .ai-btn-camera:focus:not(:disabled) {
+  background-color: #38b07a;
+  border-color: #38b07a;
+  color: #fff !important;
+}
+
+:root[data-bs-theme="dark"] .ai-btn-upload:disabled,
+:root[data-bs-theme="dark"] .ai-btn-camera:disabled {
+  background-color: #374151;
+  border-color: #4b5563;
+  color: #6b7280 !important;
+}
+
+:root[data-bs-theme="dark"] .ai-upload-limit-msg {
+  background-color: rgba(146, 64, 14, 0.25);
+  color: #fbbf24;
+  border-color: rgba(251, 191, 36, 0.35);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Dark mode
+   ───────────────────────────────────────────────────────────────────────────── */
+:root[data-bs-theme="dark"] .ai-buque-card,
+:root[data-bs-theme="dark"] .ai-inspeccion-card,
+:root[data-bs-theme="dark"] .ai-seccion-card,
+:root[data-bs-theme="dark"] .ai-foto-card,
+:root[data-bs-theme="dark"] .ai-foto-compact,
+:root[data-bs-theme="dark"] .ai-seccion-panel {
+  background: #1f2937;
+  border-color: #334155;
+}
+
+:root[data-bs-theme="dark"] .ai-buque-card .card-title,
+:root[data-bs-theme="dark"] .ai-inspeccion-card .card-title,
+:root[data-bs-theme="dark"] .ai-seccion-card .fw-bold,
+:root[data-bs-theme="dark"] .ai-seccion-panel-header h5,
+:root[data-bs-theme="dark"] .ai-inspection .page-title,
+:root[data-bs-theme="dark"] .ai-resultados-section-title {
+  color: #e5e7eb;
+}
+
+:root[data-bs-theme="dark"] .ai-seccion-card:hover {
+  background-color: rgba(32, 107, 196, 0.12);
+  border-color: #2563eb !important;
+}
+
+:root[data-bs-theme="dark"] .ai-seccion-card:hover .fw-bold {
+  color: #60a5fa;
+}
+
+:root[data-bs-theme="dark"] .ai-buque-card.selected,
+:root[data-bs-theme="dark"] .ai-seccion-card.selected {
+  background: rgba(32, 107, 196, 0.15);
+  border-color: #2563eb !important;
+}
+
+:root[data-bs-theme="dark"] .ai-foto-toggle,
+:root[data-bs-theme="dark"] .ai-foto-compact-header {
+  background: #111827;
+  border-color: #374151;
+}
+
+:root[data-bs-theme="dark"] .ai-foto-toggle .btn-outline-secondary {
+  border-color: #4b5563;
+  color: #9ca3af;
+}
+
+:root[data-bs-theme="dark"] .ai-foto-toggle .btn-outline-secondary:hover {
+  background-color: #374151;
+  border-color: #6b7280;
+  color: #e5e7eb;
+}
+
+:root[data-bs-theme="dark"] .ai-seccion-panel-header {
+  border-color: #374151;
+}
+
+:root[data-bs-theme="dark"] .ai-empty-state {
+  color: #9ca3af;
+}
+
+:root[data-bs-theme="dark"] .ai-resultados-section-title {
+  border-color: #374151;
+}

@@ -1,0 +1,58 @@
+/* ===== Compactar formularios (14px) ===== */
+
+/* Variables simples para mantener consistencia */
+:root{
+  --cmp-input-py: .25rem;      /* padding vertical reducido */
+  --cmp-input-px: .5rem;       /* padding horizontal */
+  --cmp-font: .875rem;         /* 14px */
+}
+
+/* Inputs y selects */
+.form-control,
+.form-select{
+  padding: var(--cmp-input-py) var(--cmp-input-px);
+  font-size: var(--cmp-font);
+  line-height: 1.25;
+  height: auto;                /* deja que el contenido defina altura */
+  min-height: 2rem;            /* evita que queden demasiado bajos */
+}
+
+/* Select: ajusta caret */
+.form-select{
+  padding-right: 2rem;
+  background-position: right .5rem center;
+}
+
+/* Addons y botones dentro de input-group */
+.input-group-text,
+.input-group .btn{
+  padding: var(--cmp-input-py) var(--cmp-input-px);
+  font-size: var(--cmp-font);
+  line-height: 1.25;
+}
+
+/* Labels más compactos */
+.form-label{
+  font-size: var(--cmp-font);
+  margin-bottom: .25rem;
+}
+
+/* Tablas un poco más densas */
+.table td,
+.table th{
+  padding: .5rem .75rem;
+  font-size: var(--cmp-font);
+}
+
+/* === Si usas form-floating (como en RondaEquipo) === */
+.form-floating > .form-control,
+.form-floating > .form-select{
+  padding: calc(var(--cmp-input-py) + .35rem) var(--cmp-input-px) var(--cmp-input-py);
+  min-height: 2.4rem;
+  height: 2.4rem;
+  font-size: var(--cmp-font);
+}
+.form-floating > label{
+  padding: var(--cmp-input-py) var(--cmp-input-px);
+  font-size: .78rem;
+}

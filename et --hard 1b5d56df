@@ -1,0 +1,44 @@
+[33m2b3e2860[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m Merge branch 'main' of https://github.com/Brayan7546/Rondas
+[33m1b5d56df[m correción en creación de equipo y opción de eliminar equipos
+[33m4e4ffde1[m[33m ([m[1;31morigin/main[m[33m)[m Fixes check + funcionality
+[33m6df2a7bb[m Merge + Historial equipos
+[33m799debd4[m Historial de equipos v4
+[33mf04ea42e[m Actualización dashboard
+[33m32448b1e[m Historial de equipos v3
+[33m62c385b9[m integración parcial de sebas con software actual
+[33m9d7b0409[m Merge branch 'main' of https://github.com/Brayan7546/Rondas
+[33m891f937a[m correción sencilla
+[33md56123a3[m Merge pull request #4 from Brayan7546/feature/dashboard-module
+[33m5b44cf85[m[33m ([m[1;31morigin/feature/dashboard-module[m[33m)[m Se agregó el módulo de Dashboard y su debida configuración
+[33madfb7720[m Base de datos actualizada
+[33m14c3bd2b[m corrección Leer en el grupo de wsp como actuallizar
+[33mfbb55a25[m Merge branch 'main' of https://github.com/Brayan7546/Rondas
+[33ma33c5590[m Tus cambios en Navbar y SWBS
+[33m8279bef0[m Actualizacion Angelo integrada
+[33m9f196a6d[m Historial de equipos v1
+[33m7b400b9f[m Historial de equipos
+[33m613f7bc3[m Correciónes y carga de datos grupo 200
+[33m0c33010c[m[33m ([m[1;31morigin/admin_user[m[33m)[m Actualizo cambios en main
+[33m658c4fc7[m[33m ([m[1;31morigin/backup[m[33m)[m Correción filtros y buscadores SWBS
+[33ma0df9d60[m Mergen campos adicionales y modulo de documentación
+[33m9ef66569[m Merge branch 'main' of https://github.com/Brayan7546/Rondas
+[33m57583385[m Modulo de documentación tecnica y correciones
+[33m636cec48[m SWBS
+[33md3ad078c[m correciones y carpeta media
+[33mebaa941d[m Resuelto conflicto en config.js durante merge
+[33m3c24c604[m Limpieza: eliminar archivos ignorados
+[33mcd9f623c[m Eliminación de archivos basura del repositorio
+[33m1cb9c467[m Limpieza masiva del repositorio
+[33m5b4870fc[m Modificaciones generales
+[33m8d5aa84b[m Timezone fixed
+[33m3564c804[m Export 2
+[33md549fb07[m Export
+[33m8cfef11e[m bases de datos actualizadas
+[33m0972cdb9[m Actualizacion repo
+[33me7bbf27a[m Actualización de archivos binarios rondas.pg.sql y rondas.backup
+[33m2cb0996a[m Actualización modo dark,etc
+[33m527cab77[m Actualización base de datos
+[33m9586de53[m Actualización
+[33m32b8e348[m Frontend restaurado como carpeta normal, ya no es submódulo
+[33m275d150d[m carpeta frontend
+[33mefb5f2ef[m Primer commit

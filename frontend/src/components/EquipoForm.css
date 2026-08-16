@@ -1,0 +1,200 @@
+.text-start{
+    font-size: 14px !important; 
+}
+.contenedor-principal{
+    box-shadow: 0 8px 16px rgba(123, 115, 235, 0.473);
+    background-color: #ffffff;
+}
+
+:root[data-bs-theme="dark"] .contenedor-principal {
+    background-color: #1e293b;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+}
+
+.mock-viewer{
+width: 100%;
+}
+
+/* Backdrop/overlay opaco a pantalla completa para la vista previa */
+.preview-modal{
+  position: fixed;
+  inset: 0;                /* top/right/bottom/left: 0 */
+  background: #000000e6;        /* opaco (sin transparencia) */
+  z-index: 1100;           /* por encima del resto (Bootstrap modal ~1055) */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow-y: auto;        /* permite scroll si el contenido es alto */
+}
+
+.preview-modal .modal-content{
+  max-height: calc(100vh - 3rem);
+}
+.preview-modal .modal-body{
+  overflow: auto;
+}
+
+.preview-modal-backdrop{
+  position: fixed;
+  inset: 0;
+  background: #000;           /* opaco, sin transparencia */
+  z-index: 2000;              /* > Bootstrap modal (1055) */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.preview-modal-window{
+  width: min(1200px, 96vw);
+  max-height: 95vh;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 24px 64px rgba(0,0,0,.6);
+  display: flex; flex-direction: column;
+}
+
+.preview-modal-header,
+.preview-modal-footer{ padding: 12px 16px; }
+.preview-modal-header{ border-bottom: 1px solid #e9ecef; }
+.preview-modal-footer{ border-top: 1px solid #e9ecef; }
+
+.preview-modal-body{ padding: 16px; overflow: auto; }
+.preview-modal-body iframe{ width:100%; height:70vh; border:0; }
+.preview-modal-body img{ max-width:100%; max-height:80vh; display:block; margin:0 auto; }
+
+.FondoOscuro {
+  position: absolute;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.54);
+  border-radius: 8px;
+  backdrop-filter: blur(2px); /* opcional para un efecto más suave */
+}
+
+/* Estilos de contenido del modal */
+.ModalEliminarEquipo {
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Modo oscuro: hereda tu theme global */
+:root[data-bs-theme="dark"] .ModalEliminarEquipo {
+  background-color: #1f2937; /* gris oscuro */
+  color: #f3f4f6;
+}
+
+:root[data-bs-theme="dark"] .ModalEliminarEquipo h5 {
+  color: #f87171; /* rojo más visible en fondo oscuro */
+}
+
+:root[data-bs-theme="dark"] .ModalEliminarEquipo input {
+  background-color: #111827;
+  color: #f3f4f6;
+  border: 1px solid #374151;
+}
+
+/* === Modal estilo por defecto (modo claro) === */
+.ModalEliminarEquipo {
+  background-color: #ffffff; /* blanco en modo claro */
+  color: #111827; /* gris muy oscuro */
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Inputs en modo claro */
+.ModalEliminarEquipo input.form-control {
+  background-color: #ffffff;
+  color: #111827;
+  border: 1px solid #d1d5db;
+}
+
+/* === Modo oscuro === */
+:root[data-bs-theme="dark"] .ModalEliminarEquipo {
+  background-color: #1e293b !important; /* gris muy oscuro */
+  color: #f8fafc !important; /* texto claro */
+}
+
+:root[data-bs-theme="dark"] .ModalEliminarEquipo h5,
+:root[data-bs-theme="dark"] .ModalEliminarEquipo p,
+:root[data-bs-theme="dark"] .ModalEliminarEquipo div {
+  color: #f8fafc !important;
+}
+
+:root[data-bs-theme="dark"] .ModalEliminarEquipo input.form-control {
+  background-color: #0f172a !important;
+  color: #f8fafc !important;
+  border: 1px solid #334155 !important;
+}
+
+/* ===== Parámetros: filas estilo "tabla" sin tabla ===== */
+.param-list {
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+}
+.param-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid #f1f3f5;
+}
+.param-row:last-child { border-bottom: none; }
+
+.param-cell--name {
+  flex: 1 1 40%;
+  min-width: 240px;
+  max-width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+.param-cell--min,
+.param-cell--max {
+  flex: 0 0 110px; /* más compacto para dejar espacio al selector de archivo */
+}
+.param-cell--imgs {
+  flex: 0 0 220px; /* acciones de imágenes, compactado */
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.param-badges { display: flex; gap: 6px; align-items: center; }
+.param-badge { font-size: 11px; background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 10px; padding: 2px 8px; }
+
+.param-row .input-group.input-group-sm .form-control {
+  min-width: 0; /* evita desbordes */
+}
+
+/* Modo oscuro para la lista */
+:root[data-bs-theme="dark"] .param-list { border-color: #2c3a4e; }
+:root[data-bs-theme="dark"] .param-row { border-bottom-color: #2c3a4e; }
+:root[data-bs-theme="dark"] .param-badge { background: #0f172a; border-color: #334155; color: #e2e8f0; }
+
+/* ===== Manuales: grilla de tipos con alineación estética ===== */
+.manual-type-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px 16px;
+  justify-items: center; /* centra cada casilla */
+  align-items: center;
+  width: 100%;
+}
+
+.manual-type-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.manual-type-item .form-check-input {
+  margin-top: 0; /* alinea verticalmente con el texto */
+}
+
+.manual-types-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+}

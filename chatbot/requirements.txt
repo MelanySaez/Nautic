@@ -1,0 +1,4 @@
+openpyxl>=3.0.0
+Pillow>=8.0.0 
+pdf2image>=1.0.0
+pymupdf4llm>=0.0.27

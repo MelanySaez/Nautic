@@ -1,0 +1,179 @@
+/* =========================================================
+   Rondas iOS Style - SOLO ELEMENTOS VISUALES SUPERFICIALES
+   NO modifica dimensiones, layouts, ni estructura
+   ========================================================= */
+
+/* === Variables iOS === */
+:root {
+  --ios-blue: #007AFF;
+  --ios-blue-hover: #0051D0;
+  --ios-green: #34C759;
+  --ios-gray: #F2F2F7;
+  --ios-border: rgba(0, 0, 0, 0.1);
+  --ios-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  --ios-shadow-hover: 0 4px 12px rgba(0, 0, 0, 0.15);
+  --ios-transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+:root[data-bs-theme="dark"] {
+  --ios-blue: #0A84FF;
+  --ios-green: #30D158;
+  --ios-gray: #1C1C1E;
+  --ios-border: rgba(255, 255, 255, 0.1);
+  --ios-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --ios-shadow-hover: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+/* === Botones con estilo iOS === */
+.btn.btn-light.border {
+  border-radius: 12px !important;
+  box-shadow: var(--ios-shadow);
+  transition: var(--ios-transition);
+  border-color: var(--ios-border) !important;
+}
+
+.btn.btn-light.border:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--ios-shadow-hover);
+  background-color: rgba(0, 122, 255, 0.05) !important;
+  border-color: var(--ios-blue) !important;
+}
+
+/* === Cards con bordes redondeados y sombras === */
+.buque-card {
+  border-radius: 16px !important;
+  box-shadow: var(--ios-shadow) !important;
+  border-color: var(--ios-border) !important;
+  transition: var(--ios-transition);
+}
+
+.buque-card:hover {
+  transform: translateY(-2px) scale(1.01);
+  box-shadow: var(--ios-shadow-hover) !important;
+  border-color: var(--ios-blue) !important;
+}
+
+/* === Selects con estilo iOS === */
+.form-select {
+  border-radius: 12px !important;
+  border-color: var(--ios-border) !important;
+  box-shadow: var(--ios-shadow);
+  transition: var(--ios-transition);
+}
+
+.form-select:focus {
+  border-color: var(--ios-blue) !important;
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1) !important;
+}
+
+/* === Cards de grupos === */
+.grupo-card {
+  border-radius: 20px !important;
+  box-shadow: var(--ios-shadow) !important;
+  border-color: var(--ios-border) !important;
+  transition: var(--ios-transition);
+}
+
+.grupo-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--ios-shadow-hover) !important;
+  border-color: var(--ios-blue) !important;
+}
+
+.grupo-card.seleccionado {
+  border-color: var(--ios-blue) !important;
+  background-color: rgba(0, 122, 255, 0.05) !important;
+  box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.1) !important;
+}
+
+/* === Filtros === */
+#barraFiltros .form-select,
+#barraFiltros .form-control {
+  border-radius: 10px !important;
+  border-color: var(--ios-border) !important;
+  box-shadow: var(--ios-shadow);
+  transition: var(--ios-transition);
+}
+
+#barraFiltros .form-select:focus,
+#barraFiltros .form-control:focus {
+  border-color: var(--ios-blue) !important;
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1) !important;
+}
+
+/* === Cards de equipos === */
+.card-container .card {
+  border-radius: 16px !important;
+  box-shadow: var(--ios-shadow) !important;
+  border-color: var(--ios-border) !important;
+  transition: var(--ios-transition);
+}
+
+.card-container .card:hover:not(.card-disabled) {
+  transform: translateY(-2px);
+  box-shadow: var(--ios-shadow-hover) !important;
+  border-color: var(--ios-blue) !important;
+}
+
+/* === Imágenes con bordes redondeados === */
+.buque-card .card-img-top {
+  border-radius: 12px 12px 0 0 !important;
+}
+
+.card-container .card .card-img {
+  border-radius: 12px 12px 0 0 !important;
+}
+
+/* === Overlay text con mejor estilo === */
+.overlay-text {
+  border-radius: 8px !important;
+}
+
+.buque-etapa {
+  border-radius: 8px !important;
+}
+
+/* === Alertas con bordes redondeados === */
+.alert {
+  border-radius: 12px !important;
+  border-color: transparent !important;
+}
+
+.alert.alert-success {
+  background-color: rgba(52, 199, 89, 0.1) !important;
+  color: var(--ios-green) !important;
+}
+
+.alert.alert-warning {
+  background-color: rgba(255, 149, 0, 0.1) !important;
+  color: #FF9500 !important;
+}
+
+/* === Badge de ronda realizada === */
+div[style*="rgba(25,135,84"] {
+  border-radius: 8px !important;
+  backdrop-filter: blur(8px) !important;
+}
+
+/* === Modal de bloqueo === */
+div[style*="background: #fff"][style*="border-radius"] {
+  border-radius: 16px !important;
+  box-shadow: var(--ios-shadow-hover) !important;
+}
+
+/* === Mejoras sutiles de hover === */
+.card:hover {
+  cursor: pointer;
+}
+
+.grupo-card:active {
+  transform: scale(0.98);
+}
+
+.buque-card:active {
+  transform: scale(0.98);
+}
+
+.card-container .card:active:not(.card-disabled) {
+  transform: scale(0.98);
+}

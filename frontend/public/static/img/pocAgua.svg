@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="g" x1="0" x2="1">
+      <stop offset="0%" stop-color="#e6f4ff"/>
+      <stop offset="100%" stop-color="#ffffff"/>
+    </linearGradient>
+  </defs>
+  <rect width="100%" height="100%" fill="url(#g)"/>
+  <g transform="translate(80,60)" fill="#cfe9ff">
+    <rect x="0" y="420" width="1040" height="200" rx="12"/>
+    <circle cx="200" cy="260" r="110" fill="#d9f1ff"/>
+    <circle cx="420" cy="180" r="60" fill="#d9f1ff"/>
+    <path d="M0 520 Q200 420 400 520 T800 520 L1040 520 L1040 620 L0 620 Z" fill="#bfe6ff"/>
+  </g>
+  <text x="100" y="120" font-size="36" fill="#6b7280">Portal de soporte</text>
+</svg>

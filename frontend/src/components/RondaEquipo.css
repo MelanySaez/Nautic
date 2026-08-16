@@ -1,0 +1,258 @@
+/* ===== Contenedor del campo + hint debajo ===== */
+.field-with-hint { width: 100%; }
+
+/* ===== Floating con unidad a la derecha ===== */
+.floating-with-unit {
+  display: flex;
+  align-items: stretch;
+  flex-wrap: nowrap;   /* el hint ya no va dentro: va debajo */
+  gap: 0;
+}
+
+.floating-with-unit .form-control {
+  height: 40px;
+  min-height: 40px;
+  padding: 5px 10px;
+  font-size: 14px;
+  color: #212529;
+  border-top-right-radius: 0;   /* empalme con la unidad */
+  border-bottom-right-radius: 0;
+}
+
+
+/* form-floating compacto */
+.floating-with-unit .form-floating > label {
+  color: #212529 !important;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  font-size: 14px;
+  height: 31px;
+  min-height: 1px;
+  background: transparent;      /* sin parche */
+}
+.floating-with-unit .form-floating > .form-control:focus ~ label { color: rgb(0,123,255); }
+.floating-with-unit .form-floating > .form-control:focus ~ label::after,
+.floating-with-unit .form-floating > .form-control:not(:placeholder-shown) ~ label::after {
+  background-color: transparent !important;
+}
+
+/* Hint Min/Max debajo (solo texto) */
+.minmax-hint {
+  font-size: 12px;
+  color: #6c757d;
+  margin-top: 4px;
+  padding-left: 2px; /* ligera alineación con el input */
+}
+
+/* Responsive */
+@media (max-width: 576px) {
+  .minmax-hint { margin-top: 6px; }
+}
+
+/* ====== Card contenedor ====== */
+.ronda-card{
+  background: #ffffff; /* claro */
+}
+
+/* ====== Floating con unidad a la derecha ====== */
+.field-with-hint { width: 100%; }
+
+.floating-with-unit{
+  display: flex;
+  align-items: stretch;
+  flex-wrap: nowrap;
+  gap: 0;
+}
+
+.floating-with-unit .form-control{
+  height: 40px;
+  min-height: 40px;
+  padding: 5px 10px;
+  font-size: 14px;
+  color: #212529;
+  background: #fff;
+  border: 1px solid #ced4da;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.floating-with-unit .input-group-text{
+  height: 38px;
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 10px;
+  font-size: 14px;
+  background: #f8f9fa;
+  color: #495057;
+  border: 1px solid #ced4da;
+  border-left: 0;
+}
+
+/* form-floating compacto */
+.floating-with-unit .form-floating > label{
+  color: #212529 !important;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  font-size: 14px;
+  height: 31px;
+  min-height: 1px;
+  background: transparent;
+}
+.floating-with-unit .form-floating > .form-control:focus ~ label{ color: rgb(0,123,255); }
+.floating-with-unit .form-floating > .form-control:focus ~ label::after,
+.floating-with-unit .form-floating > .form-control:not(:placeholder-shown) ~ label::after{
+  background-color: transparent !important;
+}
+
+/* Hint Min/Max debajo */
+.minmax-hint{
+  font-size: 12px;
+  color: #6c757d;
+  margin-top: 4px;
+  padding-left: 2px;
+}
+
+/* ====== MODO OSCURO (Bootstrap 5.3 con data-bs-theme) ====== */
+:root[data-bs-theme="dark"] .ronda-card{
+  background: #1f2937;         /* slate-800 */
+  color: #e5e7eb;
+  box-shadow: 0 10px 24px rgba(0,0,0,.45);
+}
+
+:root[data-bs-theme="dark"] .ronda-card .text-muted{
+  color: #9ca3af !important;   /* slate-400 */
+}
+
+/* inputs + unidad */
+:root[data-bs-theme="dark"] .floating-with-unit .form-control{
+  background: #111827;          /* slate-900 */
+  color: #e5e7eb;
+  border: 1px solid #334155;    /* slate-700 */
+}
+:root[data-bs-theme="dark"] .floating-with-unit .form-control::placeholder{
+  color: #9ca3af;
+}
+:root[data-bs-theme="dark"] .floating-with-unit .form-control:focus{
+  border-color: #60a5fa;        /* blue-400 */
+  box-shadow: 0 0 0 .2rem rgba(96,165,250,.2);
+}
+
+:root[data-bs-theme="dark"] .floating-with-unit .input-group-text{
+  background: #111827;
+  color: #e5e7eb;
+  border: 1px solid #334155;
+  border-left: 0;
+}
+
+/* label flotante en oscuro */
+:root[data-bs-theme="dark"] .floating-with-unit .form-floating > label{
+  color: #d1d5db !important;    /* slate-300 */
+}
+:root[data-bs-theme="dark"] .floating-with-unit .form-floating > .form-control:focus ~ label{
+  color: #93c5fd !important;    /* blue-300 */
+}
+:root[data-bs-theme="dark"] .floating-with-unit .form-floating > .form-control:focus ~ label::after,
+:root[data-bs-theme="dark"] .floating-with-unit .form-floating > .form-control:not(:placeholder-shown) ~ label::after{
+  background-color: transparent !important;
+}
+
+/* hint en oscuro */
+:root[data-bs-theme="dark"] .minmax-hint{
+  color: #9ca3af;               /* slate-400 */
+}
+
+/* Botón secundario en oscuro */
+:root[data-bs-theme="dark"] .ronda-card .btn.btn-secondary{
+  background-color: #374151;
+  border-color: #4b5563;
+  color: #e5e7eb;
+}
+:root[data-bs-theme="dark"] .ronda-card .btn.btn-secondary:hover{
+  background-color: #4b5563;
+}
+
+/* Alert-info en oscuro */
+:root[data-bs-theme="dark"] .ronda-card .alert.alert-info{
+  background: rgba(14,165,233,.12);
+  border-color: rgba(14,165,233,.35);
+  color: #bae6fd;
+}
+
+/* ====== Disposición con GRID: 2 columnas por defecto ====== */
+.param-grid { display: grid; gap: 1rem; grid-template-columns: repeat(2, 1fr); }
+
+/* Seguridad para pantallas pequeñas */
+@media (max-width: 576px) {
+  .param-grid { grid-template-columns: 1fr; gap: .75rem; }
+}
+
+/* Highlight for out-of-range inputs */
+.form-control.is-out-range {
+  border-color: #dc3545;
+  box-shadow: 0 0 0 0.2rem rgba(220,53,69,.25);
+}
+
+.form-control.is-out-range:focus {
+  border-color: #dc3545;
+  box-shadow: 0 0 0 0.25rem rgba(220,53,69,.35);
+}
+
+.param-card{
+  display:flex;
+  gap:12px;
+  align-items:flex-start;
+  border:1px solid var(--bs-border-color, #e6e9ef);
+  background: var(--bs-body-bg, #fff);
+  border-radius:12px;
+  padding:10px;
+}
+
+.param-thumb-wrap{ flex: 0 0 76px; }
+.param-meta{ flex: 1 1 auto; min-width: 0; }
+
+.param-thumb{
+  width:76px; height:76px;
+  border-radius:10px;
+  object-fit:cover;
+  border:1px solid var(--bs-border-color, #e6e9ef);
+  background: var(--bs-tertiary-bg, #f8f9fa);
+  cursor:pointer;
+  display:block;
+}
+
+.param-thumb--placeholder{
+  display:flex; align-items:center; justify-content:center;
+  color: var(--bs-secondary-color, #6b7280);
+  font-size:18px;
+}
+
+.param-meta .minmax-hint{
+  margin-top:6px;
+  font-size:12px;
+  color: var(--bs-secondary-color, #6b7280);
+}
+
+/* Evitar que el label envuelva: mediremos overflow para ajustar columnas */
+.param-label {
+  /* Allow label to wrap instead of truncating with ellipsis */
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+  width: 100%;
+  display: block;
+  word-break: break-word; /* break long words if needed */
+}
+
+/* Mejoras dark */
+.dark .param-card,
+[data-theme="dark"] .param-card{
+  background:#0b1220;
+  border-color:#1f2a44;
+}
+
+.dark .param-thumb,
+[data-theme="dark"] .param-thumb{
+  background:#0f172a;
+  border-color:#1f2a44;
+}
