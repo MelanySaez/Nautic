@@ -2,6 +2,9 @@
 
 Stack: Django 5.1 · Celery 5.4 · RabbitMQ (AMQP) · Redis · PostgreSQL · nautic_core (YOLO)
 
+> El paquete se instala como `nautic_core` (desde git, `v2.0.0`) pero se importa como `core_engine`:
+> `from core_engine import ImageProcessor`.
+
 ---
 
 ## Arquitectura general
@@ -73,7 +76,7 @@ Foto individual analizada por YOLO. Máquina de estados asíncrona.
 | `tiempo_inferencia_ms` | FloatField null | Tiempo de inferencia reportado por nautic_core |
 | `severidad` | CharField(20) null | `critical` / `high` / `medium` / `low` |
 | `estado` | CharField(20) | Estado actual (ver máquina de estados) |
-| `error_detalle` | CharField(500) null | Mensaje de error si `estado=error` |
+| `error_detalle` | TextField null | Mensaje de error si `estado=error` (la tarea trunca a 500 chars al escribir) |
 | `fecha_creacion` | DateTimeField | Auto (auto_now_add) |
 
 **Máquina de estados `FotoInspeccion.Estado`:**
@@ -432,12 +435,18 @@ python manage.py runserver
 
 ```
 vision/
-├── models.py        # SeccionCasco, InspeccionCasco, FotoInspeccion
-├── views.py         # Endpoints REST + SSE stream
-├── tasks.py         # procesar_foto (Celery) + dead_letter
-├── pubsub.py        # Cliente Redis + publicar_evento + suscribirse
-├── ratelimit.py     # Fixed-window counter upload + concurrent tracker
-├── inference.py     # Singleton ImageProcessor (nautic_core)
-├── urls.py          # Routing del módulo
-└── admin.py         # (Django admin)
+├── models.py         # SeccionCasco, InspeccionCasco, FotoInspeccion
+├── views.py          # Endpoints REST + SSE stream
+├── tasks.py          # procesar_foto (Celery) + dead_letter
+├── pubsub.py         # Cliente Redis + publicar_evento + suscribirse
+├── ratelimit.py      # Fixed-window counter upload + concurrent tracker
+├── inference.py      # Singleton ImageProcessor (paquete nautic_core, módulo core_engine)
+├── urls.py           # Routing del módulo
+├── apps.py           # AppConfig
+├── migrations/       # Migraciones del módulo
+├── management/
+│   └── commands/seed_secciones_casco.py   # Puebla el catálogo de secciones
+└── INSPECCION_IA.md  # Documentación funcional + decisiones de diseño
 ```
+
+No hay `admin.py` ni `tests.py` en este módulo.

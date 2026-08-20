@@ -9,11 +9,16 @@ Guidance for agentic coding agents operating in this repository.
 Multi-tier naval vessel maintenance management system ("rondas de mantenimiento"):
 
 - **`frontend/`** — React 18 SPA (Create React App + CRACO, plain JavaScript, no TypeScript)
-- **`api/`** — Django app (models, views, URLs, serializers)
-- **`backend/`** — Django project config (settings, wsgi/asgi, Dockerfile)
+- **`api/`** — Django app for the maintenance domain (models, views, URLs, serializers)
+- **`vision/`** — Django app for AI hull inspection (YOLO via Celery worker + SSE)
+- **`backend/`** — Django project config (settings, celery app, wsgi/asgi, Dockerfile)
 - **`chatbot/`** — AI microservice (n8n + Qdrant + Ollama + Python translator, Docker Compose)
 - **`manage.py`** — Root Django entry point
 - **`requirements.txt`** — Python dependencies
+
+Both `api` and `vision` are in `INSTALLED_APPS` and both mount their URLs at the project root (`backend/urls.py`), so all endpoints live under `/api/`.
+
+The `vision` module needs extra infrastructure the rest of the project does not: **RabbitMQ** (Celery broker) and **Redis** (SSE pub/sub + rate limiting). Everything else runs with just Django + Postgres.
 
 ---
 
@@ -33,7 +38,28 @@ python manage.py runserver          # Dev server on port 8000
 python manage.py migrate            # Apply migrations
 python manage.py makemigrations     # Generate migration files
 python manage.py shell              # Django interactive shell
+python manage.py seed_secciones_casco   # Seed the hull-section catalog (vision module)
 ```
+
+API docs (drf-spectacular) are served at `/api/docs/` (Swagger), `/api/docs/redoc/` and `/api/schema/`.
+
+### Vision module infrastructure (run from project root)
+
+Required only when working on `vision/`. Without them, uploads succeed but nothing gets analyzed.
+
+```bash
+# 1. Base services
+sudo systemctl start rabbitmq-server redis
+
+# 2. Celery worker (loads the YOLO model once per process)
+celery -A backend worker -Q vision -l info --concurrency=2 --pool=prefork
+
+# 3. Flower — worker monitoring UI on :5555 (optional)
+celery -A backend flower --port=5555 \
+  --broker_api=http://guest:guest@localhost:15672/api/
+```
+
+To run vision tests or scripts without a broker, set `CELERY_TASK_ALWAYS_EAGER=True` — tasks then execute inline.
 
 ### Chatbot infrastructure (run from `chatbot/`)
 
@@ -70,8 +96,9 @@ Testing libraries: `@testing-library/react`, `@testing-library/jest-dom`, `@test
 # Run all backend tests
 python manage.py test
 
-# Run tests for the api app
+# Run tests for a single app
 python manage.py test api
+python manage.py test vision
 
 # Run a specific test class
 python manage.py test api.tests.SomeTestClass
@@ -80,7 +107,7 @@ python manage.py test api.tests.SomeTestClass
 python manage.py test api.tests.SomeTestClass.test_method_name
 ```
 
-> Note: `api/tests.py` is currently a stub — no backend tests are implemented yet.
+> Note: `api/tests.py` is a stub and `vision/` has no `tests.py` at all — no backend tests are implemented yet. If you add tests that touch the vision module, set `CELERY_TASK_ALWAYS_EAGER=True` so tasks run inline instead of needing a live broker.
 
 ---
 
@@ -181,6 +208,17 @@ Language changes are dispatched via `window.dispatchEvent(new CustomEvent('app:l
 - The backend exposes REST endpoints under `/api/`; the frontend config (`frontend/src/config.js`) defines `API_BASE`.
 - The chatbot service communicates with Django via webhooks (`requests.post()` to n8n from `api/views.py`).
 - Domain language is Spanish (model names, URL paths, variable names in business logic); UI supports both `es` and `en` via the i18n pattern.
+- There is **no authentication** in the Lite version: the JWT middleware is commented out in `backend/settings.py` and `djangorestframework_simplejwt` is not installed. The 401-refresh logic in `api.js` is dormant leftover from the full version — leave it alone, do not build on it.
+
+### Vision module (async pipeline)
+
+- Django views only enqueue: `procesar_foto.apply_async()` → RabbitMQ queue `vision`. Never run YOLO inference inline in a view.
+- The Celery worker (`vision/tasks.py`) persists results to Postgres and publishes events to Redis; Django streams them to the browser as SSE from `/api/vision/inspecciones/<id>/stream/`. The frontend consumes them with `EventSource` — **do not add polling loops** to this module.
+- The YOLO model is a per-process singleton (`vision/inference.py:get_processor()`). Never instantiate `ImageProcessor` directly.
+- Postgres (`FotoInspeccion.estado`) is the source of truth — there is no Celery result backend.
+- Failures that exhaust retries go to the `vision.dead` DLQ, visible in Flower.
+- The package is installed as `nautic_core` (from git) but imported as `core_engine`.
+- `CONCURRENT_LIMIT` in `AIInspection.js` must stay in sync with `VISION_RATE_LIMIT_MAX_CONCURRENT` in `backend/settings.py`.
 
 ---
 
@@ -191,10 +229,30 @@ Language changes are dispatched via `window.dispatchEvent(new CustomEvent('app:l
 | `frontend/src/services/api.js` | Axios instance, interceptors, all API call functions |
 | `frontend/src/config.js` | `API_BASE` and other frontend constants |
 | `frontend/src/App.js` | Top-level routing and layout |
-| `api/models.py` | All Django ORM models |
-| `api/views.py` | All backend API views (~1400+ lines) |
+| `api/models.py` | Maintenance-domain ORM models |
+| `api/views.py` | Maintenance-domain API views (~3600 lines) |
 | `api/urls.py` | URL routing for the api app |
-| `backend/settings.py` | Django project settings (DB, installed apps, CORS, JWT) |
+| `vision/views.py` | Vision REST endpoints + SSE stream |
+| `vision/tasks.py` | Celery task `procesar_foto` + dead-letter task |
+| `vision/inference.py` | YOLO `ImageProcessor` singleton |
+| `vision/pubsub.py` | Redis pub/sub used by SSE |
+| `vision/ratelimit.py` | Per-IP upload and concurrency limits |
+| `backend/settings.py` | Django settings (DB, apps, CORS, Celery, Redis, rate limits) |
+| `backend/celery.py` | Celery app definition |
+| `backend/urls.py` | Root routing — mounts `api`, `vision` and the OpenAPI docs |
 | `requirements.txt` | Python dependencies |
 | `frontend/package.json` | JS dependencies and ESLint config |
 | `chatbot/docker-compose.yml` | AI infrastructure services |
+
+---
+
+## Module Documentation
+
+| Doc | Scope |
+|---|---|
+| `vision/INSPECCION_IA.md` | Vision module end-to-end + design decisions |
+| `VISION_BACKEND.md` | Vision backend reference (Celery, Redis, SSE, rate limiting) |
+| `VISION_FRONTEND.md` | Vision frontend reference (components, SSE handling, CSS) |
+| `chatbot/README.md` | Chatbot Docker Compose stack |
+
+There is no equivalent document for the `api/` maintenance domain yet.

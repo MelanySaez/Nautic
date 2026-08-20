@@ -204,8 +204,9 @@ CELERY_BROKER_URL = os.getenv(
 )
 
 # Sin result backend: el estado de cada foto vive en FotoInspeccion.estado
-# (Postgres es la fuente de verdad). Esto evita dependencia adicional de Redis
-# para la Fase 1 y mantiene el stack mínimo.
+# (Postgres es la fuente de verdad). El frontend se entera de los cambios por
+# SSE, no consultando el resultado de la tarea, así que un result backend sólo
+# añadiría escrituras que nadie lee.
 CELERY_RESULT_BACKEND = None
 CELERY_TASK_IGNORE_RESULT = True
 
@@ -279,7 +280,7 @@ SSE_KEEPALIVE_SECONDS = int(os.getenv("SSE_KEEPALIVE_SECONDS", "15"))
 # =============================================================================
 # Rate limiting — controles por IP usando contadores Redis
 # =============================================================================
-# Uploads por minuto: ventana deslizante de 60 s. Protege contra flooding de disco.
+# Uploads por minuto: ventana fija de 60 s. Protege contra flooding de disco.
 VISION_RATE_LIMIT_UPLOADS_PER_MINUTE = int(
     os.getenv("VISION_RATE_LIMIT_UPLOADS_PER_MINUTE", "20")
 )

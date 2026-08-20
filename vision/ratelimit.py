@@ -3,9 +3,12 @@ Rate limiting para el módulo de visión, basado en Redis.
 
 Dos controles independientes:
 
-1. Sliding-window 60 s por IP (upload):
+1. Fixed-window 60 s por IP (upload):
    Max VISION_RATE_LIMIT_UPLOADS_PER_MINUTE cargas por minuto.
    Previene flooding de disco por carga masiva accidental.
+   La ventana arranca con la primera carga y expira 60 s después, así que en
+   el peor caso (final de una ventana + inicio de la siguiente) admite hasta
+   2× el límite en un intervalo corto. Aceptable para este uso.
 
 2. Concurrent tracker por IP (dispatch):
    Max VISION_RATE_LIMIT_MAX_CONCURRENT fotos activas simultáneas.
@@ -42,7 +45,7 @@ def get_client_ip(request) -> str:
 
 def check_upload_rate(ip: str) -> tuple[bool, str | None]:
     """
-    Ventana deslizante de 60 s.
+    Ventana fija de 60 s (INCR + EXPIRE en el primer hit).
     Retorna (permitido, mensaje_error). Falla abierto si Redis no responde.
     """
     limit = getattr(settings, "VISION_RATE_LIMIT_UPLOADS_PER_MINUTE", 20)

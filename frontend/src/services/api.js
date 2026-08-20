@@ -308,7 +308,7 @@ export const subirFotoInspeccion = async (inspeccionId, { imagen, seccionId }) =
   return data;
 };
 
-/** Estado de una foto (polling) */
+/** Estado de una foto — consulta puntual (el progreso en vivo llega por SSE) */
 export const fetchFotoDetalle = async (fotoId) => {
   const { data } = await api.get(`/vision/fotos/${fotoId}/`);
   return data;

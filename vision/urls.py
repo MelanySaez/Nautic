@@ -14,10 +14,10 @@ urlpatterns = [
     # Detalle de inspección + sus fotos
     path('api/vision/inspecciones/<int:inspeccion_id>/', views.api_vision_inspeccion_detalle, name='api_vision_inspeccion_detalle'),
 
-    # Subir foto a una inspección (dispara YOLO en background)
+    # Subir foto a una inspección (solo guarda; el análisis se dispara aparte)
     path('api/vision/inspecciones/<int:inspeccion_id>/fotos/', views.api_vision_subir_foto, name='api_vision_subir_foto'),
 
-    # Estado de una foto individual (polling) + análisis manual + eliminación
+    # Estado de una foto individual (consulta puntual) + análisis manual + eliminación
     path('api/vision/fotos/<int:foto_id>/', views.api_vision_foto_detalle, name='api_vision_foto_detalle'),
 
     # Disparar análisis YOLO para todas las fotos pendientes de una inspección

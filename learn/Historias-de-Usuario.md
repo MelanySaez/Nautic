@@ -187,7 +187,27 @@
 
 Estas historias de usuario son la base para:
 
-- ✅ **Requerimientos.md** - Especificaciones técnicas derivadas
-- ✅ **Casos-de-Uso.md** - Flujos detallados de interacción
-- ✅ **02-Arquitectura/** - Decisiones de diseño del sistema
-- ✅ **03-Diseño-UI-UX/** - Mockups y flujos de interfaz
+- ⬜ **Requerimientos.md** - Especificaciones técnicas derivadas — *no existe en el repo*
+- ⬜ **Casos-de-Uso.md** - Flujos detallados de interacción — *no existe en el repo*
+- ⬜ **02-Arquitectura/** - Decisiones de diseño del sistema — *no existe; las decisiones del módulo de visión están en [`vision/INSPECCION_IA.md`](../vision/INSPECCION_IA.md)*
+- ⬜ **03-Diseño-UI-UX/** - Mockups y flujos de interfaz — *no existe en el repo*
+
+---
+
+## Estado de implementación (verificado 19-Ago-2026)
+
+El módulo de Inspección IA (`vision/`) cubre parcialmente estas historias. Divergencias a tener presentes:
+
+| HU | Estado | Nota |
+|---|---|---|
+| HU-01 Registrar barco | ✅ | Módulo `api/` (`Buque`) |
+| HU-02 Registrar componente | ⚠️ | Implementado como catálogo fijo de `SeccionCasco` (zonas del casco), no como componentes por barco |
+| HU-03 Inspección con imagen | ✅ | Acepta jpg/jpeg/png/bmp/webp/tiff, no solo JPG/PNG |
+| HU-04 Notificación de análisis | ✅ | Vía SSE en tiempo real dentro de la vista; no hay notificación fuera de ella |
+| HU-05 Visualizar resultados | ⚠️ | Falta lo pronóstico: **no hay RUL ni recomendación de acción**. La severidad se deriva de la clase detectada (`corrosion`→critical, etc.), **no** del porcentaje de área afectada. Tampoco hay "ubicación precisa" más allá de la sección del casco |
+| HU-06 Historial | ⚠️ | Listado por buque; **sin filtros** por rango de fechas, usuario ni estado. Sin tendencias de deterioro |
+| HU-07 Reporte técnico PDF | ❌ | No implementado en el módulo de visión |
+| HU-08 Reintentar análisis | ✅ | `POST /api/vision/fotos/<id>/` |
+| HU-09 Consultar estado | ⚠️ | Los 4 estados existen; **no se muestra tiempo estimado**, solo el tiempo de inferencia una vez completada |
+
+También sigue abierta la decisión de autenticación: la versión Lite **no tiene login** — `tomado_por` es texto libre.

@@ -5,8 +5,8 @@
 1. [Visión general](#1-visión-general)
 2. [Arquitectura y stack](#2-arquitectura-y-stack)
 3. [Modelos de base de datos](#3-modelos-de-base-de-datos)
-4. [API REST — Endpoints](#4-api-rest--endpoints)
-5. [Procesamiento YOLO asíncrono](#5-procesamiento-yolo-asíncrono)
+4. [API REST, SSE y rate limiting](#4-api-rest-sse-y-rate-limiting)
+5. [Procesamiento YOLO asíncrono (Celery)](#5-procesamiento-yolo-asíncrono-celery)
 6. [Persistencia de imágenes en disco](#6-persistencia-de-imágenes-en-disco)
 7. [Frontend — Componentes React](#7-frontend--componentes-react)
 8. [Servicio API en el frontend](#8-servicio-api-en-el-frontend)
@@ -18,7 +18,7 @@
 
 ## 1. Visión general
 
-El módulo de Inspección IA permite a los inspectores navales fotografiar secciones del casco de un buque y obtener detecciones automáticas de anomalías usando un modelo YOLO (`nautic_core.ImageProcessor`). Las inspecciones se agrupan por buque y sesión, las fotos se organizan por sección del casco, y el análisis corre de forma asíncrona sin bloquear la interfaz.
+El módulo de Inspección IA permite a los inspectores navales fotografiar secciones del casco de un buque y obtener detecciones automáticas de anomalías usando un modelo YOLO (`core_engine.ImageProcessor`). Las inspecciones se agrupan por buque y sesión, las fotos se organizan por sección del casco, y el análisis corre en workers Celery sin bloquear la interfaz. El progreso llega al browser por Server-Sent Events.
 
 Clases detectables por el modelo:
 
@@ -39,23 +39,45 @@ Clases detectables por el modelo:
 
 ## 2. Arquitectura y stack
 
+Stack: Django 5.1 · Celery 5.4 · RabbitMQ (broker) · Redis (pub/sub + rate limit) · PostgreSQL · React 18
+
 ```
 frontend/src/components/AIInspection.js   ← componente principal React
 frontend/src/components/AIInspection.css  ← estilos alineados al design system
-frontend/src/services/api.js              ← funciones de cliente HTTP (axios)
+frontend/src/components/CameraCapture.js  ← captura desde cámara (modal)
+frontend/src/services/api.js              ← cliente HTTP (axios) + stream SSE
 
 vision/models.py       ← modelos Django (SeccionCasco, InspeccionCasco, FotoInspeccion)
-vision/views.py        ← lógica de endpoints + worker YOLO
+vision/views.py        ← endpoints REST + endpoint SSE
+vision/tasks.py        ← tarea Celery procesar_foto + DLQ
+vision/inference.py    ← singleton del ImageProcessor (YOLO)
+vision/pubsub.py       ← cliente Redis pub/sub para eventos SSE
+vision/ratelimit.py    ← rate limiting por IP (uploads + concurrencia)
 vision/urls.py         ← registro de rutas
 vision/management/commands/seed_secciones_casco.py  ← comando para poblar el catálogo
+
+backend/celery.py      ← app Celery del proyecto
+backend/settings.py    ← config CELERY_*, REDIS_URL, SSE_*, VISION_RATE_LIMIT_*
+```
+
+**Flujo de datos:**
+
+```
+Django view (upload)  → guarda en disco → publica foto-created (Redis)
+Django view (analizar)→ rate limit → procesar_foto.apply_async() → RabbitMQ cola "vision"
+Celery worker         → inferencia YOLO → guarda en Postgres → publica foto-updated (Redis)
+Django view (stream)  → SUBSCRIBE Redis → StreamingHttpResponse (SSE) → browser EventSource
 ```
 
 **Dependencias clave:**
-- `nautic_core.ImageProcessor` — wrapper del modelo YOLO (paquete externo)
+- `core_engine.ImageProcessor` — wrapper del modelo YOLO (paquete externo)
+- `celery` + RabbitMQ — cola de tareas para la inferencia
+- `redis` — pub/sub de eventos SSE y contadores de rate limiting
 - `PIL` (Pillow) — validación de imágenes antes de guardarlas o procesarlas
-- `threading` — ejecución del worker YOLO en hilo daemon
 - `SweetAlert2` — diálogos de confirmación en el frontend
 - Bootstrap Icons (`bi-*`) — iconografía de la interfaz
+
+> Detalle ampliado del backend en [`VISION_BACKEND.md`](../VISION_BACKEND.md) y del frontend en [`VISION_FRONTEND.md`](../VISION_FRONTEND.md).
 
 ---
 
@@ -143,11 +165,11 @@ Cada entrada incluye:
 **Otras decisiones:**
 - `imagen_original` y `imagen_anotada` son `CharField`, no `ImageField`. Esto es consistente con el enfoque del resto del proyecto (`api.Buque.imagen`, `api.Equipo.imagen`) y permite mayor control manual sobre las rutas de almacenamiento.
 - La FK a `SeccionCasco` usa `on_delete=PROTECT` (no CASCADE): si una sección tiene fotos asociadas no se puede eliminar accidentalmente del catálogo.
-- Los índices `(inspeccion, estado)` y `(seccion)` optimizan las consultas de polling y agrupación por sección que el frontend realiza periódicamente.
+- Los índices `(inspeccion, estado)` y `(seccion)` optimizan el filtrado de fotos pendientes (endpoint `/analizar/`) y la agrupación por sección de la vista de resultados.
 
 ---
 
-## 4. API REST — Endpoints
+## 4. API REST, SSE y rate limiting
 
 Todos registrados en `vision/urls.py` y prefijados con `/api/`.
 
@@ -159,10 +181,39 @@ Todos registrados en `vision/urls.py` y prefijados con `/api/`.
 | `GET` | `/api/vision/inspecciones/<id>/` | Detalle de inspección con todas sus fotos |
 | `DELETE` | `/api/vision/inspecciones/<id>/` | Eliminar inspección + archivos físicos |
 | `POST` | `/api/vision/inspecciones/<id>/fotos/` | Subir foto (multipart) |
-| `GET` | `/api/vision/fotos/<id>/` | Estado de una foto (usado para polling) |
+| `GET` | `/api/vision/fotos/<id>/` | Estado de una foto (consulta puntual / fallback) |
 | `POST` | `/api/vision/fotos/<id>/` | Disparar análisis de foto en estado `pendiente` o `error` |
 | `DELETE` | `/api/vision/fotos/<id>/` | Eliminar foto + archivos físicos |
 | `POST` | `/api/vision/inspecciones/<id>/analizar/` | Iniciar análisis de todas las fotos pendientes |
+| `GET` | `/api/vision/inspecciones/<id>/stream/` | Stream SSE de eventos de la inspección |
+
+### Rate limiting (`vision/ratelimit.py`)
+
+Dos controles por IP respaldados por contadores Redis. Ambos **fallan abiertos**: si Redis no responde, la operación pasa igualmente (no se bloquea el negocio por indisponibilidad del cache).
+
+| Control | Dónde aplica | Límite (env) | Respuesta al superarlo |
+|---|---|---|---|
+| Uploads por minuto (ventana de 60 s) | `POST .../fotos/` | `VISION_RATE_LIMIT_UPLOADS_PER_MINUTE` (20) | `429` |
+| Fotos activas simultáneas | `POST /fotos/<id>/` y `POST .../analizar/` | `VISION_RATE_LIMIT_MAX_CONCURRENT` (10) | `429` (o parcial, ver abajo) |
+
+`track_concurrent_start(ip, foto_id)` se llama desde la vista al disparar; `track_concurrent_end(foto_id)` desde el worker al terminar (éxito, error final o skip). El mapeo `foto → IP` vive en Redis con TTL de 2 h.
+
+En `POST .../analizar/` el límite se aplica foto por foto: la respuesta `202` devuelve `{"iniciadas": N, "omitidas_por_limite": M}`. Solo devuelve `429` si no se pudo disparar ninguna.
+
+La IP real se extrae respetando `X-Forwarded-For` (primer valor) para funcionar detrás de nginx/proxies.
+
+### Eventos SSE emitidos
+
+`GET /api/vision/inspecciones/<id>/stream/` devuelve `text/event-stream`. Emite un `ready` de handshake, sugiere `retry: 5000` al browser, y envía un comentario `:keepalive` cada `SSE_KEEPALIVE_SECONDS` (15 por defecto) para sobrevivir proxies con timeouts agresivos.
+
+| Evento | Emisor | Payload |
+|---|---|---|
+| `ready` | vista SSE | `{inspeccion_id, ts}` |
+| `foto-created` | vista de upload | `{foto: {...}}` |
+| `foto-updated` | worker Celery | `{foto_id, inspeccion_id, estado, severidad, detecciones, tiempo_inferencia_ms, imagen_anotada, error_detalle}` |
+| `foto-deleted` | vista de borrado | `{foto_id, inspeccion_id}` |
+
+**Nota sobre rutas de imagen:** el worker Celery no tiene `request`, por lo que `foto-updated` viaja con paths relativos (`media/...`), mientras que el `GET` de detalle devuelve URLs absolutas. El frontend normaliza con `_absMediaUrl()` antes del merge para no pisar una URL buena con un path roto.
 
 ### Endpoint legado
 
@@ -179,46 +230,89 @@ Antes de guardar cualquier archivo, `_validar_imagen()` aplica tres comprobacion
 
 ---
 
-## 5. Procesamiento YOLO asíncrono
+## 5. Procesamiento YOLO asíncrono (Celery)
 
 ### Por qué asíncrono
 
 La inferencia YOLO puede tardar entre 100ms y varios segundos dependiendo del hardware. Bloquear el worker HTTP de Django durante ese tiempo colapsaría la capacidad de respuesta del servidor ante múltiples uploads simultáneos.
 
-### Implementación con `threading`
+### Implementación con Celery + RabbitMQ
+
+La vista solo encola. Toda la inferencia vive en el worker.
 
 ```python
+# vision/views.py
 def _disparar_procesamiento(foto_id):
-    t = threading.Thread(target=_procesar_foto_worker, args=(foto_id,), daemon=True)
-    t.start()
+    """Encola la tarea Celery ``vision.procesar_foto`` para la foto dada."""
+    procesar_foto.apply_async(kwargs={"foto_id": foto_id})
 ```
 
-El hilo es `daemon=True`: si el proceso principal de Django muere, el hilo no bloquea el cierre.
+**Colas** (`backend/settings.py`): `vision` es la cola principal, declarada con `x-dead-letter-exchange: vision.dlx`; `vision.dead` recoge lo que RabbitMQ reencamina y las tareas que agotan reintentos.
 
-### Flujo del worker
+Parámetros relevantes:
+
+| Setting | Valor | Razón |
+|---|---|---|
+| `CELERY_RESULT_BACKEND` | `None` | Postgres (`FotoInspeccion.estado`) es la fuente de verdad; no hace falta backend de resultados |
+| `CELERY_WORKER_PREFETCH_MULTIPLIER` | `1` | Tareas largas de ML: evita que un worker acapare la cola |
+| `CELERY_TASK_ACKS_LATE` | `True` | Si el worker muere a mitad de inferencia, RabbitMQ re-encola en otro |
+| `CELERY_TASK_REJECT_ON_WORKER_LOST` | `True` | Complemento del anterior |
+| `CELERY_TASK_SOFT_TIME_LIMIT` / `TIME_LIMIT` | `270` / `300` s | Soft lanza excepción; hard mata el proceso |
+| `CELERY_TASK_ALWAYS_EAGER` | env, `False` | Modo síncrono para tests/CI |
+
+Arranque del worker:
+
+```bash
+celery -A backend worker -Q vision -l info --concurrency=2 --pool=prefork
+```
+
+### Singleton del modelo YOLO (`vision/inference.py`)
+
+`get_processor()` carga `ImageProcessor` **una sola vez por proceso** y lo reutiliza, protegido con un `Lock` para el caso de dos hilos inicializando a la vez. En workers prefork, la señal `worker_process_init` precarga el modelo al arrancar cada subproceso, de modo que la primera tarea no paga la latencia de inicialización.
+
+### Flujo de la tarea (`vision/tasks.py`)
 
 ```python
-def _procesar_foto_worker(foto_id):
-    foto.estado = 'en_proceso'  → guarda
+@shared_task(
+    bind=True,
+    name="vision.procesar_foto",
+    autoretry_for=(IOError, OSError),
+    retry_backoff=True, retry_backoff_max=60, retry_jitter=True,
+    retry_kwargs={"max_retries": 3},
+)
+def procesar_foto(self, foto_id):
+    si la foto no existe        → track_concurrent_end + return
+    si estado == 'completada'   → track_concurrent_end + return   # idempotencia
+    foto.estado = 'en_proceso'  → guarda → _notificar()           # evento SSE
     lee imagen del disco
     valida con PIL (protege contra archivos corruptos en disco)
-    processor = ImageProcessor(confidence=0.25, iou=0.45)
+    processor = get_processor()                                   # singleton
     imagen_anotada_bytes, resultados = asyncio.run(processor.process_and_visualize(...))
     guarda imagen anotada en disco
 
     raw_detections = resultados['detections']
     foto.imagen_anotada       = ruta
     foto.detecciones          = _agrupar_detecciones(raw_detections)
-    foto.tiempo_inferencia_ms = resultados['inference_time_ms']
+    foto.tiempo_inferencia_ms = round(resultados['inference_time_ms'], 2)
     foto.severidad            = _calcular_severidad(raw_detections)
-    foto.estado = 'completada'  → guarda
+    foto.estado = 'completada'  → guarda → _notificar() → track_concurrent_end()
 
     # si falla en cualquier punto:
-    foto.estado = 'error'
-    foto.error_detalle = str(exc)
+    foto.estado = 'error'; foto.error_detalle = str(exc)[:500] → _notificar()
+    # IOError/OSError → reintenta con backoff hasta 3 veces
+    # cualquier otra excepción → fallo terminal → dead_letter en cola vision.dead
 ```
 
-El worker aplica dos transformaciones sobre la salida cruda del modelo antes de guardar:
+**Idempotencia:** con `acks_late`, RabbitMQ puede re-entregar una tarea cuyo worker murió. La comprobación `estado == 'completada'` al inicio evita reprocesar trabajo ya hecho.
+
+**Dead Letter Queue:** `dead_letter(foto_id, error_type, error_detail, original_task_id)` es una tarea aparte en la cola `vision.dead`. No repara nada — registra el fallo con nivel `ERROR` y queda visible en Flower para diagnóstico y requeue manual:
+
+```python
+from vision.tasks import procesar_foto
+procesar_foto.apply_async([foto_id])
+```
+
+La tarea aplica dos transformaciones sobre la salida cruda del modelo antes de guardar:
 
 - **`_agrupar_detecciones(raw_detections)`** — colapsa la lista de detecciones individuales en una entrada por clase única, conservando el conteo de apariciones y la confianza máxima.
 - **`_calcular_severidad(raw_detections)`** — evalúa todas las clases detectadas contra `_SEVERITY_MAP` y retorna el nivel más alto encontrado (`critical` > `high` > `medium` > `low`). Si no hay anomalías reales entre las detecciones, retorna `None`.
@@ -227,15 +321,11 @@ El worker aplica dos transformaciones sobre la salida cruda del modelo antes de 
 
 **Decisión deliberada:** el análisis no se dispara al subir la foto. El inspector puede subir múltiples fotos a distintas secciones, revisarlas, eliminar errores, y solo cuando considera que el lote está completo presiona **"Iniciar análisis"**. Esto evita consumir recursos de GPU/CPU en fotos que se iban a eliminar de todas formas.
 
-El endpoint `POST /api/vision/inspecciones/<id>/analizar/` itera todas las fotos en estado `pendiente` y llama `_disparar_procesamiento` para cada una.
-
-### Punto de migración a Celery
-
-El código incluye un comentario explícito indicando que `_disparar_procesamiento` es el punto de reemplazo cuando se migre a un sistema de colas (Celery + Redis/RabbitMQ). La firma de la función worker no necesitaría cambiar.
+El endpoint `POST /api/vision/inspecciones/<id>/analizar/` itera todas las fotos en estado `pendiente`, reserva slot de concurrencia para cada una y llama `_disparar_procesamiento`.
 
 ### Reintentar fotos en error
 
-`POST /api/vision/fotos/<id>/` permite reintentar el análisis de una foto en estado `error` **o** `pendiente`. Restablece el estado a `pendiente` y lanza el worker nuevamente. Útil cuando el modelo falla por un pico de carga o un error transitorio.
+`POST /api/vision/fotos/<id>/` permite reintentar el análisis de una foto en estado `error` **o** `pendiente`. Restablece el estado a `pendiente`, limpia `error_detalle` y re-encola la tarea. Útil cuando el fallo fue terminal (sin reintento automático) o cuando ya se agotaron los 3 reintentos de Celery.
 
 ---
 
@@ -341,15 +431,16 @@ Vista principal de trabajo. Contiene:
 - **Cuadrícula de secciones** — muestra todas las `SeccionCasco` como cards clickeables. La sección activa despliega un panel debajo. El badge de conteo en cada sección se actualiza en tiempo real.
 - **Panel de sección activa** — contiene el botón de upload y la lista de fotos de esa sección en modo compacto.
 - **Botón "Iniciar análisis"** — habilitado solo si hay fotos en estado `pendiente`. Muestra un badge con el conteo de pendientes. Deshabilitado durante el proceso (`analizando` state).
-- **Polling automático** — cuando hay fotos en `pendiente` o `en_proceso`, el componente consulta el estado de la inspección cada 3 segundos con `setInterval`. El intervalo se limpia al desmontar o cuando ya no hay fotos pendientes.
+- **Stream SSE** — al montar, abre `abrirStreamInspeccion(inspeccionId, handlers)` y mergea los eventos `foto-created` / `foto-updated` / `foto-deleted` sobre el estado local. El `EventSource` se cierra en el cleanup del `useEffect`.
+- **Límite de concurrencia** — la constante `CONCURRENT_LIMIT = 10` en `AIInspection.js:181` debe coincidir con `VISION_RATE_LIMIT_MAX_CONCURRENT` del backend. El frontend calcula las fotos activas y avisa antes de que el servidor devuelva `429`.
 
-**Decisión sobre el polling:** en lugar de polling por foto individual, se consulta el detalle completo de la inspección. Esto actualiza el estado de todas las fotos en una sola petición, lo cual es más eficiente cuando hay varias fotos procesándose en paralelo.
+**Decisión sobre SSE en lugar de polling:** la versión anterior consultaba el detalle completo de la inspección cada 3 segundos con `setInterval`. Con Celery el worker ya sabe exactamente cuándo cambia el estado de una foto, así que publica el evento a Redis y Django lo empuja por `text/event-stream`. Esto elimina las peticiones en vacío y baja la latencia percibida de ~3 s a inmediata. El `GET` de detalle sigue existiendo para la carga inicial de la vista.
 
 ---
 
 ### `Resultados`
 
-Vista de lectura de los resultados del análisis. Agrupa las fotos por sección con `reduce` sobre `fotos[]`. Mantiene el mismo polling de 3 segundos que `SubirFotos` mientras haya fotos pendientes.
+Vista de lectura de los resultados del análisis. Agrupa las fotos por sección con `reduce` sobre `fotos[]`. Abre su propio stream SSE igual que `SubirFotos`, de modo que los reintentos disparados desde esta vista se reflejan en tiempo real.
 
 Incluye:
 - Botón "Subir foto" — navega de vuelta a `SubirFotos` para añadir más fotos a la inspección
@@ -388,6 +479,7 @@ fetchSeccionesCasco()              // GET  /vision/secciones/
 fetchInspecciones(buqueId?)        // GET  /vision/inspecciones/
 crearInspeccion({ buqueId, ... })  // POST /vision/inspecciones/
 fetchInspeccionDetalle(id)         // GET  /vision/inspecciones/<id>/
+abrirStreamInspeccion(id, handlers)// GET  /vision/inspecciones/<id>/stream/  (EventSource)
 eliminarInspeccion(id)             // DELETE /vision/inspecciones/<id>/
 subirFotoInspeccion(id, { imagen, seccionId })  // POST multipart /vision/inspecciones/<id>/fotos/
 fetchFotoDetalle(fotoId)           // GET  /vision/fotos/<id>/
@@ -440,10 +532,10 @@ const SEVERITY_MAP = {
 
 ### Severidad global de la foto
 
-La severidad se calcula en el backend durante el procesamiento YOLO y se persiste en el campo `FotoInspeccion.severidad`. El worker usa `_calcular_severidad()` que evalúa todas las detecciones contra `_SEVERITY_MAP` y retorna la peor encontrada. Se muestra como badge en el encabezado de la lista de detecciones.
+La severidad se calcula en el worker Celery durante el procesamiento YOLO y se persiste en el campo `FotoInspeccion.severidad`. `_calcular_severidad()` evalúa todas las detecciones contra `_SEVERITY_MAP` y retorna la peor encontrada. Se muestra como badge en el encabezado de la lista de detecciones.
 
 ```python
-# Backend: vision/views.py
+# Backend: vision/tasks.py
 _SEVERITY_MAP = {
     'corrosion':     'critical',
     'defect':        'high',
@@ -487,8 +579,9 @@ Se usa azul (no verde) para "Bajo" porque verde implicaría que no hay problema,
        └── Las fotos subidas se muestran en modo compacto con su estado
        └── Botón "Eliminar foto" en header de cada card compacta
    └── Botón "Iniciar análisis" (habilitado si hay pendientes)
-       └── POST /analizar/ → lanza worker YOLO en hilo separado por cada foto pendiente
-       └── El frontend hace polling cada 3s hasta que todas pasen a completada/error
+       └── POST /analizar/ → encola una tarea Celery por cada foto pendiente (cola "vision")
+       └── El worker publica foto-updated en Redis a cada cambio de estado
+       └── El frontend recibe los eventos por SSE y actualiza las cards en tiempo real
    └── "Ver resultados" → navega a /resultados
 
 4. /ai-inspection/<id>/resultados
@@ -511,22 +604,37 @@ Se usa azul (no verde) para "Bajo" porque verde implicaría que no hay problema,
 
 **Solución:** el upload solo guarda el archivo y crea el registro con `estado=pendiente`. El inspector revisa, elimina errores si los hay, y cuando el lote está listo presiona "Iniciar análisis".
 
-### Threading vs Celery
+### De hilos daemon a Celery + RabbitMQ
 
-Threading es adecuado para desarrollo y despliegues con carga moderada. Los hilos daemon no sobreviven si el proceso Django muere, lo que significa que un reinicio del servidor puede perder jobs en vuelo. El código señala explícitamente el punto de migración a Celery para producción.
+**Estado inicial:** el análisis corría en un `threading.Thread(daemon=True)` lanzado desde la vista. Funcionaba en desarrollo, pero tenía tres problemas serios:
+
+1. **Pérdida de jobs.** Un hilo daemon muere con el proceso. Cualquier reinicio del servidor (deploy, crash, recarga del autoreloader) perdía en silencio todas las inferencias en vuelo, dejando fotos clavadas en `en_proceso` para siempre.
+2. **Sin reintentos ni visibilidad.** Un fallo de E/S transitorio marcaba la foto como `error` definitivamente. No había forma de saber cuántos jobs fallaron ni por qué, más allá de leer logs.
+3. **Sin control de carga.** Nada limitaba cuántos hilos se lanzaban a la vez. Con un lote grande, N hilos competían por CPU/GPU y degradaban el servidor HTTP del que colgaban.
+
+**Estado actual:** RabbitMQ persiste la cola, así que un reinicio no pierde trabajo; `acks_late` + `reject_on_worker_lost` re-encolan lo que quedó a medias, y la comprobación de `estado == 'completada'` al inicio de la tarea garantiza idempotencia frente a re-entregas. Los fallos de E/S reintentan con backoff exponencial y jitter; los terminales van a la DLQ `vision.dead`, visible en Flower. La concurrencia queda acotada por `--concurrency` del worker y por el rate limit por IP.
+
+**Costo asumido:** el stack pasó de "solo Django" a Django + RabbitMQ + Redis + worker. Es más infraestructura que operar, y el módulo deja de funcionar si el broker está caído — a diferencia de los hilos, que al menos degradaban solos. Se aceptó porque perder inferencias en silencio era peor que la complejidad operativa.
+
+### Por qué Redis pub/sub para las notificaciones
+
+Con el worker en otro proceso, Django ya no sabe cuándo termina una foto. Las opciones eran seguir haciendo polling contra Postgres, o que el worker avisara.
+
+Se eligió Redis pub/sub porque Redis ya entraba al stack para el rate limiting, el canal por inspección (`vision:inspeccion:{id}`) aísla naturalmente a los clientes de cada sesión, y `publicar_evento()` no rompe la operación de negocio si Redis está caído — solo loguea y sigue. Se perdería la actualización en vivo, pero la foto se procesa igual y la próxima carga de la vista muestra el estado real desde Postgres.
+
+Se descartó WebSockets: el flujo es unidireccional (servidor → browser), y SSE se resuelve con `StreamingHttpResponse` sin meter Channels ni ASGI en el proyecto.
+
+### Rate limiting fail-open
+
+Ambos controles de `ratelimit.py` dejan pasar la petición si Redis no responde. La alternativa (fail-closed) convertiría una caída del cache en una caída total del módulo. Se prioriza disponibilidad: el rate limit protege contra uso accidental abusivo, no es un control de seguridad.
 
 ### `on_delete=CASCADE` en `FotoInspeccion`
 
 Al eliminar una `InspeccionCasco`, Django elimina automáticamente todos los `FotoInspeccion` asociados en cascada. Sin embargo, los archivos físicos en disco no se eliminan en cascada automáticamente — Django no conoce la semántica de negocio del almacenamiento. Por eso el endpoint `DELETE /inspecciones/<id>/` itera las fotos manualmente y borra los archivos antes de llamar `insp.delete()`.
 
-### Polling del frontend
+### Carga inicial por REST, actualizaciones por SSE
 
-El frontend hace polling sobre el detalle completo de la inspección (no sobre cada foto individualmente) porque:
-1. Una sola petición actualiza el estado de todas las fotos
-2. Cuando hay N fotos procesándose, hacer N peticiones en paralelo cada 3 segundos saturaria el servidor
-3. El endpoint de detalle ya incluye `select_related('seccion')` y el prefetch de fotos, por lo que es una sola query
-
-El intervalo de 3 segundos es un balance entre latencia percibida y carga al servidor.
+La vista carga el estado completo con `GET /inspecciones/<id>/` (una sola query, con `select_related('seccion')`) y a partir de ahí solo aplica deltas recibidos por SSE. El stream no reenvía el estado completo: si el browser pierde la conexión, `EventSource` reconecta solo (`retry: 5000`) pero los eventos ocurridos durante el corte se pierden. Se acepta porque cualquier navegación a la vista vuelve a leer el estado real desde Postgres, que sigue siendo la fuente de verdad.
 
 ### Eliminación optimista en el listado
 

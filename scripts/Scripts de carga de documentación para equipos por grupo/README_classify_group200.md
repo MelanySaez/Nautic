@@ -24,7 +24,7 @@ Notas
 
 - Un archivo puede clasificarse en más de una categoría si su nombre contiene varias palabras clave.
 - Solo se procesan archivos `.pdf`.
-- Si necesitas ajustar las palabras clave, edita `scripts/classify_group200.js` y modifica las constantes `MANUAL_KEYWORDS`, `PLANO_KEYWORDS`, `DATASHEET_KEYWORDS`.
+- Si necesitas ajustar las palabras clave, edita `Paso 1 classify_group200.js` (en esta misma carpeta) y modifica las constantes `MANUAL_KEYWORDS`, `PLANO_KEYWORDS`, `DATASHEET_KEYWORDS`.
 
 Reglas adicionales:
 - Catálogo/listas: si el nombre contiene `catalogo`, `catálogo`, `lista` o `listado`, el script lo marcará como `isCatalog: true` y sugerirá los subtipos manuales `manual_herramientas` y `manual_partes` en la salida JSON (campo `suggestedManualSubtypes`). Esto permite revisar rápidamente archivos tipo catálogo y asignarlos como manual de herramientas/partes en tu aplicación.
@@ -47,10 +47,18 @@ El script intentará mapear el nombre del archivo a uno o más subtipos. Si el a
 
 Uso
 
-Abre un terminal en la raíz del repo y ejecuta:
+Los scripts viven en esta carpeta (`scripts/Scripts de carga de documentación para equipos por grupo/`). Desde la raíz del repo:
 
 ```bash
-node scripts\\classify_group200.js
+cd "scripts/Scripts de carga de documentación para equipos por grupo"
+
+# Paso 1 — clasifica los PDF y genera el JSON
+node "Paso 1 classify_group200.js"
+
+# Paso 2 — convierte el JSON a sentencias SQL
+python "Paso 2 convertir_json_a_sql.py"
 ```
 
-El resultado se escribirá en `scripts/grupo_200_classification.json`.
+El resultado del paso 1 se escribe en `grupo_200_classification.json`, dentro de esta misma carpeta.
+
+Utilidad adicional: `json_to_csv.js` convierte ese JSON a `grupo_200_files.csv` para revisarlo en hoja de cálculo.

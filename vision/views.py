@@ -446,9 +446,12 @@ def api_vision_inspeccion_detalle(request, inspeccion_id):
     tags=['Inspección IA'],
     summary='Subir foto a una inspección',
     description=(
-        'Guarda la foto en disco y dispara el análisis YOLO en segundo plano.\n\n'
-        'Responde inmediatamente con estado=pendiente (HTTP 202).\n\n'
-        'Usar GET /api/vision/fotos/<id>/ para polling del resultado.'
+        'Guarda la foto en disco y crea el registro con estado=pendiente.\n\n'
+        'Responde inmediatamente (HTTP 202). El análisis NO arranca aquí: hay que '
+        'dispararlo con POST /api/vision/inspecciones/<id>/analizar/.\n\n'
+        'Para seguir el progreso, suscribirse a GET /api/vision/inspecciones/<id>/stream/ (SSE). '
+        'GET /api/vision/fotos/<id>/ queda como consulta puntual.\n\n'
+        'Limitado a VISION_RATE_LIMIT_UPLOADS_PER_MINUTE cargas por minuto y por IP (HTTP 429).'
     ),
     request={
         'multipart/form-data': {
@@ -473,9 +476,10 @@ def api_vision_subir_foto(request, inspeccion_id):
         imagen     (file, requerido)  — foto del casco
         seccion_id (int, requerido)   — sección del casco a la que pertenece
 
-    Respuesta inmediata (estado=pendiente).
-    El procesamiento YOLO corre en segundo plano y actualiza el estado.
-    Usar GET /api/vision/fotos/<id>/ para hacer polling del resultado.
+    Respuesta inmediata (estado=pendiente). El análisis se dispara aparte,
+    con POST /api/vision/inspecciones/<id>/analizar/.
+
+    Publica el evento SSE `foto-created` en el canal de la inspección.
     """
     insp = get_object_or_404(InspeccionCasco, pk=inspeccion_id)
 
@@ -526,7 +530,11 @@ def api_vision_subir_foto(request, inspeccion_id):
     methods=['GET'],
     tags=['Inspección IA'],
     summary='Estado de una foto',
-    description='Devuelve el estado actual, sección y detecciones de la foto. Usar para polling.',
+    description=(
+        'Devuelve el estado actual, sección y detecciones de la foto. '
+        'Consulta puntual — para seguir el progreso en vivo usar el stream SSE '
+        'GET /api/vision/inspecciones/<id>/stream/.'
+    ),
     responses={200: OpenApiTypes.OBJECT},
 )
 @extend_schema(
@@ -539,7 +547,7 @@ def api_vision_subir_foto(request, inspeccion_id):
 @api_view(['GET', 'POST', 'DELETE'])
 def api_vision_foto_detalle(request, foto_id):
     """
-    GET    /api/vision/fotos/<id>/  → estado y resultado de una foto (polling)
+    GET    /api/vision/fotos/<id>/  → estado y resultado de una foto (consulta puntual)
     POST   /api/vision/fotos/<id>/  → dispara análisis si estado=pendiente o error
     DELETE /api/vision/fotos/<id>/  → elimina la foto y sus archivos físicos
     """

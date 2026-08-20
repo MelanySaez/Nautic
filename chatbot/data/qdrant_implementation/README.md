@@ -232,7 +232,7 @@ QdrantTextIndexer(
     qdrant_host="localhost",        # Qdrant server host
     qdrant_port=6333,              # HTTP API port
     qdrant_grpc_port=6334,         # gRPC port (if using gRPC)
-    collection_name="documents",    # Collection name
+    collection_name="text_documents",  # Collection name
     vector_size=1536,              # Embedding dimension
     use_grpc=False                 # Use gRPC for better performance
 )
