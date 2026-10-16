@@ -1,6 +1,55 @@
 from django.db import models
 
 
+class Buque(models.Model):
+    nombre = models.CharField(max_length=255)
+    tipo = models.CharField(max_length=255)
+    descripcion = models.TextField(blank=True, default='')
+    autonomia_horas = models.IntegerField(null=True, blank=True)
+    vida_diseno_anios = models.IntegerField(null=True, blank=True)
+    horas_navegacion_anio = models.IntegerField(null=True, blank=True)
+    imagen = models.CharField(max_length=255, null=True, blank=True)
+    etapa = models.CharField(max_length=255, default='Activo')
+
+    # Configuración y documentos del buque (JSON)
+    rondas_config = models.JSONField(default=dict, blank=True)
+    documentos    = models.JSONField(default=list, blank=True)
+
+    # Ficha técnica
+    vel_maxima_nudos = models.FloatField(null=True, blank=True)
+    autonomia_dias = models.IntegerField(null=True, blank=True)
+    alcance_nm_a_12kn = models.FloatField(null=True, blank=True)
+    eslora_total_m = models.FloatField(null=True, blank=True)
+    manga_moldeada_m = models.FloatField(null=True, blank=True)
+    puntal_m = models.FloatField(null=True, blank=True)
+    calado_diseno_m = models.FloatField(null=True, blank=True)
+    desplazamiento_ton = models.FloatField(null=True, blank=True)
+    combustible_diario_m3 = models.FloatField(null=True, blank=True)
+    combustible_diesel_m3 = models.FloatField(null=True, blank=True)
+    combustible_helicoptero_m3 = models.FloatField(null=True, blank=True)
+    gasolina_botes_m3 = models.FloatField(null=True, blank=True)
+    agua_potable_m3 = models.FloatField(null=True, blank=True)
+    aceite_lubricante_m3 = models.FloatField(null=True, blank=True)
+    aceite_hidraulico_m3 = models.FloatField(null=True, blank=True)
+
+    # Contexto operacional
+    contexto_operacional = models.JSONField(default=dict, blank=True)
+
+    misiones = models.JSONField(default=list, blank=True)
+
+    # Grupos constructivos SWBS configurables
+    grupos_constructivos = models.JSONField(default=list, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)  # ahora es timestamptz en PG
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'buques'
+
+    def __str__(self):
+        return self.nombre
+
+
 class SeccionCasco(models.Model):
     """
     Catálogo genérico de zonas físicas del casco.
@@ -25,7 +74,7 @@ class InspeccionCasco(models.Model):
     en una misma campaña de revisión de un buque.
     """
     buque = models.ForeignKey(
-        'api.Buque',
+        Buque,
         on_delete=models.CASCADE,
         related_name='inspecciones_casco'
     )

@@ -17,7 +17,7 @@ def auto_tag_endpoints(result, generator, **kwargs):
     """
     Recorre todos los paths del esquema OpenAPI generado y asigna un tag
     descriptivo a las operaciones cuyos tags fueron auto-generados por
-    drf-spectacular (ej. "api", "rondas").  Los endpoints con tags
+    drf-spectacular (ej. "api").  Los endpoints con tags
     explícitos (definidos con @extend_schema) se dejan intactos.
     """
     for path_str, methods in result.get('paths', {}).items():
@@ -38,29 +38,12 @@ def auto_tag_endpoints(result, generator, **kwargs):
 
 def _tag_for_path(path):
     """Determina el tag apropiado según el prefijo de la URL."""
-    # Catálogos SWBS
-    if any(seg in path for seg in ['/api/grupos/', '/api/subgrupos/',
-                                    '/api/sistemas/', '/api/subsistemas/']):
-        return 'Catálogos SWBS'
+    # Detección directa con YOLO (nautic_core)
+    if '/api/ai/' in path:
+        return 'Visión Artificial'
 
-    # Buques
-    if '/api/buque' in path:
-        return 'Buques'
-
-    # Equipos
-    if '/api/equipo' in path or '/api/cj-sugerido/' in path:
-        return 'Equipos'
-
-    # Parámetros
-    if '/api/parametro' in path:
-        return 'Parámetros'
-
-    # Rondas y lecturas
-    if '/api/ronda' in path or '/api/lectura' in path:
-        return 'Rondas'
-
-    # Datos de prueba
-    if '/api/generate-test-data' in path or '/api/delete-test-data' in path:
-        return 'Testing'
+    # Inspecciones de casco con visión artificial
+    if '/api/vision/' in path:
+        return 'Inspección IA'
 
     return 'Otros'

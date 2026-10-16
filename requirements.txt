@@ -19,10 +19,6 @@ djangorestframework==3.16.1
 # --- Documentación automática de API ---
 drf-spectacular==0.29.0
 
-# --- Autenticación JWT ---
-PyJWT==2.10.1
-# djangorestframework_simplejwt==5.5.1   # en requirements original, no configurado en settings.py
-
 # --- Base de datos PostgreSQL ---
 psycopg2-binary==2.9.10
 # psycopg2==2.9.10                        # duplicado; psycopg2-binary es suficiente para desarrollo
@@ -40,11 +36,7 @@ redis==5.2.1
 # --- Monitoreo de workers Celery (UI web en :5555) ---
 flower==2.0.1
 
-# --- Requerido por api/views.py ---
-qrcode==8.0
-
 # --- HTTP / utilidades ---
-requests==2.32.3
 urllib3==2.2.3
 certifi==2024.8.30
 charset-normalizer==3.4.0

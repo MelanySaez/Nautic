@@ -28,7 +28,6 @@ INSTALLED_APPS = [
     "rest_framework",  # Para tus APIs
     "corsheaders",  # Para permitir llamadas desde React o cualquier origen
     "drf_spectacular",  # Documentación automática de API (OpenAPI 3)
-    "api",  # App de negocio principal
     "vision",  # Módulo de visión artificial (nautic_core)
 ]
 
@@ -41,7 +40,6 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    # "api.middleware.JWTAuthMiddleware",  # Deshabilitado en versión lite
 ]
 
 ROOT_URLCONF = "backend.urls"
@@ -49,7 +47,7 @@ ROOT_URLCONF = "backend.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [BASE_DIR / "templates"],  # Aquí irán tus rondas.html y demás
+        "DIRS": [],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -83,7 +81,6 @@ DATABASES = {
 
 # Configuración de archivos estáticos
 STATIC_URL = "/static/"
-STATICFILES_DIRS = [BASE_DIR / "static"]
 
 # Configuración para archivos media (carga de imágenes como hacías en Flask)
 MEDIA_URL = "/media/"
@@ -123,7 +120,7 @@ CSRF_TRUSTED_ORIGINS = [
 ]
 
 
-# Cookies (Lax)   el login ya fija JWT con HttpOnly y SameSite=Lax
+# Cookies (Lax)
 
 SESSION_COOKIE_SAMESITE = "Lax"
 CSRF_COOKIE_SAMESITE = "Lax"
@@ -133,7 +130,7 @@ CSRF_COOKIE_SECURE = False
 # En producci n (HTTPS) cambia ambos a True
 
 # -----------------------------
-# DRF — sin autenticación por defecto (usamos JWT propio en middleware)
+# DRF — sin autenticación por defecto
 # Evita CSRF derivado de SessionAuthentication
 # -----------------------------
 REST_FRAMEWORK = {
@@ -151,9 +148,8 @@ REST_FRAMEWORK = {
 SPECTACULAR_SETTINGS = {
     "TITLE": "PSCV-Lite Nautic Module API",
     "DESCRIPTION": (
-        "API REST del sistema de gestión de mantenimiento naval. "
-        "Incluye módulos de rondas, equipos, buques, parámetros "
-        "y visión artificial para detección de anomalías."
+        "API REST de inspección de cascos de buques con visión artificial "
+        "(YOLO) para la detección de anomalías."
     ),
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
@@ -171,15 +167,6 @@ SPECTACULAR_SETTINGS = {
             "name": "Visión Artificial",
             "description": "Detección de anomalías con YOLO (nautic_core) — inferencia directa",
         },
-        {"name": "Buques", "description": "Gestión de buques"},
-        {"name": "Equipos", "description": "Gestión de equipos"},
-        {"name": "Rondas", "description": "Rondas de mantenimiento"},
-        {"name": "Parámetros", "description": "Parámetros de equipos y subsistemas"},
-        {
-            "name": "Catálogos SWBS",
-            "description": "Grupos, subgrupos, sistemas y subsistemas SWBS",
-        },
-        {"name": "Testing", "description": "Generación y limpieza de datos de prueba"},
     ],
 }
 
@@ -289,12 +276,6 @@ VISION_RATE_LIMIT_UPLOADS_PER_MINUTE = int(
 VISION_RATE_LIMIT_MAX_CONCURRENT = int(
     os.getenv("VISION_RATE_LIMIT_MAX_CONCURRENT", "10")
 )
-
-
-# Webhook configuration
-N8N_WEBHOOK_URL = "http://localhost:5678/webhook/DELETE_DOCUMENT"
-N8N_UPLOAD_WEBHOOK_URL = "http://localhost:5678/webhook/REDACTED"
-WEBHOOK_TIMEOUT = 70
 
 
 # Logging: asegurar salida por consola para desarrollo

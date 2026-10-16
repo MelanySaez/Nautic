@@ -19,9 +19,8 @@ from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExampl
 from drf_spectacular.types import OpenApiTypes
 
 from core_engine import ImageProcessor
-from api.models import Buque
 from .inference import DEFAULT_CONFIDENCE, DEFAULT_IOU, get_processor
-from .models import SeccionCasco, InspeccionCasco, FotoInspeccion
+from .models import Buque, SeccionCasco, InspeccionCasco, FotoInspeccion
 from .pubsub import publicar_evento, suscribirse
 from .ratelimit import check_upload_rate, get_client_ip, track_concurrent_start
 from .tasks import procesar_foto

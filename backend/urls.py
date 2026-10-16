@@ -8,7 +8,6 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, Sp
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', include('api.urls')),
     path('', include('vision.urls')),  # Módulo de visión artificial
 
     # Documentación automática (drf-spectacular)
