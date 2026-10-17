@@ -1,4 +1,3 @@
-import asyncio
 import base64
 import json
 import logging
@@ -18,8 +17,7 @@ from rest_framework.response import Response
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample
 from drf_spectacular.types import OpenApiTypes
 
-from core_engine import ImageProcessor
-from .inference import DEFAULT_CONFIDENCE, DEFAULT_IOU, get_processor
+from .inference import DEFAULT_CONFIDENCE, run_inference
 from .models import Buque, SeccionCasco, InspeccionCasco, FotoInspeccion
 from .pubsub import publicar_evento, suscribirse
 from .ratelimit import check_upload_rate, get_client_ip, track_concurrent_start
@@ -86,11 +84,6 @@ def _validar_imagen(archivo):
                     "default": 0.25,
                     "description": "Umbral de confianza (0.01–1.0)",
                 },
-                "iou": {
-                    "type": "number",
-                    "default": 0.45,
-                    "description": "Umbral IOU para NMS (0.01–1.0)",
-                },
                 "retornar_imagen": {
                     "type": "string",
                     "enum": ["true", "false"],
@@ -130,7 +123,7 @@ def _validar_imagen(archivo):
                 "total_detecciones": 1,
                 "tiempo_inferencia_ms": 142.5,
                 "tamano_imagen": {"width": 640, "height": 480},
-                "parametros": {"confidence": 0.25, "iou": 0.45},
+                "parametros": {"confidence": 0.25},
                 "imagen_anotada_base64": "<base64_string>",
             },
         )
@@ -145,7 +138,6 @@ def api_ai_anomalias(request):
     Parámetros (multipart/form-data):
         imagen      (file, requerido)  — imagen a analizar
         confidence  (float, opcional)  — umbral de confianza, por defecto 0.25
-        iou         (float, opcional)  — umbral IOU para NMS, por defecto 0.45
         retornar_imagen (bool, opcional) — si 'true' devuelve la imagen anotada
                                           como base64 en JSON; de lo contrario
                                           devuelve directamente el archivo JPEG.
@@ -161,7 +153,7 @@ def api_ai_anomalias(request):
             "detecciones": [...],
             "total_detecciones": int,
             "tiempo_inferencia_ms": float,
-            "parametros": {"confidence": float, "iou": float},
+            "parametros": {"confidence": float},
             "imagen_anotada_base64": "..."
         }
     """
@@ -179,22 +171,10 @@ def api_ai_anomalias(request):
             status=400,
         )
 
-    try:
-        iou = float(request.data.get("iou", DEFAULT_IOU))
-    except (ValueError, TypeError):
-        return Response(
-            {"error": 'El parámetro "iou" debe ser un número decimal.'}, status=400
-        )
-
     if not (0.0 < confidence <= 1.0):
         return Response(
             {"error": 'El parámetro "confidence" debe estar entre 0.01 y 1.0.'},
             status=400,
-        )
-
-    if not (0.0 < iou <= 1.0):
-        return Response(
-            {"error": 'El parámetro "iou" debe estar entre 0.01 y 1.0.'}, status=400
         )
 
     retornar_imagen = request.data.get("retornar_imagen", "false").lower() == "true"
@@ -208,30 +188,15 @@ def api_ai_anomalias(request):
             {"error": f"Error al leer el archivo de imagen: {str(e)}"}, status=400
         )
 
-    # --- Obtener procesador (singleton si se usan los umbrales por defecto) ---
+    # --- Ejecutar inferencia + renderizado (delegado a nautic_core) ---
+    # El parámetro opcional "iou" ya no se usa (core_engine v3 fija su NMS);
+    # si el cliente lo envía simplemente se ignora.
     try:
-        if confidence == DEFAULT_CONFIDENCE and iou == DEFAULT_IOU:
-            processor = get_processor()
-        else:
-            # Umbrales custom: instancia efímera (modelo se recarga). Para uso
-            # frecuente con umbrales distintos al default, considerar cachear
-            # por (conf, iou).
-            processor = ImageProcessor(
-                confidence_threshold=confidence,
-                iou_threshold=iou,
-            )
+        imagen_anotada_bytes, resultados = run_inference(
+            imagen_bytes, confidence=confidence
+        )
     except FileNotFoundError as e:
         return Response({"error": f"Modelo YOLO no encontrado: {str(e)}"}, status=500)
-    except Exception as e:
-        return Response(
-            {"error": f"Error al inicializar el procesador: {str(e)}"}, status=500
-        )
-
-    # --- Ejecutar inferencia + renderizado (delegado a nautic_core) ---
-    try:
-        imagen_anotada_bytes, resultados = asyncio.run(
-            processor.process_and_visualize(imagen_bytes)
-        )
     except Exception as e:
         return Response({"error": f"Error durante la inferencia: {str(e)}"}, status=500)
 
@@ -244,10 +209,7 @@ def api_ai_anomalias(request):
                 "total_detecciones": resultados["detection_count"],
                 "tiempo_inferencia_ms": round(resultados["inference_time_ms"], 2),
                 "tamano_imagen": resultados["image_size"],
-                "parametros": {
-                    "confidence": confidence,
-                    "iou": iou,
-                },
+                "parametros": {"confidence": confidence},
                 "imagen_anotada_base64": imagen_b64,
             }
         )

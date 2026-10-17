@@ -4,7 +4,7 @@ Tareas Celery del módulo de visión.
 La tarea ``procesar_foto`` ejecuta la inferencia YOLO sobre una
 ``FotoInspeccion`` y persiste el resultado en Postgres. El procesamiento de
 imagen (preprocesado + inferencia + anotación) se delega íntegramente a
-``core_engine.ImageProcessor.process_and_visualize`` — esta capa sólo
+``core_engine.vision.analyze`` (vía ``inference.run_inference``) — esta capa sólo
 orquesta E/S de disco, transición de estado y categorización de severidad.
 
 DLQ (Dead Letter Queue):
@@ -12,7 +12,6 @@ DLQ (Dead Letter Queue):
   un mensaje a la cola ``vision.dead`` vía la tarea ``dead_letter``. Visible
   en Flower como tarea separada para diagnóstico y requeue manual.
 """
-import asyncio
 import io
 import logging
 import os
@@ -22,7 +21,7 @@ from PIL import Image
 from celery import shared_task
 from django.conf import settings
 
-from .inference import get_processor
+from .inference import run_inference
 from .models import FotoInspeccion
 from .pubsub import publicar_evento
 from .ratelimit import track_concurrent_end
@@ -139,8 +138,7 @@ def procesar_foto(self, foto_id: int):
       1. Marca la foto como ``en_proceso`` (idempotente: si ya está
          ``completada`` la tarea retorna sin reprocesar).
       2. Lee bytes desde disco y verifica que la imagen es válida.
-      3. Delega procesado + anotación a ``ImageProcessor.process_and_visualize``
-         del paquete ``nautic_core``.
+      3. Delega procesado + anotación a ``inference.run_inference`` (nautic_core v3)
       4. Persiste imagen anotada, detecciones agrupadas, severidad y estado.
       5. Ante excepción, marca ``error`` con detalle y reintenta si aplica.
       6. Al finalizar (éxito, error final o skip) libera el slot de concurrencia.
@@ -176,10 +174,7 @@ def procesar_foto(self, foto_id: int):
             raise ValueError("El archivo almacenado no es una imagen válida.")
 
         # Procesado + anotación íntegramente vía nautic_core
-        processor = get_processor()
-        imagen_anotada_bytes, resultados = asyncio.run(
-            processor.process_and_visualize(imagen_bytes)
-        )
+        imagen_anotada_bytes, resultados = run_inference(imagen_bytes)
 
         # Persistir imagen anotada en disco
         nombre_anotada = (

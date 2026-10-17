@@ -610,7 +610,7 @@ requires-dist = [
     { name = "djangorestframework", specifier = "==3.16.1" },
     { name = "drf-spectacular", specifier = "==0.29.0" },
     { name = "flower", specifier = "==2.0.1" },
-    { name = "nautic-core", git = "ssh://git@github.com/AaronDLF/nautic_core.git?tag=v2.0.0" },
+    { name = "nautic-core", git = "ssh://git@github.com/AaronDLF/nautic_core.git?tag=v3.0.0" },
     { name = "psycopg2-binary", specifier = "==2.9.10" },
     { name = "python-dotenv", specifier = "==1.0.1" },
     { name = "redis", specifier = "==5.2.1" },
@@ -618,8 +618,8 @@ requires-dist = [
 
 [[package]]
 name = "nautic-core"
-version = "2.0.0"
-source = { git = "ssh://git@github.com/AaronDLF/nautic_core.git?tag=v2.0.0#88c9d5b75cc4b2f0a1b48afe95bb9d9c5b2cb10a" }
+version = "3.0.0"
+source = { git = "ssh://git@github.com/AaronDLF/nautic_core.git?tag=v3.0.0#8f250e83e448258e539d22adbf2ab57ab8414b09" }
 dependencies = [
     { name = "numpy" },
     { name = "pillow" },

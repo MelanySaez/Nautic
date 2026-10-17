@@ -1,5 +1,5 @@
-# Build from the repository root:
-#   DOCKER_BUILDKIT=1 docker build --ssh default -f backend/Dockerfile .
+# Build with backend/ as the build context (from the repository root):
+#   DOCKER_BUILDKIT=1 docker build --ssh default backend/
 # The SSH mount is required because nautic_core is installed from a private Git repo.
 FROM python:3.12-slim
 

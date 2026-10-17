@@ -42,7 +42,7 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-ROOT_URLCONF = "backend.urls"
+ROOT_URLCONF = "config.urls"
 
 TEMPLATES = [
     {
@@ -60,7 +60,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = "backend.wsgi.application"
+WSGI_APPLICATION = "config.wsgi.application"
 
 # settings.py
 DATABASES = {
@@ -156,7 +156,7 @@ SPECTACULAR_SETTINGS = {
     "COMPONENT_SPLIT_REQUEST": True,
     "POSTPROCESSING_HOOKS": [
         "drf_spectacular.hooks.postprocess_schema_enums",
-        "backend.spectacular_hooks.auto_tag_endpoints",
+        "config.spectacular_hooks.auto_tag_endpoints",
     ],
     "TAGS": [
         {
@@ -250,6 +250,16 @@ CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
 # Modo eager (síncrono) para tests/CI: setear CELERY_TASK_ALWAYS_EAGER=True en env.
 CELERY_TASK_ALWAYS_EAGER = os.getenv("CELERY_TASK_ALWAYS_EAGER", "False") == "True"
 CELERY_TASK_EAGER_PROPAGATES = True
+
+
+# =============================================================================
+# Modelo de visión (core_engine / nautic_core v3)
+# =============================================================================
+# Id del detector en core_engine.vision.available_models(): yolo-seg,
+# yolo-tiled, maskrcnn, rtdetr. Los pesos se resuelven desde la variable de
+# entorno NAUTIC_WEIGHTS_DIR (la lee core_engine directamente; load_dotenv ya
+# la cargó desde .env). Ver .env.example.
+VISION_MODEL_ID = os.getenv("VISION_MODEL_ID", "yolo-seg")
 
 
 # =============================================================================
