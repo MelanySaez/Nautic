@@ -1,32 +1,60 @@
-# React + TypeScript + Vite
+# Nautic · Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Interfaz web de inspección de cascos: listado de inspecciones, alta de inspección, carga de fotos por zona del casco con estado de análisis en vivo (SSE) y resultados del análisis de IA. Modo claro y oscuro.
 
-Currently, two official plugins are available:
+Stack: React 19, TypeScript, Vite, Tailwind CSS v4, React Router. Tests con Vitest y Testing Library.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+> `interfaz/` contiene los mockups originales. Son solo referencia visual: no se importan ni se publican.
 
-## React Compiler
+## Puesta en marcha
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Requisitos: Node 20.19+ o 22.12+ y el backend Django corriendo en `:8000` (ver el `README.md` de la raíz).
 
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+cd frontend
+cp .env.example .env.local   # opcional
+npm install
+npm run dev                  # http://localhost:5173
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+`VITE_API_BASE_URL` define la URL del backend. Si queda vacía, el navegador habla con Vite y Vite reenvía `/api` y `/media` a `http://localhost:8000` (ver `vite.config.ts`). Con una URL explícita, el backend debe permitir el origen en `CORS_ALLOWED_ORIGINS` (`:5173` ya está incluido).
+
+## Comandos
+
+| Comando | Qué hace |
+|---|---|
+| `npm run dev` | Servidor de desarrollo |
+| `npm test` | Tests (una pasada) |
+| `npm run test:watch` | Tests en modo watch |
+| `npm run lint` | oxlint |
+| `npm run build` | Typecheck + build de producción en `dist/` |
+
+## Arquitectura
+
+Organizada por funcionalidad (screaming) con puertos y adaptadores:
+
+```
+src/
+├── app/            # composición: router, layout, raíz de dependencias
+├── inspecciones/
+│   ├── domain/         # tipos y reglas puras (progreso, severidad, eventos en vivo, búsqueda)
+│   ├── application/    # puertos: InspeccionesRepository, EventosInspeccion
+│   ├── infrastructure/ # adaptadores: HTTP (fetch) y SSE (EventSource), mapeo snake_case → dominio
+│   └── ui/             # páginas (contenedores) y componentes de presentación
+├── buques/         # puerto BuquesRepository + adaptador en memoria
+├── shared/         # cliente HTTP, tema, hooks y átomos de UI
+└── test/           # setup de Vitest y dobles de prueba
+```
+
+- Las páginas obtienen los adaptadores con `useDependencias()`; `app/composicion.ts` es el único lugar que decide qué adaptador implementa cada puerto. Los tests inyectan dobles (`src/test/dobles.tsx`).
+- El estado de las fotos se actualiza por SSE (`/api/vision/inspecciones/<id>/stream/`), sin polling. `EventSource` reconecta solo.
+- Los errores del backend (`{"error": ...}` o `{"detail": ...}`) se muestran tal cual; los fallos de red o respuestas ilegibles muestran un mensaje genérico.
+
+## Limitaciones conocidas
+
+- **Buques:** el backend no expone endpoints de buques. El selector usa `EnMemoriaBuquesRepository` con la semilla de `src/buques/infrastructure/semilla.ts`. Los `id` de la semilla deben existir en la tabla `buques`; si no, crear la inspección devuelve 404. Cuando exista `/api/buques/`, basta con un adaptador HTTP que implemente `BuquesRepository` y cambiarlo en `composicion.ts`.
+- **Exportar resultados:** no implementado (no hay endpoint).
+
+## Tests
+
+TDD: cada comportamiento tiene primero su test. Los tests de páginas recorren la interfaz pública (roles y etiquetas accesibles) con adaptadores falsos; los adaptadores HTTP y SSE se prueban con `fetch` y `EventSource` simulados.
