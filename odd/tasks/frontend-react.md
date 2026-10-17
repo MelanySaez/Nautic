@@ -17,8 +17,8 @@ Branch: `feat/frontend-react` · Delivery: `ask-on-risk` · Test runner: Vitest 
 
 | ID | Specs | Route | Status | Commit |
 |----|-------|-------|--------|--------|
-| T1 | S1 S3 S4 | inline | pending | |
-| T2 | S5 S6 | inline | pending | |
+| T1 | S1 S3 S4 | inline | done (RED→GREEN: theme, layout) | 935ce49 |
+| T2 | S5 S6 | inline | done (RED→GREEN: rules, HTTP, SSE, buques) | (this commit) |
 | T3 | S5 S7 | inline | pending | |
 | T4 | S5 S6 S7 | inline | pending | |
 | T5 | S5 S7 | inline | pending | |
@@ -41,3 +41,6 @@ Route evidence: no Writer trigger (units share infra and are sequential); all in
 - L2 (2026-10-17, user): "hgaamos lo que propones y activa el tdd"
 - L3: Backend gotcha: SSE `foto-updated` sends `imagen_anotada` as a raw relative path (`media/...`), while REST returns absolute URLs. Frontend must normalize.
 - L4: Repo convention: npm + package-lock (pnpm ignored in .gitignore).
+- L5: T1 review assess: medium (configuration_change `.env.example`), review_due=false `under_budget`; pending in slice.
+- L6: `.env*` edits are blocked by a permission rule; `.env.example` keeps `VITE_API_BASE_URL=http://localhost:8000`. Vite also proxies `/api` and `/media` to :8000 for an empty base URL.
+- L7: Composition root split (`composicion.ts`, `useDependencias.ts`, `DependenciasProvider.tsx`) to satisfy oxlint `only-export-components`.
