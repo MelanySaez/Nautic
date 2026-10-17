@@ -19,8 +19,8 @@ Branch: `feat/frontend-react` · Delivery: `ask-on-risk` · Test runner: Vitest 
 |----|-------|-------|--------|--------|
 | T1 | S1 S3 S4 | inline | done (RED→GREEN: theme, layout) | 935ce49 |
 | T2 | S5 S6 | inline | done (RED→GREEN: rules, HTTP, SSE, buques) | 0bbc07a |
-| T3 | S5 S7 | inline | done (RED→GREEN: 11 page tests) | (this commit) |
-| T4 | S5 S6 S7 | inline | pending | |
+| T3 | S5 S7 | inline | done (RED→GREEN: 11 page tests) | c24bdab |
+| T4 | S5 S6 S7 | inline | done (RED→GREEN: 6 form tests) | (this commit) |
 | T5 | S5 S7 | inline | pending | |
 | T6 | S5 S7 | inline | pending | |
 | T7 | S1 | inline | pending | |
