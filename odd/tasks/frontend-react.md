@@ -21,8 +21,8 @@ Branch: `feat/frontend-react` · Delivery: `ask-on-risk` · Test runner: Vitest 
 | T2 | S5 S6 | inline | done (RED→GREEN: rules, HTTP, SSE, buques) | 0bbc07a |
 | T3 | S5 S7 | inline | done (RED→GREEN: 11 page tests) | c24bdab |
 | T4 | S5 S6 S7 | inline | done (RED→GREEN: 6 form tests) | 77a6ed9 |
-| T5 | S5 S7 | inline | done (RED→GREEN: 12 page tests) | (this commit) |
-| T6 | S5 S7 | inline | pending | |
+| T5 | S5 S7 | inline | done (RED→GREEN: 12 page tests) | 71a3d0a |
+| T6 | S5 S7 | inline | done (RED→GREEN: 6 page tests) | (this commit) |
 | T7 | S1 | inline | pending | |
 
 - T1: scaffold (Vite, TS strict, Tailwind design tokens light/dark, Vitest, router shell, theme toggle).
