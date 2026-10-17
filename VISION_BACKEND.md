@@ -234,7 +234,7 @@ def run_inference(image_bytes, confidence=None, incluir_mascaras=False) -> (jpeg
 | Dónde | Efecto |
 |---|---|
 | System check de Django `vision.E001` (`manage.py check`, `runserver`, `migrate`) | Falla con el mensaje de error |
-| Señal Celery `worker_init` (proceso principal) | El worker se detiene con `RuntimeError` en vez de reiniciar subprocesos en bucle |
+| Señal Celery `worker_init` (proceso principal) | El worker termina con `SystemExit` (código 1) antes de crear subprocesos; Celery traga cualquier `Exception` de los receivers de señales |
 
 Tras validar, `worker_process_init` precarga el detector en cada subproceso para que la primera tarea no pague la latencia de carga.
 

@@ -41,13 +41,18 @@ def verificar_configuracion() -> List[str]:
     Returns:
         Lista de mensajes de error; vacía si la configuración es válida.
     """
-    from core_engine.vision import available_models
-
     errores = []
 
     modelo_id = _modelo_id()
-    ids_validos = [m.id for m in available_models()]
-    if modelo_id not in ids_validos:
+    try:
+        from core_engine.vision import available_models
+
+        ids_validos = [m.id for m in available_models()]
+    except Exception as e:
+        errores.append(f"No se pudo cargar el catálogo de modelos de core_engine: {e}")
+        ids_validos = None
+
+    if ids_validos is not None and modelo_id not in ids_validos:
         errores.append(
             f"VISION_MODEL_ID='{modelo_id}' no existe en core_engine. "
             f"Valores válidos: {', '.join(ids_validos)}."
@@ -120,7 +125,9 @@ def _validar_configuracion_en_worker(**_kwargs):
     if errores:
         for error in errores:
             logger.error(error)
-        raise RuntimeError(
+        # SystemExit (BaseException) y no RuntimeError: Signal.send de Celery
+        # captura y sólo registra cualquier Exception de los receivers.
+        raise SystemExit(
             "Configuración de visión inválida: " + " ".join(errores)
         )
 
