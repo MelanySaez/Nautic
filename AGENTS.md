@@ -1,4 +1,4 @@
-# AGENTS.md — PSCV-Lite-Nautic-Module
+# AGENTS.md — Nautic
 
 Guidance for agentic coding agents operating in this repository.
 
@@ -6,219 +6,159 @@ Guidance for agentic coding agents operating in this repository.
 
 ## Project Overview
 
-Multi-tier naval vessel maintenance management system ("rondas de mantenimiento"):
+Nautic is a hull-inspection system for naval vessels. This repository is a **monorepo root**:
 
-- **`frontend/`** — React 18 SPA (Create React App + CRACO, plain JavaScript, no TypeScript)
-- **`api/`** — Django app for the maintenance domain (models, views, URLs, serializers)
-- **`vision/`** — Django app for AI hull inspection (YOLO via Celery worker + SSE)
-- **`backend/`** — Django project config (settings, celery app, wsgi/asgi, Dockerfile)
-- **`chatbot/`** — AI microservice (n8n + Qdrant + Ollama + Python translator, Docker Compose)
-- **`manage.py`** — Root Django entry point
-- **`requirements.txt`** — Python dependencies
+- **`backend/`** — the only code that exists today: a Django project (DRF + Celery) with a single app, `vision`.
+- **`frontend/`** — a new frontend will live here. It **does not exist yet**.
 
-Both `api` and `vision` are in `INSTALLED_APPS` and both mount their URLs at the project root (`backend/urls.py`), so all endpoints live under `/api/`.
+Intended product (roadmap, **not implemented yet**): three sections.
 
-The `vision` module needs extra infrastructure the rest of the project does not: **RabbitMQ** (Celery broker) and **Redis** (SSE pub/sub + rate limiting). Everything else runs with just Django + Postgres.
+| Section | Purpose | Status |
+|---|---|---|
+| **Buques** | Vessel entity with a technical sheet | Model exists (`vision.models.Buque`); no CRUD endpoints |
+| **Inspecciones** | Inspection sessions per vessel | Model + endpoints exist (`InspeccionCasco`) |
+| **Visión IA** | YOLO hull analysis; every analysis belongs to a concrete inspection | Implemented (photos → Celery → SSE) |
+
+All endpoints live under `/api/`. The `vision` module needs infrastructure beyond Django + Postgres: **RabbitMQ** (Celery broker) and **Redis** (SSE pub/sub + rate limiting).
+
+---
+
+## Layout
+
+```
+.
+├── AGENTS.md / README.md        # repo-level docs
+├── VISION_BACKEND.md            # vision backend reference
+├── backend/                     # ALL Python/Django lives here
+│   ├── manage.py
+│   ├── pyproject.toml, uv.lock  # uv-managed dependencies (no requirements.txt)
+│   ├── Dockerfile, .dockerignore, start.sh
+│   ├── .env, .env.example
+│   ├── config/                  # Django project package
+│   │   ├── settings.py, urls.py, celery.py
+│   │   ├── wsgi.py, asgi.py
+│   │   └── spectacular_hooks.py
+│   └── vision/                  # the only Django app
+│       ├── models.py, views.py, urls.py, tasks.py
+│       ├── inference.py, pubsub.py, ratelimit.py
+│       ├── management/commands/seed_secciones_casco.py
+│       └── INSPECCION_IA.md
+└── frontend/                    # (future)
+```
 
 ---
 
 ## Build / Run Commands
 
-### Frontend (run from `frontend/`)
+Run from `backend/`. Python 3.12, dependencies managed with **uv** (`backend/.venv`).
 
 ```bash
-npm start          # Dev server on port 3000 (CRACO)
-npm run build      # Production build
+cd backend
+cp .env.example .env                       # first time; fill DB_PASSWORD, SECRET_KEY, NAUTIC_WEIGHTS_DIR
+uv sync                                    # install dependencies from uv.lock
+uv add <package>                           # add a dependency (updates pyproject.toml + uv.lock)
+
+uv run python manage.py migrate
+uv run python manage.py seed_secciones_casco   # seed the hull-section catalog
+uv run python manage.py runserver              # dev server on :8000
+uv run python manage.py check                  # system checks (includes vision.E001)
 ```
 
-### Backend (run from project root)
+- Database: PostgreSQL, default name `NauticDB` (`DB_NAME` in `.env`).
+- `nautic_core` (v3.0.0) is installed from `ssh://git@github.com/AaronDLF/nautic_core.git`; it needs an SSH key with access. It is installed as `nautic_core` but imported as `core_engine`.
+- Docker: `DOCKER_BUILDKIT=1 docker build --ssh default backend/` (build context is `backend/`).
+- API docs (drf-spectacular): `/api/docs/` (Swagger), `/api/docs/redoc/`, `/api/schema/`.
 
-```bash
-python manage.py runserver          # Dev server on port 8000
-python manage.py migrate            # Apply migrations
-python manage.py makemigrations     # Generate migration files
-python manage.py shell              # Django interactive shell
-python manage.py seed_secciones_casco   # Seed the hull-section catalog (vision module)
-```
+### Vision infrastructure
 
-API docs (drf-spectacular) are served at `/api/docs/` (Swagger), `/api/docs/redoc/` and `/api/schema/`.
-
-### Vision module infrastructure (run from project root)
-
-Required only when working on `vision/`. Without them, uploads succeed but nothing gets analyzed.
+Required only when working on `vision/`. Without it, uploads succeed but nothing gets analyzed.
 
 ```bash
 # 1. Base services
 sudo systemctl start rabbitmq-server redis
 
-# 2. Celery worker (loads the YOLO model once per process)
-celery -A backend worker -Q vision -l info --concurrency=2 --pool=prefork
+# 2. Celery worker (run from backend/)
+uv run celery -A config worker -Q vision -l info --concurrency=2 --pool=prefork
 
 # 3. Flower — worker monitoring UI on :5555 (optional)
-celery -A backend flower --port=5555 \
+uv run celery -A config flower --port=5555 \
   --broker_api=http://guest:guest@localhost:15672/api/
 ```
 
-To run vision tests or scripts without a broker, set `CELERY_TASK_ALWAYS_EAGER=True` — tasks then execute inline.
+Required environment: `NAUTIC_WEIGHTS_DIR` (directory with the model weights). Optional: `VISION_MODEL_ID` (default `yolo-seg`; valid ids come from the `core_engine` catalog: `yolo-seg`, `yolo-tiled`, `maskrcnn`, `rtdetr`).
 
-### Chatbot infrastructure (run from `chatbot/`)
-
-```bash
-docker compose up    # Start Postgres, n8n, Qdrant, Ollama, translator
-docker compose down  # Stop all services
-```
+`vision.inference.verificar_configuracion()` validates both settings. It is enforced by the Django system check `vision.E001` and by Celery `worker_init`: a misconfigured worker **refuses to start**.
 
 ---
 
 ## Test Commands
 
-### Frontend (Jest via CRACO)
+No backend tests exist yet (`vision/` has no `tests.py`).
 
 ```bash
-# Run all tests (interactive watch mode)
-npm test
-
-# Run all tests once (CI mode)
-npm test -- --watchAll=false
-
-# Run a single test file by filename pattern
-npm test -- --watchAll=false --testPathPattern="ComponentName"
-
-# Run a single test by test name
-npm test -- --watchAll=false --testNamePattern="test description here"
+cd backend
+uv run python manage.py test vision                      # all vision tests
+uv run python manage.py test vision.tests.SomeTestClass  # one class
+uv run python manage.py test vision.tests.SomeTestClass.test_method_name
 ```
 
-Testing libraries: `@testing-library/react`, `@testing-library/jest-dom`, `@testing-library/user-event`.
-
-### Backend (Django)
-
-```bash
-# Run all backend tests
-python manage.py test
-
-# Run tests for a single app
-python manage.py test api
-python manage.py test vision
-
-# Run a specific test class
-python manage.py test api.tests.SomeTestClass
-
-# Run a specific test method
-python manage.py test api.tests.SomeTestClass.test_method_name
-```
-
-> Note: `api/tests.py` is a stub and `vision/` has no `tests.py` at all — no backend tests are implemented yet. If you add tests that touch the vision module, set `CELERY_TASK_ALWAYS_EAGER=True` so tasks run inline instead of needing a live broker.
-
----
-
-## Lint / Format
-
-- **ESLint**: Configured via `"eslintConfig"` in `frontend/package.json`; extends `react-app` and `react-app/jest` (default CRA config, no custom rules).
-- **No Prettier** and no `.editorconfig` — formatting is not automated.
-- **No dedicated lint script** in `package.json`; ESLint runs implicitly during `npm start` / `npm run build`.
-
-Follow the existing code style manually (see guidelines below).
+If you add tests that touch the vision module, set `CELERY_TASK_ALWAYS_EAGER=True` so tasks run inline instead of needing a live broker.
 
 ---
 
 ## Code Style Guidelines
 
-### JavaScript / React (Frontend)
-
-**Language**
-- Plain JavaScript (`.js` / `.jsx`) — no TypeScript, no JSDoc type annotations.
-- Runtime guards use `typeof`, `Array.isArray()`, `parseInt(k, 10)`, etc.
-
-**Formatting**
-- **Single quotes** for all JS strings.
-- **2-space indentation**.
-- **Semicolons** at end of every statement.
-- Multi-line JSX uses consistent 2-space indentation with each prop on its own line when wrapping.
-
-**Imports order** (follow this order within each file):
-1. React and hooks: `import React, { useState, useEffect } from 'react';`
-2. React Router: `import { useParams, useNavigate } from 'react-router-dom';`
-3. Third-party libraries (axios instance, Swal, chart.js, etc.)
-4. Local components and services
-5. CSS: `import './ComponentName.css';`
-
-**Naming conventions**
-- React components: **PascalCase** (`RondaEquipo`, `BuqueForm`)
-- Component files: **PascalCase** matching the component name (`RondaEquipo.js`)
-- Functions and variables: **camelCase** (`loadLang`, `handleSubmit`, `buqueId`)
-- CSS class names: **kebab-case** (`.ronda-card`, `.param-grid`)
-- Top-level string constants: **SCREAMING_SNAKE_CASE** (`LANG_KEY`, `SS_KEYS`)
-
-**React patterns**
-- Functional components only — no class components.
-- Hooks: `useState`, `useEffect`, `useMemo`, `useRef` are the standard set.
-- Clean up effects: always return a cleanup function from `useEffect` when using `setInterval` or `addEventListener`.
-- File uploads use `FormData`.
-- Navigation uses `useNavigate`; route params use `useParams`.
-
-**i18n pattern** (used in every component)
-```js
-const i18n = {
-  es: { label: 'Etiqueta' },
-  en: { label: 'Label' },
-};
-const loadLang = () => localStorage.getItem(LANG_KEY) || navigator.language?.slice(0,2) || 'es';
-const [lang, setLang] = useState(loadLang);
-```
-Language changes are dispatched via `window.dispatchEvent(new CustomEvent('app:language', ...))`.
-
-**Error handling (frontend)**
-- Wrap async calls in `try/catch`; log errors with `console.error()`.
-- Surface user-facing errors via `alert()` for simple cases or `Swal.fire()` for richer UX.
-- The axios instance in `frontend/src/services/api.js` handles 401 refresh-token retry and cooldown — do not re-implement this logic in components.
-- Log API-level messages with the prefix `[API][...]`.
-
-### Python / Django (Backend)
+### Python / Django (backend)
 
 **Formatting**
 - Standard Python conventions: **4-space indentation**, single or double quotes (be consistent within a file).
-- Snake_case for all functions, variables, and URL names.
+- `snake_case` for all functions, variables, and URL names.
+- No formatter or linter is configured; follow the existing style manually.
 
 **View conventions**
 - All views are **function-based views (FBV)** — do not introduce class-based views.
 - Decorate every API view with `@api_view(["GET", "POST"])` (or appropriate methods) from DRF.
-- Return `Response(data)` with manually constructed Python dicts — the existing codebase does not use DRF serializers for output, even though `serializers.py` exists.
+- Return `Response(data)` with manually constructed Python dicts — the codebase does not use DRF serializers for output.
+- The SSE stream is a plain Django `StreamingHttpResponse` view (not DRF).
 
 **Naming conventions**
-- View functions: `snake_case`, prefixed with domain (e.g., `api_buques`, `api_equipos`, `obtener_parametros`).
-- Internal helper functions: prefix with `_` (e.g., `_as_int_or_none`, `_parse_json`).
-- Models: **PascalCase** matching domain language (Spanish): `Buque`, `Equipo`, `Ronda`, `Parametro`.
+- View functions: `snake_case`, prefixed with domain (e.g., `api_vision_inspecciones`, `api_vision_subir_foto`).
+- Internal helper functions: prefix with `_` (e.g., `_foto_to_dict`, `_media_url`).
+- Models: **PascalCase** matching domain language (Spanish): `Buque`, `InspeccionCasco`, `FotoInspeccion`, `SeccionCasco`.
+- Domain language is Spanish (model names, URL paths, business variables).
 
 **Database**
-- Use Django ORM — `.select_related()`, `.annotate()`, `.filter()` as needed.
-- Pagination is manual (offset/limit query params), not DRF's built-in pagination.
-- PostgreSQL-specific features are acceptable: `GinIndex`, `JSONField`.
+- Use the Django ORM — `.select_related()`, `.annotate()`, `.filter()` as needed.
+- Pagination, if added, is manual (offset/limit query params), not DRF's built-in pagination.
+- PostgreSQL-specific features are acceptable (`JSONField`, `GinIndex`).
 
-**Error handling (backend)**
+**Error handling**
 - Use `get_object_or_404()` for not-found cases.
 - Return structured error responses: `Response({"error": "..."}, status=400)`.
-- Helper functions that parse optional parameters should catch exceptions and return `None` silently (see `_as_int_or_none` pattern in `api/views.py`).
+- Never expose server paths or internal exception text in API errors: log the details (`logger.exception(...)`) and return a generic message.
+- Helpers that parse optional parameters catch exceptions and return `None` silently.
 - Use `try/except Exception` for file/IO operations; log failures rather than crashing.
+
+### Frontend
+
+Not defined yet. Conventions will be added here when `frontend/` is created.
 
 ---
 
 ## Architecture Notes
 
-- The frontend communicates with the backend exclusively through the shared axios instance at `frontend/src/services/api.js`. Do not create additional axios instances in components.
-- The backend exposes REST endpoints under `/api/`; the frontend config (`frontend/src/config.js`) defines `API_BASE`.
-- The chatbot service communicates with Django via webhooks (`requests.post()` to n8n from `api/views.py`).
-- Domain language is Spanish (model names, URL paths, variable names in business logic); UI supports both `es` and `en` via the i18n pattern.
-- There is **no authentication** in the Lite version: the JWT middleware is commented out in `backend/settings.py` and `djangorestframework_simplejwt` is not installed. The 401-refresh logic in `api.js` is dormant leftover from the full version — leave it alone, do not build on it.
+- No authentication in this version (no JWT middleware, no login). Authorship fields such as `tomado_por` are free text.
+- UI and API language: the domain is Spanish; the future frontend decides its own i18n.
 
 ### Vision module (async pipeline)
 
-- Django views only enqueue: `procesar_foto.apply_async()` → RabbitMQ queue `vision`. Never run YOLO inference inline in a view.
-- The Celery worker (`vision/tasks.py`) persists results to Postgres and publishes events to Redis; Django streams them to the browser as SSE from `/api/vision/inspecciones/<id>/stream/`. The frontend consumes them with `EventSource` — **do not add polling loops** to this module.
-- The YOLO model is a per-process singleton (`vision/inference.py:get_processor()`). Never instantiate `ImageProcessor` directly.
+- Django views only enqueue: `procesar_foto.apply_async()` → RabbitMQ queue `vision`. Never run inference inline in a view (the direct endpoint `/api/ai/anomalias/` is the one documented exception: no persistence, no queue).
+- The Celery worker (`vision/tasks.py`) persists results to Postgres and publishes events to Redis; Django streams them to the browser as SSE from `/api/vision/inspecciones/<id>/stream/`. Clients consume them with `EventSource` — **do not add polling loops**.
+- Inference goes through `vision.inference.run_inference()`. Never call `core_engine` directly from views or tasks. `core_engine` caches each detector per process, so there is no singleton to manage.
+- `run_inference()` takes no `iou` parameter (removed in nautic_core v3).
 - Postgres (`FotoInspeccion.estado`) is the source of truth — there is no Celery result backend.
 - Failures that exhaust retries go to the `vision.dead` DLQ, visible in Flower.
-- The package is installed as `nautic_core` (from git) but imported as `core_engine`.
-- `CONCURRENT_LIMIT` in `AIInspection.js` must stay in sync with `VISION_RATE_LIMIT_MAX_CONCURRENT` in `backend/settings.py`.
+- Rate limiting is per IP, Redis-backed and fail-open. Limits: `VISION_RATE_LIMIT_UPLOADS_PER_MINUTE` and `VISION_RATE_LIMIT_MAX_CONCURRENT` in `backend/config/settings.py`.
 
 ---
 
@@ -226,23 +166,19 @@ Language changes are dispatched via `window.dispatchEvent(new CustomEvent('app:l
 
 | File | Purpose |
 |---|---|
-| `frontend/src/services/api.js` | Axios instance, interceptors, all API call functions |
-| `frontend/src/config.js` | `API_BASE` and other frontend constants |
-| `frontend/src/App.js` | Top-level routing and layout |
-| `api/models.py` | Maintenance-domain ORM models |
-| `api/views.py` | Maintenance-domain API views (~3600 lines) |
-| `api/urls.py` | URL routing for the api app |
-| `vision/views.py` | Vision REST endpoints + SSE stream |
-| `vision/tasks.py` | Celery task `procesar_foto` + dead-letter task |
-| `vision/inference.py` | YOLO `ImageProcessor` singleton |
-| `vision/pubsub.py` | Redis pub/sub used by SSE |
-| `vision/ratelimit.py` | Per-IP upload and concurrency limits |
-| `backend/settings.py` | Django settings (DB, apps, CORS, Celery, Redis, rate limits) |
-| `backend/celery.py` | Celery app definition |
-| `backend/urls.py` | Root routing — mounts `api`, `vision` and the OpenAPI docs |
-| `requirements.txt` | Python dependencies |
-| `frontend/package.json` | JS dependencies and ESLint config |
-| `chatbot/docker-compose.yml` | AI infrastructure services |
+| `backend/config/settings.py` | Django settings (DB, apps, CORS, Celery, Redis, vision, rate limits) |
+| `backend/config/urls.py` | Root routing — mounts `vision` and the OpenAPI docs |
+| `backend/config/celery.py` | Celery app definition |
+| `backend/vision/models.py` | `Buque`, `SeccionCasco`, `InspeccionCasco`, `FotoInspeccion` |
+| `backend/vision/views.py` | Vision REST endpoints + SSE stream |
+| `backend/vision/urls.py` | URL routing for the vision app |
+| `backend/vision/tasks.py` | Celery task `procesar_foto` + dead-letter task |
+| `backend/vision/inference.py` | `run_inference()` adapter over `core_engine.vision.analyze` + config validation |
+| `backend/vision/pubsub.py` | Redis pub/sub used by SSE |
+| `backend/vision/ratelimit.py` | Per-IP upload and concurrency limits |
+| `backend/pyproject.toml`, `backend/uv.lock` | Dependencies (uv) |
+| `backend/.env.example` | Environment variable template |
+| `backend/Dockerfile` | Container image (build context `backend/`) |
 
 ---
 
@@ -250,9 +186,6 @@ Language changes are dispatched via `window.dispatchEvent(new CustomEvent('app:l
 
 | Doc | Scope |
 |---|---|
-| `vision/INSPECCION_IA.md` | Vision module end-to-end + design decisions |
-| `VISION_BACKEND.md` | Vision backend reference (Celery, Redis, SSE, rate limiting) |
-| `VISION_FRONTEND.md` | Vision frontend reference (components, SSE handling, CSS) |
-| `chatbot/README.md` | Chatbot Docker Compose stack |
-
-There is no equivalent document for the `api/` maintenance domain yet.
+| `README.md` | Project intro, roadmap, quickstart |
+| `backend/vision/INSPECCION_IA.md` | Vision module end-to-end + design decisions |
+| `VISION_BACKEND.md` | Vision backend reference (Celery, Redis, SSE, rate limiting, inference adapter) |

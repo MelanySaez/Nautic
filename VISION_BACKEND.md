@@ -1,9 +1,10 @@
 # Vision Module — Backend Technical Reference
 
-Stack: Django 5.1 · Celery 5.4 · RabbitMQ (AMQP) · Redis · PostgreSQL · nautic_core (YOLO)
+Stack: Django 5.1 · Celery 5.4 · RabbitMQ (AMQP) · Redis · PostgreSQL · nautic_core v3 (YOLO)
 
-> El paquete se instala como `nautic_core` (desde git, `v2.0.0`) pero se importa como `core_engine`:
-> `from core_engine import ImageProcessor`.
+> El paquete se instala como `nautic_core` (desde git, tag `v3.0.0`, por SSH) pero se importa como `core_engine`.
+> Todo el código vive en `backend/`; los comandos de este documento se ejecutan desde ese directorio.
+> Los pesos del modelo se resuelven desde `NAUTIC_WEIGHTS_DIR` (ver [Adaptador de inferencia](#adaptador-de-inferencia-visioninferencepy)).
 
 ---
 
@@ -23,8 +24,8 @@ RabbitMQ cola: vision
     │
     ▼
 Celery worker (vision/tasks.py)
-    │  Carga modelo una vez por proceso (worker_process_init)
-    │  Lee imagen → valida → ImageProcessor.process_and_visualize()
+    │  Valida config al arrancar (worker_init) y precarga el modelo (worker_process_init)
+    │  Lee imagen → valida → run_inference() (core_engine.vision.analyze)
     │  Guarda imagen anotada → actualiza Postgres → publica evento Redis
     │
     ▼
@@ -50,12 +51,17 @@ Catálogo estático de zonas físicas del casco. Aplica a todos los buques.
 
 Tabla: `seccion_casco`. Ordenada por `orden, codigo`.
 
+### `Buque`
+Entidad buque con su ficha técnica (dimensiones, autonomía, capacidades, JSON de contexto operacional, etc.). Vive en `vision/models.py` y es la raíz a la que pertenecen las inspecciones.
+
+Tabla: `buques`. Aún no hay endpoints CRUD ni registro en el admin de Django: los buques se crean desde `manage.py shell` o directamente en la base de datos.
+
 ### `InspeccionCasco`
 Sesión de inspección: agrupa fotos de una misma campaña sobre un buque.
 
 | Campo | Tipo | Descripción |
 |---|---|---|
-| `buque` | FK → `api.Buque` | Embarcación inspeccionada (CASCADE) |
+| `buque` | FK → `Buque` | Embarcación inspeccionada (CASCADE) |
 | `descripcion` | TextField | Contexto libre de la campaña |
 | `tomado_por` | CharField(255) | Nombre del inspector |
 | `fecha_creacion` | DateTimeField | Auto (auto_now_add) |
@@ -97,11 +103,11 @@ pendiente → en_proceso → completada
 
 ## API Endpoints (`vision/urls.py`)
 
-Todos bajo prefijo base de `backend/urls.py`.
+Registrados en `vision/urls.py` y montados en la raíz por `backend/config/urls.py`. La documentación OpenAPI (`/api/docs/`, `/api/docs/redoc/`, `/api/schema/`) también se sirve desde ahí.
 
 | Método | URL | Vista | Descripción |
 |--------|-----|-------|-------------|
-| POST | `/api/ai/anomalias/` | `api_ai_anomalias` | Inferencia directa sin persistencia (retorna imagen JPEG o JSON con base64) |
+| POST | `/api/ai/anomalias/` | `api_ai_anomalias` | Inferencia directa sin persistencia (retorna imagen JPEG o JSON con base64). Acepta `confidence`; ya no acepta ni devuelve `iou` |
 | GET | `/api/vision/secciones/` | `api_vision_secciones` | Catálogo completo de secciones del casco |
 | GET | `/api/vision/inspecciones/` | `api_vision_inspecciones` | Lista inspecciones (`?buque_id=` opcional) |
 | POST | `/api/vision/inspecciones/` | `api_vision_inspecciones` | Crear inspección (`buque_id`, `descripcion`, `tomado_por`) |
@@ -139,7 +145,7 @@ Keepalive cada `SSE_KEEPALIVE_SECONDS` (default 15s):
 
 ---
 
-## Celery + RabbitMQ (`backend/celery.py`, `backend/settings.py`)
+## Celery + RabbitMQ (`backend/config/celery.py`, `backend/config/settings.py`)
 
 ### Configuración de colas
 
@@ -182,39 +188,59 @@ CELERY_TASK_QUEUES = (
 ### Arranque del worker
 
 ```bash
-celery -A backend worker -Q vision -l info --concurrency=2 --pool=prefork
+cd backend
+uv run celery -A config worker -Q vision -l info --concurrency=2 --pool=prefork
 ```
 
 `--concurrency=2` = 2 procesos, cada uno con el modelo YOLO cargado una vez.
 
+Si `NAUTIC_WEIGHTS_DIR` o `VISION_MODEL_ID` son inválidos, el worker **no arranca** (ver validación de configuración abajo).
+
 ---
 
-## Singleton del modelo YOLO (`vision/inference.py`)
+## Adaptador de inferencia (`vision/inference.py`)
+
+Punto de entrada único hacia `core_engine`. Ni las vistas ni las tareas llaman a `core_engine` directamente.
 
 ```python
-_processor: Optional[ImageProcessor] = None
-_lock = Lock()
-
-def get_processor() -> ImageProcessor:
-    if _processor is None:
-        with _lock:          # double-checked locking
-            if _processor is None:
-                _processor = ImageProcessor(
-                    confidence_threshold=DEFAULT_CONFIDENCE,
-                    iou_threshold=DEFAULT_IOU,
-                )
-    return _processor
-
-@worker_process_init.connect
-def _precargar_modelo_en_worker(**_kwargs):
-    get_processor()          # warm-up al arrancar el proceso
+def run_inference(image_bytes, confidence=None, incluir_mascaras=False) -> (jpeg_anotado, resultado):
+    from core_engine.vision import analyze
+    anotada, resultado = analyze(
+        image_bytes,
+        model_id=settings.VISION_MODEL_ID,
+        confidence=confidence or DEFAULT_CONFIDENCE,
+        annotate=True,
+    )
+    # sin incluir_mascaras se elimina "mask" (RLE) de cada detección
+    return anotada, resultado
 ```
 
-La señal `worker_process_init` garantiza que la primera tarea no paga la latencia de carga del modelo YOLO. El patrón double-checked locking protege contra inicialización concurrente en el proceso Django (servidor de desarrollo).
+- Es **síncrono**: la tarea Celery y la vista lo llaman directamente, sin `asyncio.run`.
+- `core_engine` cachea el detector por modelo dentro de cada proceso: los pesos se cargan una sola vez por proceso. Ya no existe `ImageProcessor`, singleton propio ni `iou` (v3 fija su NMS).
+- Umbral por defecto: `DEFAULT_CONFIDENCE = 0.25`.
+- `resultado` es `InferenceResult.to_dict()` más la clave `"model"`; el código usa `detections`, `detection_count`, `inference_time_ms` e `image_size`.
 
-Umbrales por defecto exportados como constantes:
-- `DEFAULT_CONFIDENCE = 0.25`
-- `DEFAULT_IOU = 0.45`
+### Configuración
+
+| Variable / setting | Descripción |
+|---|---|
+| `NAUTIC_WEIGHTS_DIR` | **Obligatoria.** Directorio con los pesos (p. ej. `yolo11s-seg-0.1.0.pt` para `yolo-seg`). La lee `core_engine` directamente |
+| `VISION_MODEL_ID` | Id del modelo: `yolo-seg` (default), `yolo-tiled`, `maskrcnn`, `rtdetr` |
+
+### Validación de configuración
+
+`verificar_configuracion()` comprueba que `VISION_MODEL_ID` exista en el catálogo de `core_engine` y que `NAUTIC_WEIGHTS_DIR` sea un directorio existente. Se aplica en dos puntos:
+
+| Dónde | Efecto |
+|---|---|
+| System check de Django `vision.E001` (`manage.py check`, `runserver`, `migrate`) | Falla con el mensaje de error |
+| Señal Celery `worker_init` (proceso principal) | El worker se detiene con `RuntimeError` en vez de reiniciar subprocesos en bucle |
+
+Tras validar, `worker_process_init` precarga el detector en cada subproceso para que la primera tarea no pague la latencia de carga.
+
+### Errores hacia el cliente
+
+Los errores de inferencia no exponen rutas del servidor. `api_ai_anomalias` responde `500` con un mensaje genérico (`Modelo de visión no disponible en el servidor.` o `Error durante la inferencia.`) y el detalle va solo al log.
 
 ---
 
@@ -241,7 +267,7 @@ Umbrales por defecto exportados como constantes:
 3. Marca `EN_PROCESO` → save → publica `foto-updated`
 4. Lee bytes desde disco (`imagen_original`)
 5. Valida integridad con `PIL.Image.open().verify()`
-6. Delega a `asyncio.run(ImageProcessor.process_and_visualize(imagen_bytes))` → `(bytes_anotada, resultados)` — `asyncio.run` necesario porque `process_and_visualize` es una corrutina (`async def`) ejecutada desde el contexto síncrono del worker Celery
+6. Delega a `run_inference(imagen_bytes)` → `(bytes_anotada, resultados)` (llamada síncrona sobre `core_engine.vision.analyze`)
 7. Persiste imagen anotada en `media/inspecciones/anotadas/{foto_id}_{uuid8}.jpg`
 8. Agrupa detecciones por clase (`_agrupar_detecciones`)
 9. Calcula severidad máxima (`_calcular_severidad`)
@@ -389,6 +415,8 @@ def get_client_ip(request) -> str:
 | `VISION_RATE_LIMIT_UPLOADS_PER_MINUTE` | `20` | Max uploads/min por IP |
 | `VISION_RATE_LIMIT_MAX_CONCURRENT` | `10` | Max fotos activas simultáneas por IP |
 | `CELERY_TASK_ALWAYS_EAGER` | `False` | `True` ejecuta tareas inline (tests/CI) |
+| `NAUTIC_WEIGHTS_DIR` | _(sin default)_ | Directorio de pesos del modelo (obligatoria) |
+| `VISION_MODEL_ID` | `yolo-seg` | Modelo de `core_engine` a usar |
 
 ---
 
@@ -396,7 +424,8 @@ def get_client_ip(request) -> str:
 
 ```bash
 # Arranque con management API de RabbitMQ
-celery -A backend flower --port=5555 \
+cd backend
+uv run celery -A config flower --port=5555 \
   --broker_api=http://guest:guest@localhost:15672/api/
 ```
 
@@ -417,16 +446,17 @@ sudo rabbitmq-plugins enable rabbitmq_management
 # 1. Servicios base
 sudo systemctl start rabbitmq-server redis
 
+cd backend
+
 # 2. Worker Celery
-source .venv/bin/activate
-celery -A backend worker -Q vision -l info --concurrency=2
+uv run celery -A config worker -Q vision -l info --concurrency=2 --pool=prefork
 
 # 3. Flower (opcional, monitoreo)
-celery -A backend flower --port=5555 \
+uv run celery -A config flower --port=5555 \
   --broker_api=http://guest:guest@localhost:15672/api/
 
 # 4. Django
-python manage.py runserver
+uv run python manage.py runserver
 ```
 
 ---
@@ -434,19 +464,21 @@ python manage.py runserver
 ## Árbol de archivos del módulo
 
 ```
-vision/
-├── models.py         # SeccionCasco, InspeccionCasco, FotoInspeccion
-├── views.py          # Endpoints REST + SSE stream
-├── tasks.py          # procesar_foto (Celery) + dead_letter
-├── pubsub.py         # Cliente Redis + publicar_evento + suscribirse
-├── ratelimit.py      # Fixed-window counter upload + concurrent tracker
-├── inference.py      # Singleton ImageProcessor (paquete nautic_core, módulo core_engine)
-├── urls.py           # Routing del módulo
-├── apps.py           # AppConfig
-├── migrations/       # Migraciones del módulo
-├── management/
-│   └── commands/seed_secciones_casco.py   # Puebla el catálogo de secciones
-└── INSPECCION_IA.md  # Documentación funcional + decisiones de diseño
+backend/
+├── config/               # Proyecto Django: settings.py, urls.py, celery.py, wsgi/asgi
+└── vision/
+    ├── models.py         # Buque, SeccionCasco, InspeccionCasco, FotoInspeccion
+    ├── views.py          # Endpoints REST + SSE stream
+    ├── tasks.py          # procesar_foto (Celery) + dead_letter
+    ├── pubsub.py         # Cliente Redis + publicar_evento + suscribirse
+    ├── ratelimit.py      # Fixed-window counter upload + concurrent tracker
+    ├── inference.py      # run_inference() sobre core_engine.vision + verificar_configuracion()
+    ├── urls.py           # Routing del módulo
+    ├── apps.py           # AppConfig + system check vision.E001
+    ├── migrations/       # Migraciones del módulo
+    ├── management/
+    │   └── commands/seed_secciones_casco.py   # Puebla el catálogo de secciones
+    └── INSPECCION_IA.md  # Documentación funcional + decisiones de diseño
 ```
 
 No hay `admin.py` ni `tests.py` en este módulo.

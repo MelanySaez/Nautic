@@ -1,82 +1,68 @@
-# PSCV-Lite — Nautic Module
+# Nautic
 
-Sistema de gestión de mantenimiento naval con inspección asistida por IA, desarrollado para COTECMAR.
+Backend de inspección de cascos de buques con análisis visual asistido por IA (YOLO). El inspector fotografía secciones del casco y un modelo detecta anomalías (corrosión, defectos estructurales, incrustación marina, descascaramiento de pintura) de forma asíncrona, con progreso en tiempo real por SSE.
 
-Cubre dos dominios:
+> **Estado:** solo existe el backend (`backend/`). El frontend nuevo vivirá en `frontend/` y aún no existe.
 
-- **Rondas de mantenimiento** — registro de buques, equipos, parámetros y lecturas periódicas.
-- **Inspección IA del casco** — el inspector fotografía secciones del casco y un modelo YOLO detecta anomalías (corrosión, defectos estructurales, incrustación marina, descascaramiento de pintura) de forma asíncrona.
+## Idea base (hoja de ruta)
+
+El producto se organiza en tres secciones. Hoy solo la tercera está implementada.
+
+| Sección | Qué es | Estado |
+|---|---|---|
+| **Buques** | Entidad buque con ficha técnica (dimensiones, autonomía, capacidades, etc.) | Existe el modelo `Buque`; **sin endpoints CRUD** |
+| **Inspecciones** | Sesiones de inspección por buque | Modelo y endpoints en `vision` |
+| **Visión IA** | Análisis YOLO del casco; todo análisis pertenece a una inspección concreta | Implementado |
+
+Por ahora los buques se crean desde el shell de Django (`uv run python manage.py shell`) o directamente en la base de datos: `Buque` no está registrado en el admin.
 
 ## Estructura
 
-| Directorio | Contenido |
+| Ruta | Contenido |
 |---|---|
-| `frontend/` | SPA React 18 (Create React App + CRACO, JavaScript) |
-| `api/` | App Django del dominio de mantenimiento |
-| `vision/` | App Django del módulo de inspección IA |
-| `backend/` | Configuración del proyecto Django (settings, Celery, wsgi/asgi) |
-| `chatbot/` | Microservicio de IA conversacional (n8n + Qdrant + Ollama + translator, vía Docker Compose) |
-| `scripts/` | Utilidades de carga y clasificación de documentación de equipos |
-| `learn/` | Historias de usuario y material de referencia |
+| `backend/` | Todo el código Python/Django |
+| `backend/config/` | Configuración del proyecto Django (settings, urls, Celery, wsgi/asgi) |
+| `backend/vision/` | Única app Django: modelos, API REST, SSE, tareas Celery |
+| `backend/pyproject.toml`, `backend/uv.lock` | Dependencias (uv) |
+| `frontend/` | _(futuro)_ nuevo frontend |
 
-## Stack
+## Puesta en marcha
 
-Django 5.1 · Django REST Framework · PostgreSQL · Celery 5.4 · RabbitMQ · Redis · React 18 · YOLO (`nautic_core`)
-
-Python 3.12.8.
-
-## Puesta en marcha (desarrollo)
-
-### 1. Backend
+**Requisitos:** Python 3.12, [uv](https://docs.astral.sh/uv/), PostgreSQL, RabbitMQ, Redis, acceso SSH a `AaronDLF/nautic_core` (se instala por Git) y los pesos del modelo en disco.
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+cd backend
+cp .env.example .env     # completa DB_PASSWORD, SECRET_KEY y NAUTIC_WEIGHTS_DIR
+uv sync                  # instala dependencias (incluye nautic_core v3.0.0)
 
-cp .env.example .env        # completa DB_PASSWORD y SECRET_KEY
-
-python manage.py migrate
-python manage.py seed_secciones_casco   # catálogo de secciones del casco
-python manage.py runserver               # :8000
+createdb NauticDB        # o crea la base desde psql
+uv run python manage.py migrate
+uv run python manage.py seed_secciones_casco   # catálogo de secciones del casco
+uv run python manage.py runserver              # :8000
 ```
 
-> `requirements.txt` instala `nautic_core` desde GitHub por SSH. Necesitas una clave SSH con acceso al repositorio.
-
-### 2. Módulo de visión (solo si vas a usar la inspección IA)
-
-Sin estos servicios las fotos se suben pero nunca se analizan.
+En otra terminal, para que las fotos se analicen:
 
 ```bash
 sudo systemctl start rabbitmq-server redis
-celery -A backend worker -Q vision -l info --concurrency=2 --pool=prefork
-
-# opcional — monitoreo de workers en :5555
-celery -A backend flower --port=5555 \
-  --broker_api=http://guest:guest@localhost:15672/api/
+cd backend
+uv run celery -A config worker -Q vision -l info --concurrency=2 --pool=prefork
 ```
 
-### 3. Frontend
+Sin RabbitMQ, Redis y el worker las fotos se suben pero nunca se analizan.
 
-```bash
-cd frontend
-npm install
-npm start                    # :3000
-```
+### Configuración del modelo
 
-`frontend/src/config.js` define `API_BASE` (por defecto `http://localhost:8000`).
+| Variable | Descripción |
+|---|---|
+| `NAUTIC_WEIGHTS_DIR` | **Obligatoria.** Directorio con los pesos (p. ej. `yolo11s-seg-0.1.0.pt`) |
+| `VISION_MODEL_ID` | Modelo a usar: `yolo-seg` (default), `yolo-tiled`, `maskrcnn`, `rtdetr` |
 
-### 4. Chatbot (opcional)
-
-```bash
-cd chatbot
-docker compose up -d
-```
-
-Ver [`chatbot/README.md`](chatbot/README.md) para variables de entorno y puertos.
+Si alguna es inválida, `manage.py check` falla (`vision.E001`) y el worker de Celery se niega a arrancar.
 
 ## Documentación de API
 
-Con el servidor Django corriendo:
+Con el servidor corriendo:
 
 - Swagger UI — http://localhost:8000/api/docs/
 - ReDoc — http://localhost:8000/api/docs/redoc/
@@ -86,18 +72,14 @@ Con el servidor Django corriendo:
 
 | Documento | Alcance |
 |---|---|
-| [`AGENTS.md`](AGENTS.md) | Convenciones de código, comandos y arquitectura general |
-| [`vision/INSPECCION_IA.md`](vision/INSPECCION_IA.md) | Módulo de inspección IA de extremo a extremo + decisiones de diseño |
-| [`VISION_BACKEND.md`](VISION_BACKEND.md) | Referencia del backend de visión (Celery, Redis, SSE, rate limiting) |
-| [`VISION_FRONTEND.md`](VISION_FRONTEND.md) | Referencia del frontend de visión (componentes, SSE, estilos) |
-| [`learn/Historias-de-Usuario.md`](learn/Historias-de-Usuario.md) | Historias de usuario y estado de implementación |
-
-El dominio de mantenimiento (`api/`) aún no tiene documento propio.
+| [`AGENTS.md`](AGENTS.md) | Convenciones de código, comandos y arquitectura |
+| [`backend/vision/INSPECCION_IA.md`](backend/vision/INSPECCION_IA.md) | Módulo de inspección IA de extremo a extremo + decisiones de diseño |
+| [`VISION_BACKEND.md`](VISION_BACKEND.md) | Referencia del backend de visión (Celery, Redis, SSE, rate limiting, inferencia) |
 
 ## Notas
 
-- **Sin autenticación.** Esta es la versión Lite: el middleware JWT está deshabilitado en `backend/settings.py` y no hay login. Los campos de autoría (p. ej. `tomado_por`) son texto libre.
-- El idioma del dominio es español (modelos, rutas, variables de negocio); la interfaz soporta `es` y `en`.
+- **Sin autenticación** en esta versión. Los campos de autoría (p. ej. `tomado_por`) son texto libre.
+- El idioma del dominio es español (modelos, rutas, variables de negocio).
 
 ## Licencia
 
