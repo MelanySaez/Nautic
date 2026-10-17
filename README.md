@@ -2,7 +2,7 @@
 
 Backend de inspección de cascos de buques con análisis visual asistido por IA (YOLO). El inspector fotografía secciones del casco y un modelo detecta anomalías (corrosión, defectos estructurales, incrustación marina, descascaramiento de pintura) de forma asíncrona, con progreso en tiempo real por SSE.
 
-> **Estado:** solo existe el backend (`backend/`). El frontend nuevo vivirá en `frontend/` y aún no existe.
+> **Estado:** backend en `backend/` y frontend React + TypeScript en `frontend/` (ver [`frontend/README.md`](frontend/README.md)).
 
 ## Idea base (hoja de ruta)
 
@@ -24,7 +24,7 @@ Por ahora los buques se crean desde el shell de Django (`uv run python manage.py
 | `backend/config/` | Configuración del proyecto Django (settings, urls, Celery, wsgi/asgi) |
 | `backend/vision/` | Única app Django: modelos, API REST, SSE, tareas Celery |
 | `backend/pyproject.toml`, `backend/uv.lock` | Dependencias (uv) |
-| `frontend/` | _(futuro)_ nuevo frontend |
+| `frontend/` | Frontend React + TypeScript (Vite). `frontend/interfaz/` guarda los mockups de referencia |
 
 ## Puesta en marcha
 

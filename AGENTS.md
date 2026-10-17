@@ -9,7 +9,7 @@ Guidance for agentic coding agents operating in this repository.
 Nautic is a hull-inspection system for naval vessels. This repository is a **monorepo root**:
 
 - **`backend/`** — the only code that exists today: a Django project (DRF + Celery) with a single app, `vision`.
-- **`frontend/`** — a new frontend will live here. It **does not exist yet**.
+- **`frontend/`** — React + TypeScript SPA (Vite, Tailwind v4, React Router). `frontend/interfaz/` holds the original mockups: visual reference only, never imported or shipped.
 
 Intended product (roadmap, **not implemented yet**): three sections.
 
@@ -43,7 +43,15 @@ All endpoints live under `/api/`. The `vision` module needs infrastructure beyon
 │       ├── inference.py, pubsub.py, ratelimit.py
 │       ├── management/commands/seed_secciones_casco.py
 │       └── INSPECCION_IA.md
-└── frontend/                    # (future)
+└── frontend/                    # React + TypeScript SPA (npm)
+    ├── package.json, vite.config.ts
+    ├── interfaz/                # mockups (reference only)
+    └── src/
+        ├── app/                 # router, layout, composition root
+        ├── inspecciones/        # domain / application / infrastructure / ui
+        ├── buques/              # port + in-memory adapter
+        ├── shared/              # http client, theme, hooks, UI atoms
+        └── test/                # Vitest setup and test doubles
 ```
 
 ---
@@ -141,14 +149,32 @@ If you add tests that touch the vision module, set `CELERY_TASK_ALWAYS_EAGER=Tru
 
 ### Frontend
 
-Not defined yet. Conventions will be added here when `frontend/` is created.
+Run from `frontend/` with **npm** (pnpm files are git-ignored). Node `^20.19.0 || >=22.12.0`.
+
+```bash
+npm install
+npm run dev        # :5173, proxies /api and /media to :8000 when VITE_API_BASE_URL is empty
+npm test           # Vitest, single run
+npx vitest run src/inspecciones/ui/ListaInspeccionesPage.test.tsx   # one file
+npx vitest run -t "creates the inspection"                          # one test by name
+npm run lint       # oxlint
+npm run build      # tsc -b + vite build
+```
+
+- **TDD**: write the failing test first. Page tests go through accessible roles/labels with fake adapters from `src/test/dobles.tsx`; never hit the real API in tests.
+- **Ports and adapters**: pages get adapters via `useDependencias()`. Only `src/app/composicion.ts` picks implementations. Map snake_case DTOs to the domain in `infrastructure/dtos.ts`; components never see wire shapes.
+- **Container / presentational**: `*Page.tsx` loads data and owns state; presentational components receive props only.
+- **Live updates** come from `EventSource` through the `EventosInspeccion` port and the `aplicarEvento` reducer. Do not add polling.
+- **Styling**: Tailwind with the semantic tokens in `src/index.css` (`bg-surface`, `text-ink`, `border-line`, `text-critical`, …). They swap in dark mode, so `dark:` variants are rarely needed.
+- **Language**: identifiers follow the Spanish domain (`Inspeccion`, `subirFoto`); UI copy is neutral Spanish; code comments in English.
+- **Vessels**: no backend endpoints yet; `EnMemoriaBuquesRepository` with a seed whose ids must exist in the `buques` table.
 
 ---
 
 ## Architecture Notes
 
 - No authentication in this version (no JWT middleware, no login). Authorship fields such as `tomado_por` are free text.
-- UI and API language: the domain is Spanish; the future frontend decides its own i18n.
+- UI and API language: the domain is Spanish; the frontend UI copy is Spanish (no i18n layer yet).
 
 ### Vision module (async pipeline)
 

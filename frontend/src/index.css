@@ -1,0 +1,107 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Design tokens, inspired by the "Abyssal Precision" reference.
+ * Semantic names swap their value in dark mode, so components rarely need `dark:`.
+ */
+:root {
+  --c-canvas: #f7f9fb;
+  --c-surface: #ffffff;
+  --c-surface-2: #f2f4f6;
+  --c-line: #e2e8f0;
+  --c-line-strong: #cbd5e1;
+  --c-ink: #191c1e;
+  --c-ink-muted: #45464d;
+  --c-ink-dim: #76777d;
+  --c-primary: #0f172a;
+  --c-on-primary: #ffffff;
+  --c-accent: #06b6d4;
+  --c-accent-ink: #00687a;
+  --c-on-accent: #0f172a;
+
+  --c-critical: #93000a;
+  --c-critical-bg: #ffdad6;
+  --c-high: #9a3412;
+  --c-high-bg: #ffedd5;
+  --c-medium: #854d0e;
+  --c-medium-bg: #fef9c3;
+  --c-low: #166534;
+  --c-low-bg: #dcfce7;
+  --c-info: #00687a;
+  --c-info-bg: #cff4fc;
+
+  color-scheme: light;
+}
+
+.dark {
+  --c-canvas: #0b111e;
+  --c-surface: #111b2d;
+  --c-surface-2: #162238;
+  --c-line: #17253b;
+  --c-line-strong: #22324f;
+  --c-ink: #f0f6fc;
+  --c-ink-muted: #94a3b8;
+  --c-ink-dim: #64748b;
+  --c-primary: #00f0ff;
+  --c-on-primary: #00363a;
+  --c-accent: #00dbe9;
+  --c-accent-ink: #7df4ff;
+  --c-on-accent: #00363a;
+
+  --c-critical: #ff2a51;
+  --c-critical-bg: #2a0812;
+  --c-high: #fb923c;
+  --c-high-bg: #2a1305;
+  --c-medium: #f59e0b;
+  --c-medium-bg: #261704;
+  --c-low: #10b981;
+  --c-low-bg: #042217;
+  --c-info: #00d2ff;
+  --c-info-bg: #042433;
+
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-canvas: var(--c-canvas);
+  --color-surface: var(--c-surface);
+  --color-surface-2: var(--c-surface-2);
+  --color-line: var(--c-line);
+  --color-line-strong: var(--c-line-strong);
+  --color-ink: var(--c-ink);
+  --color-ink-muted: var(--c-ink-muted);
+  --color-ink-dim: var(--c-ink-dim);
+  --color-primary: var(--c-primary);
+  --color-on-primary: var(--c-on-primary);
+  --color-accent: var(--c-accent);
+  --color-accent-ink: var(--c-accent-ink);
+  --color-on-accent: var(--c-on-accent);
+  --color-critical: var(--c-critical);
+  --color-critical-bg: var(--c-critical-bg);
+  --color-high: var(--c-high);
+  --color-high-bg: var(--c-high-bg);
+  --color-medium: var(--c-medium);
+  --color-medium-bg: var(--c-medium-bg);
+  --color-low: var(--c-low);
+  --color-low-bg: var(--c-low-bg);
+  --color-info: var(--c-info);
+  --color-info-bg: var(--c-info-bg);
+
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+}
+
+@layer base {
+  body {
+    @apply bg-canvas font-sans text-ink antialiased;
+  }
+}
+
+@layer components {
+  /* "label-caps": system metadata, distinct from user content. */
+  .label-caps {
+    @apply font-mono text-xs font-medium tracking-wider uppercase;
+  }
+}
