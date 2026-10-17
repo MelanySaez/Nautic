@@ -14,9 +14,10 @@ Los pesos se resuelven con ``$NAUTIC_WEIGHTS_DIR/<archivo>`` (ver
 rutas probadas.
 """
 import logging
-from typing import Any, Dict, Optional, Tuple
+import os
+from typing import Any, Dict, List, Optional, Tuple
 
-from celery.signals import worker_process_init
+from celery.signals import worker_init, worker_process_init
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
@@ -29,6 +30,41 @@ DEFAULT_CONFIDENCE = 0.25
 def _modelo_id() -> str:
     """Id del modelo de ``core_engine`` a usar (``VISION_MODEL_ID``)."""
     return settings.VISION_MODEL_ID
+
+
+def verificar_configuracion() -> List[str]:
+    """Valida la configuración de inferencia sin cargar el modelo.
+
+    Comprueba que ``VISION_MODEL_ID`` exista en el catálogo de ``core_engine``
+    y que ``NAUTIC_WEIGHTS_DIR`` apunte a un directorio existente.
+
+    Returns:
+        Lista de mensajes de error; vacía si la configuración es válida.
+    """
+    from core_engine.vision import available_models
+
+    errores = []
+
+    modelo_id = _modelo_id()
+    ids_validos = [m.id for m in available_models()]
+    if modelo_id not in ids_validos:
+        errores.append(
+            f"VISION_MODEL_ID='{modelo_id}' no existe en core_engine. "
+            f"Valores válidos: {', '.join(ids_validos)}."
+        )
+
+    pesos_dir = os.getenv("NAUTIC_WEIGHTS_DIR")
+    if not pesos_dir:
+        errores.append(
+            "NAUTIC_WEIGHTS_DIR no está definido. Debe apuntar al directorio "
+            "con los pesos de los modelos (ver backend/.env.example)."
+        )
+    elif not os.path.isdir(pesos_dir):
+        errores.append(
+            f"NAUTIC_WEIGHTS_DIR='{pesos_dir}' no es un directorio existente."
+        )
+
+    return errores
 
 
 def run_inference(
@@ -70,6 +106,23 @@ def run_inference(
             det.pop("mask", None)
 
     return anotada, resultado
+
+
+@worker_init.connect
+def _validar_configuracion_en_worker(**_kwargs):
+    """Aborta el arranque del worker si la configuración es inválida.
+
+    Corre en el proceso principal, antes de crear los subprocesos: un fallo
+    aquí detiene el worker con un mensaje claro en lugar de dejar al pool
+    reiniciando subprocesos que fallan en ``worker_process_init``.
+    """
+    errores = verificar_configuracion()
+    if errores:
+        for error in errores:
+            logger.error(error)
+        raise RuntimeError(
+            "Configuración de visión inválida: " + " ".join(errores)
+        )
 
 
 @worker_process_init.connect

@@ -195,10 +195,15 @@ def api_ai_anomalias(request):
         imagen_anotada_bytes, resultados = run_inference(
             imagen_bytes, confidence=confidence
         )
-    except FileNotFoundError as e:
-        return Response({"error": f"Modelo YOLO no encontrado: {str(e)}"}, status=500)
-    except Exception as e:
-        return Response({"error": f"Error durante la inferencia: {str(e)}"}, status=500)
+    except FileNotFoundError:
+        # El detalle (rutas probadas del servidor) va solo al log.
+        logger.exception("[vision] Pesos del modelo no encontrados")
+        return Response(
+            {"error": "Modelo de visión no disponible en el servidor."}, status=500
+        )
+    except Exception:
+        logger.exception("[vision] Error durante la inferencia")
+        return Response({"error": "Error durante la inferencia."}, status=500)
 
     # --- Devolver respuesta ---
     if retornar_imagen:
