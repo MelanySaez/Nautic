@@ -23,7 +23,7 @@ Branch: `feat/frontend-react` · Delivery: `ask-on-risk` · Test runner: Vitest 
 | T4 | S5 S6 S7 | inline | done (RED→GREEN: 6 form tests) | 77a6ed9 |
 | T5 | S5 S7 | inline | done (RED→GREEN: 12 page tests) | 71a3d0a |
 | T6 | S5 S7 | inline | done (RED→GREEN: 6 page tests) | 8e4719f |
-| T7 | S1 | inline | done (docs; documented commands run) | (this commit) |
+| T7 | S1 | inline | done (docs; documented commands run) | 0db2cfa |
 
 - T1: scaffold (Vite, TS strict, Tailwind design tokens light/dark, Vitest, router shell, theme toggle).
 - T2: domain types + pure rules, repository ports, HTTP adapter, SSE adapter, in-memory buques.
@@ -46,3 +46,4 @@ Route evidence: no Writer trigger (units share infra and are sequential); all in
 - L7: Composition root split (`composicion.ts`, `useDependencias.ts`, `DependenciasProvider.tsx`) to satisfy oxlint `only-export-components`.
 - L8: Checks at T6: 72 tests, `tsc -b`, oxlint, `vite build` green. Dev-server smoke: app served on Vite; backend not running locally, so no end-to-end run against the real API (proxy returned 502).
 - L9: Every slice assessment so far: medium, `under_budget`.
+- L10: Independent verifier (Risk item 5): no blockers; S1-S7 and A1 PASS; wire contract matches backend field by field. Advisories, not fixed: (1) SSE events lost while loading or across reconnects, fix by refetching on `ready`; (2) "Iniciar análisis" stays enabled while photos are still `pendiente`, so a second click re-dispatches them (backend has no dedup); (3) retry response can overwrite a newer SSE state; (4) theme flash on load; (5) vessel seed ids must exist in DB; (6) non-numeric route id shows generic error.
