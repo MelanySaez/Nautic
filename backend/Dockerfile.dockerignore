@@ -36,3 +36,9 @@ staticfiles
 
 # Environment variables
 .env
+
+# Local tooling
+.venv
+node_modules
+odd
+.atl

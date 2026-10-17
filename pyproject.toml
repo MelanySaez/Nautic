@@ -1,0 +1,24 @@
+[project]
+name = "nautic"
+version = "0.1.0"
+description = "Hull inspection backend: vessels, inspections and YOLO-based visual analysis."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "django==5.1.7",
+    "django-cors-headers==4.7.0",
+    "djangorestframework==3.16.1",
+    "drf-spectacular==0.29.0",
+    "python-dotenv==1.0.1",
+    "psycopg2-binary==2.9.10",
+    "celery==5.4.0",
+    "redis==5.2.1",
+    "flower==2.0.1",
+    "nautic-core",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+nautic-core = { git = "ssh://git@github.com/AaronDLF/nautic_core.git", tag = "v2.0.0" }
