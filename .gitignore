@@ -63,10 +63,10 @@ coverage/
 build/
 dist/
 npm-debug.log*
+pnpm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# pnpm — personal local use only; the team uses npm + package-lock.json
-pnpm-lock.yaml
-pnpm-workspace.yaml
-.npmrc
+# The frontend uses pnpm (frontend/pnpm-lock.yaml); other lockfiles must not be committed
+package-lock.json
+yarn.lock
