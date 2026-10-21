@@ -43,7 +43,7 @@ All endpoints live under `/api/`. The `vision` module needs infrastructure beyon
 │       ├── inference.py, pubsub.py, ratelimit.py
 │       ├── management/commands/seed_secciones_casco.py
 │       └── INSPECCION_IA.md
-└── frontend/                    # React + TypeScript SPA (npm)
+└── frontend/                    # React + TypeScript SPA (pnpm)
     ├── package.json, vite.config.ts
     ├── interfaz/                # mockups (reference only)
     └── src/
@@ -149,16 +149,17 @@ If you add tests that touch the vision module, set `CELERY_TASK_ALWAYS_EAGER=Tru
 
 ### Frontend
 
-Run from `frontend/` with **npm** (pnpm files are git-ignored). Node `^20.19.0 || >=22.12.0`.
+Run from `frontend/` with **pnpm** (version pinned in `package.json` `packageManager`; `corepack enable` provides it). `frontend/pnpm-lock.yaml` is the only lockfile: never commit `package-lock.json` or `yarn.lock`. Node `^20.19.0 || >=22.12.0`.
 
 ```bash
-npm install
-npm run dev        # :5173, proxies /api and /media to :8000 when VITE_API_BASE_URL is empty
-npm test           # Vitest, single run
-npx vitest run src/inspecciones/ui/ListaInspeccionesPage.test.tsx   # one file
-npx vitest run -t "creates the inspection"                          # one test by name
-npm run lint       # oxlint
-npm run build      # tsc -b + vite build
+pnpm install
+pnpm dev           # :5173, proxies /api and /media to :8000 when VITE_API_BASE_URL is empty
+pnpm test          # Vitest, single run
+pnpm vitest run src/inspecciones/ui/ListaInspeccionesPage.test.tsx   # one file
+pnpm vitest run -t "creates the inspection"                          # one test by name
+pnpm lint          # oxlint
+pnpm build         # tsc -b + vite build
+pnpm add <pkg>     # add a dependency (pnpm add -D <pkg> for dev)
 ```
 
 - **TDD**: write the failing test first. Page tests go through accessible roles/labels with fake adapters from `src/test/dobles.tsx`; never hit the real API in tests.

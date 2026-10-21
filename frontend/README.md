@@ -8,13 +8,13 @@ Stack: React 19, TypeScript, Vite, Tailwind CSS v4, React Router. Tests con Vite
 
 ## Puesta en marcha
 
-Requisitos: Node 20.19+ o 22.12+ y el backend Django corriendo en `:8000` (ver el `README.md` de la raíz).
+Requisitos: Node 20.19+ o 22.12+, pnpm 12 (`corepack enable` instala la versión fijada en `package.json`) y el backend Django corriendo en `:8000` (ver el `README.md` de la raíz).
 
 ```bash
 cd frontend
 cp .env.example .env.local   # opcional
-npm install
-npm run dev                  # http://localhost:5173
+pnpm install
+pnpm dev                     # http://localhost:5173
 ```
 
 `VITE_API_BASE_URL` define la URL del backend. Si queda vacía, el navegador habla con Vite y Vite reenvía `/api` y `/media` a `http://localhost:8000` (ver `vite.config.ts`). Con una URL explícita, el backend debe permitir el origen en `CORS_ALLOWED_ORIGINS` (`:5173` ya está incluido).
@@ -23,11 +23,11 @@ npm run dev                  # http://localhost:5173
 
 | Comando | Qué hace |
 |---|---|
-| `npm run dev` | Servidor de desarrollo |
-| `npm test` | Tests (una pasada) |
-| `npm run test:watch` | Tests en modo watch |
-| `npm run lint` | oxlint |
-| `npm run build` | Typecheck + build de producción en `dist/` |
+| `pnpm dev` | Servidor de desarrollo |
+| `pnpm test` | Tests (una pasada) |
+| `pnpm test:watch` | Tests en modo watch |
+| `pnpm lint` | oxlint |
+| `pnpm build` | Typecheck + build de producción en `dist/` |
 
 ## Arquitectura
 
