@@ -15,7 +15,7 @@ Intended product (roadmap, **not implemented yet**): three sections.
 
 | Section | Purpose | Status |
 |---|---|---|
-| **Buques** | Vessel entity with a technical sheet | Model exists (`vision.models.Buque`); no CRUD endpoints |
+| **Buques** | Vessel entity with a technical sheet | Model + endpoints (create / list / detail) in `vision/views_buques.py`; no update/delete |
 | **Inspecciones** | Inspection sessions per vessel | Model + endpoints exist (`InspeccionCasco`) |
 | **Visión IA** | YOLO hull analysis; every analysis belongs to a concrete inspection | Implemented (photos → Celery → SSE) |
 
@@ -39,7 +39,7 @@ All endpoints live under `/api/`. The `vision` module needs infrastructure beyon
 │   │   ├── wsgi.py, asgi.py
 │   │   └── spectacular_hooks.py
 │   └── vision/                  # the only Django app
-│       ├── models.py, views.py, urls.py, tasks.py
+│       ├── models.py, views.py, views_buques.py, urls.py, tasks.py
 │       ├── inference.py, pubsub.py, ratelimit.py
 │       ├── management/commands/seed_secciones_casco.py
 │       └── INSPECCION_IA.md
@@ -101,13 +101,13 @@ Required environment: `NAUTIC_WEIGHTS_DIR` (directory with the model weights). O
 
 ## Test Commands
 
-No backend tests exist yet (`vision/` has no `tests.py`).
+Backend tests live in `backend/vision/tests/` (currently `test_buques_api.py`, covering the Buques API). The vision pipeline itself has no tests yet.
 
 ```bash
 cd backend
 uv run python manage.py test vision                      # all vision tests
-uv run python manage.py test vision.tests.SomeTestClass  # one class
-uv run python manage.py test vision.tests.SomeTestClass.test_method_name
+uv run python manage.py test vision.tests.test_buques_api.CrearBuqueTests  # one class
+uv run python manage.py test vision.tests.test_buques_api.CrearBuqueTests.test_falta_nombre  # one test
 ```
 
 If you add tests that touch the vision module, set `CELERY_TASK_ALWAYS_EAGER=True` so tasks run inline instead of needing a live broker.
@@ -168,7 +168,7 @@ pnpm add <pkg>     # add a dependency (pnpm add -D <pkg> for dev)
 - **Live updates** come from `EventSource` through the `EventosInspeccion` port and the `aplicarEvento` reducer. Do not add polling.
 - **Styling**: Tailwind with the semantic tokens in `src/index.css` (`bg-surface`, `text-ink`, `border-line`, `text-critical`, …). They swap in dark mode, so `dark:` variants are rarely needed.
 - **Language**: identifiers follow the Spanish domain (`Inspeccion`, `subirFoto`); UI copy is neutral Spanish; code comments in English.
-- **Vessels**: no backend endpoints yet; `EnMemoriaBuquesRepository` with a seed whose ids must exist in the `buques` table.
+- **Vessels**: the backend now exposes `GET/POST /api/buques/` and `GET /api/buques/<id>/`, but the frontend still uses `EnMemoriaBuquesRepository` with a seed whose ids must exist in the `buques` table (HTTP adapter pending).
 
 ---
 
@@ -198,6 +198,7 @@ pnpm add <pkg>     # add a dependency (pnpm add -D <pkg> for dev)
 | `backend/config/celery.py` | Celery app definition |
 | `backend/vision/models.py` | `Buque`, `SeccionCasco`, `InspeccionCasco`, `FotoInspeccion` |
 | `backend/vision/views.py` | Vision REST endpoints + SSE stream |
+| `backend/vision/views_buques.py` | Buques REST endpoints (`/api/buques/`): list, create, detail |
 | `backend/vision/urls.py` | URL routing for the vision app |
 | `backend/vision/tasks.py` | Celery task `procesar_foto` + dead-letter task |
 | `backend/vision/inference.py` | `run_inference()` adapter over `core_engine.vision.analyze` + config validation |

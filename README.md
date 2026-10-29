@@ -6,15 +6,15 @@ Backend de inspección de cascos de buques con análisis visual asistido por IA 
 
 ## Idea base (hoja de ruta)
 
-El producto se organiza en tres secciones. Hoy solo la tercera está implementada.
+El producto se organiza en tres secciones. Hoy están implementadas Visión IA, Inspecciones y, parcialmente, Buques (alta, listado y detalle).
 
 | Sección | Qué es | Estado |
 |---|---|---|
-| **Buques** | Entidad buque con ficha técnica (dimensiones, autonomía, capacidades, etc.) | Existe el modelo `Buque`; **sin endpoints CRUD** |
+| **Buques** | Entidad buque con ficha técnica (dimensiones, autonomía, capacidades, etc.) | Modelo `Buque` + endpoints `GET/POST /api/buques/` y `GET /api/buques/<id>/` (crear, listar con `offset`/`limit`, ficha completa); **sin edición ni borrado** |
 | **Inspecciones** | Sesiones de inspección por buque | Modelo y endpoints en `vision` |
 | **Visión IA** | Análisis YOLO del casco; todo análisis pertenece a una inspección concreta | Implementado |
 
-Por ahora los buques se crean desde el shell de Django (`uv run python manage.py shell`) o directamente en la base de datos: `Buque` no está registrado en el admin.
+Los buques se crean con `POST /api/buques/` (`nombre` y `tipo` son obligatorios; el resto de la ficha técnica es opcional). Editar o eliminar un buque aún no tiene endpoint: `Buque` no está registrado en el admin.
 
 ## Estructura
 
