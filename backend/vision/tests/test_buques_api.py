@@ -165,6 +165,12 @@ class CrearBuqueTests(TestCase):
         self.assertEqual(res.status_code, 400)
         self.assertIn('autonomia_horas', res.json()['campos'])
 
+    def test_decimal_demasiado_grande(self):
+        res = self._post({'nombre': 'A', 'tipo': 'B', 'eslora_total_m': 10 ** 400})
+
+        self.assertEqual(res.status_code, 400)
+        self.assertIn('eslora_total_m', res.json()['campos'])
+
     def test_varios_errores_se_reportan_juntos(self):
         res = self._post({'nombre': '', 'puntal_m': -2})
 
@@ -244,6 +250,8 @@ class ListarBuquesTests(TestCase):
             {'offset': -1},
             {'offset': 'abc'},
             {'offset': '1.5'},
+            {'offset': '9' * 5000},
+            {'offset': 2_147_483_648},
             {'limit': 0},
             {'limit': -5},
             {'limit': 201},

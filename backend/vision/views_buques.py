@@ -13,6 +13,8 @@ from .models import Buque
 # Pagination bounds for the list endpoint.
 _LIMIT_POR_DEFECTO = 50
 _LIMIT_MAXIMO = 200
+# Upper bound for offset: keeps int() parsing cheap and the SQL OFFSET in range.
+_OFFSET_MAXIMO = 2_147_483_647
 
 # Fields the client may never send.
 _CAMPOS_SOLO_LECTURA = {'id', 'created_at', 'updated_at'}
@@ -69,7 +71,7 @@ def _parse_param_entero(valor, defecto, minimo, maximo=None):
     if valor is None:
         return defecto
     valor = valor.strip()
-    if not (valor.isascii() and valor.isdigit()):
+    if not (valor.isascii() and valor.isdigit()) or len(valor) > 12:
         return None
     numero = int(valor)
     if numero < minimo or (maximo is not None and numero > maximo):
@@ -112,6 +114,12 @@ def _validar_valor(nombre, valor):
             if not (math.isfinite(valor) and float(valor).is_integer()):
                 return None, 'Debe ser un número entero.'
             valor = int(valor)
+        if isinstance(campo, models.FloatField):
+            # A huge JSON integer would overflow inside full_clean (500).
+            try:
+                valor = float(valor)
+            except OverflowError:
+                return None, 'Número fuera de rango.'
         if isinstance(valor, float) and not math.isfinite(valor):
             return None, 'Debe ser un número finito.'
         if valor < 0:
@@ -228,7 +236,7 @@ def api_buques(request):
     POST /api/buques/   → crea un buque
     """
     if request.method == 'GET':
-        offset = _parse_param_entero(request.query_params.get('offset'), 0, 0)
+        offset = _parse_param_entero(request.query_params.get('offset'), 0, 0, _OFFSET_MAXIMO)
         limit = _parse_param_entero(
             request.query_params.get('limit'), _LIMIT_POR_DEFECTO, 1, _LIMIT_MAXIMO,
         )
