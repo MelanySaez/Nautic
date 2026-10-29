@@ -1,5 +1,5 @@
 from django.urls import path
-from . import views
+from . import views, views_buques
 
 urlpatterns = [
     # Endpoint original — inferencia directa sin persistencia
@@ -25,4 +25,10 @@ urlpatterns = [
 
     # Stream SSE de cambios de estado (reemplaza polling del frontend)
     path('api/vision/inspecciones/<int:inspeccion_id>/stream/', views.api_vision_inspeccion_stream, name='api_vision_inspeccion_stream'),
+
+    # Buques (lista + creación)
+    path('api/buques/', views_buques.api_buques, name='api_buques'),
+
+    # Ficha técnica de un buque
+    path('api/buques/<int:buque_id>/', views_buques.api_buque_detalle, name='api_buque_detalle'),
 ]
