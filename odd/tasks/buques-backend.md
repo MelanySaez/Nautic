@@ -62,8 +62,8 @@ Branch `feat/buques-backend` from d27115b.
 - `manage.py test vision` FAILS on this machine before running any test: template1 collation
   version mismatch (created with 2.42, OS provides 2.43). Environment issue, not code. Tests pass
   (28 OK) with a scratchpad settings override `DATABASES["default"]["TEST"]["TEMPLATE"] =
-  "template0"`. Permanent fix needs the user's decision: `ALTER DATABASE template1 REFRESH
-  COLLATION VERSION` (and the same for `postgres`).
+  "template0"`. Fixed on user approval: `ALTER DATABASE template1|postgres REFRESH COLLATION
+  VERSION` (2.42 → 2.43). Plain `uv run python manage.py test vision` now: 28 tests OK.
 
 ## Next step
 All tasks done. Push / PR are the user's decision.
