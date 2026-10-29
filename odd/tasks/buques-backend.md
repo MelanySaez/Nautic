@@ -28,8 +28,17 @@ Mode: off (source: no project/session configuration). Runner: Django test runner
 (`uv run python manage.py test vision`). Tests are still written alongside the behavior.
 
 ## Checklist
-- [ ] T1 — Buques API (list, create, detail) + tests + docs. Route: delegated direct (writer
-      trigger: views, urls, tests, docs = 2+ non-trivial files).
+- [x] T1 — Buques API (list, create, detail) + tests + docs. Route: delegated direct (writer
+      trigger: views, urls, tests, docs = 2+ non-trivial files). Commit 75f7331
+      (`backend/vision/views_buques.py`, routes in `vision/urls.py`, 27 tests in
+      `vision/tests/test_buques_api.py`, AGENTS.md, README.md). Review: medium, granted, lens
+      reliability, lineage review-47ae83dfc898c5a7 → APPROVED + acknowledged (authority burned).
+- [x] T2 — Fix advisories R3-001 (oversized `offset` → 500) and R3-002 (huge JSON integer on a
+      FloatField → OverflowError 500). Route: direct inline (2 small edits). Commit 58fa898. RED
+      observed without the fix (2 errors + 1 failure), GREEN with it (28 tests OK). Assess: medium,
+      under_budget (20 lines).
+- Open advisory (not done): R3-003 `test_entero_fuera_de_rango` depends on PostgreSQL's 32-bit
+  integer range (would pass 201 on SQLite). Acceptable: the project is PostgreSQL-only.
 
 ## Acceptance criteria
 - POST with valid data returns 201 and the full vessel; invalid or unknown fields return 400 with
@@ -48,6 +57,13 @@ Strategy: ask-on-risk. Forecast: ~300 authored lines (single slice).
 
 ## Progress / Evidence
 Branch `feat/buques-backend` from d27115b.
+- `manage.py check`: no issues. `makemigrations --check --dry-run`: no changes.
+  `spectacular`: `/api/buques/` and `/api/buques/{buque_id}/` present.
+- `manage.py test vision` FAILS on this machine before running any test: template1 collation
+  version mismatch (created with 2.42, OS provides 2.43). Environment issue, not code. Tests pass
+  (28 OK) with a scratchpad settings override `DATABASES["default"]["TEST"]["TEMPLATE"] =
+  "template0"`. Permanent fix needs the user's decision: `ALTER DATABASE template1 REFRESH
+  COLLATION VERSION` (and the same for `postgres`).
 
 ## Next step
-T1.
+All tasks done. Push / PR are the user's decision.
