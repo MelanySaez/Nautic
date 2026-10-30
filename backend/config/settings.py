@@ -3,6 +3,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 from kombu import Exchange, Queue
 
+from config.almacenamiento import configurar_storages
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Carga variables desde .env en la raíz del proyecto (ignorado por git)
@@ -88,11 +90,11 @@ MEDIA_ROOT = BASE_DIR / "media"  # Aquí se guardarán las imágenes cargadas po
 
 # Almacenamiento de archivos. Las fotos de inspección se leen y escriben SIEMPRE
 # a través de default_storage (vision/almacenamiento.py), nunca con open()/os.*.
-# "default" guarda en MEDIA_ROOT y sirve en MEDIA_URL.
-STORAGES = {
-    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
-    "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
-}
+# STORAGE_BACKEND=local (defecto): FileSystemStorage en MEDIA_ROOT, servido en
+# MEDIA_URL. STORAGE_BACKEND=s3: bucket S3-compatible con URL firmadas. Ver
+# config/almacenamiento.py y .env.example. Una configuración inválida falla al
+# arrancar (ImproperlyConfigured).
+STORAGES = configurar_storages(os.environ)
 
 # Configuración CORS para aceptar peticiones desde cualquier origen (útil para React)
 # CORS_ALLOW_ALL_ORIGINS = True

@@ -7,7 +7,7 @@
 3. [Modelos de base de datos](#3-modelos-de-base-de-datos)
 4. [API REST, SSE y rate limiting](#4-api-rest-sse-y-rate-limiting)
 5. [Procesamiento YOLO asíncrono (Celery)](#5-procesamiento-yolo-asíncrono-celery)
-6. [Persistencia de imágenes en disco](#6-persistencia-de-imágenes-en-disco)
+6. [Persistencia de imágenes (disco local o bucket)](#6-persistencia-de-imágenes-disco-local-o-bucket)
 7. [Frontend (pendiente)](#7-frontend-pendiente)
 8. [Estructura de respuesta de una foto](#8-estructura-de-respuesta-de-una-foto)
 9. [Sistema de severidad de anomalías](#9-sistema-de-severidad-de-anomalías)
@@ -60,7 +60,7 @@ backend/config/settings.py   ← config CELERY_*, REDIS_URL, SSE_*, VISION_*
 **Flujo de datos:**
 
 ```
-Django view (upload)  → guarda en disco → publica foto-created (Redis)
+Django view (upload)  → guarda en storage (disco o bucket) → publica foto-created (Redis)
 Django view (analizar)→ rate limit → procesar_foto.apply_async() → RabbitMQ cola "vision"
 Celery worker         → inferencia YOLO → guarda en Postgres → publica foto-updated (Redis)
 Django view (stream)  → SUBSCRIBE Redis → StreamingHttpResponse (SSE) → browser EventSource
@@ -229,7 +229,7 @@ La IP real se extrae respetando `X-Forwarded-For` (primer valor) para funcionar 
 | `foto-updated` | worker Celery | `{foto_id, inspeccion_id, estado, severidad, detecciones, tiempo_inferencia_ms, imagen_anotada, error_detalle}` |
 | `foto-deleted` | vista de borrado | `{foto_id, inspeccion_id}` |
 
-**Nota sobre rutas de imagen:** el worker Celery no tiene `request`, por lo que `foto-updated` viaja con paths relativos (`media/...`), mientras que el `GET` de detalle devuelve URLs absolutas. El cliente debe normalizar ambas formas antes de mergear el evento, para no pisar una URL buena con un path relativo.
+**Nota sobre URLs de imagen:** el worker Celery no tiene `request`, por lo que `foto-updated` lleva la URL tal como la devuelve el storage: relativa (`/media/...`) en local, absoluta y firmada en un bucket. El `GET` de detalle devuelve URLs absolutas (en local usa `request.build_absolute_uri`). El cliente debe normalizar ambas formas antes de mergear el evento, para no pisar una URL buena con una relativa. Las URL firmadas caducan (`S3_URL_EXPIRE_SECONDS`); un `GET` posterior devuelve URLs nuevas.
 
 ### Endpoint legado
 
@@ -307,13 +307,13 @@ def procesar_foto(self, foto_id):
     si la foto no existe        → track_concurrent_end + return
     si estado == 'completada'   → track_concurrent_end + return   # idempotencia
     foto.estado = 'en_proceso'  → guarda → _notificar()           # evento SSE
-    lee imagen del disco
-    valida con PIL (protege contra archivos corruptos en disco)
+    lee imagen del storage (leer_archivo)
+    valida con PIL (protege contra archivos corruptos)
     imagen_anotada_bytes, resultados = run_inference(imagen_bytes) # core_engine v3
-    guarda imagen anotada en disco
+    guarda imagen anotada en el storage (guardar_anotada → clave)
 
     raw_detections = resultados['detections']
-    foto.imagen_anotada       = ruta
+    foto.imagen_anotada       = clave
     foto.detecciones          = _agrupar_detecciones(raw_detections)
     foto.tiempo_inferencia_ms = round(resultados['inference_time_ms'], 2)
     foto.severidad            = _calcular_severidad(raw_detections)
@@ -351,61 +351,67 @@ El endpoint `POST /api/vision/inspecciones/<id>/analizar/` itera todas las fotos
 
 ---
 
-## 6. Persistencia de imágenes en disco
+## 6. Persistencia de imágenes (disco local o bucket)
 
-### Estructura de directorios
+Las fotos se manejan **siempre** con la API de almacenamiento de Django (`default_storage`), a través de los helpers de `vision/almacenamiento.py`. Nunca se usa `open()`, `os.remove()` ni `os.makedirs()` sobre rutas de fotos.
+
+### Selección de backend
+
+`config/almacenamiento.py` construye `settings.STORAGES` desde variables de entorno:
+
+| `STORAGE_BACKEND` | Backend | Uso |
+|---|---|---|
+| `local` (defecto) | `FileSystemStorage` en `MEDIA_ROOT` (`backend/media/`, ignorado por git) | desarrollo |
+| `s3` | `django-storages` `S3Storage`: bucket S3-compatible privado, URL firmadas con vigencia limitada | producción |
+
+Con `s3` se leen `S3_BUCKET` (obligatoria), `S3_ACCESS_KEY_ID` y `S3_SECRET_ACCESS_KEY` (opcionales y juntas; si faltan se usa la cadena de credenciales de boto3, p. ej. un rol IAM), `S3_ENDPOINT_URL` (R2, MinIO u otros S3-compatibles), `S3_REGION`, `S3_LOCATION` (prefijo de claves) y `S3_URL_EXPIRE_SECONDS` (900 por defecto). Un backend desconocido o la falta del bucket impiden arrancar (`ImproperlyConfigured`). Ver `backend/.env.example`.
+
+**Decisión:** el proveedor concreto (AWS S3, Cloudflare R2, MinIO) es una decisión de despliegue, no de código: ningún camino del código sabe qué backend está activo.
+
+### Claves de almacenamiento
+
+La base de datos guarda la **clave** del archivo en el storage, nunca una URL ni un prefijo `media/`:
 
 ```
-<BASE_DIR>/
-└── media/
-    └── inspecciones/
-        ├── originales/    ← fotos subidas por el usuario
-        │   └── <uuid_hex><ext>
-        └── anotadas/      ← imágenes procesadas por YOLO
-            └── <foto_id>_<uuid_hex[:8]>.jpg
+inspecciones/originales/3f7a1b2c9e4d.jpg
+inspecciones/anotadas/42_9a8b7c6d.jpg
 ```
 
-### Convención de rutas
+En local, la clave es la ruta relativa a `MEDIA_ROOT`. En un bucket, es la clave del objeto (bajo `S3_LOCATION` si se definió). Siempre se persiste el nombre que **devuelve** `storage.save()`, porque un backend puede modificarlo.
 
-El path almacenado en la base de datos **incluye el prefijo `media/`**, por ejemplo:
-
-```
-media/inspecciones/originales/3f7a1b2c9e4d.jpg
-```
-
-`settings.BASE_DIR` (el directorio `backend/`) es la raíz para las operaciones de disco, por lo que los archivos quedan en `backend/media/` (ignorado por git). `MEDIA_URL`/`MEDIA_ROOT` sirven esos archivos en desarrollo.
-
-**Decisión:** guardar el prefijo `media/` en la base de datos mantiene la ruta autodescriptiva y permite resolver tanto el archivo en disco (`BASE_DIR` + ruta) como la URL pública (`/` + ruta) sin transformaciones adicionales.
+La migración `0003_claves_de_almacenamiento` quita el prefijo `media/` de las filas existentes (y es reversible).
 
 ### Conversión a URL
 
 ```python
-def _media_url(path, request=None):
-    s = path.replace('\\', '/')
-    if request:
-        return request.build_absolute_uri('/' + s.lstrip('/'))
-    return '/' + s.lstrip('/')
+def url_archivo(clave, request=None):
+    url = default_storage.url(clave)
+    if request is not None and url.startswith('/'):
+        return request.build_absolute_uri(url)
+    return url
 ```
 
-Convierte `media/inspecciones/originales/foto.jpg` → `http://HOST/media/inspecciones/originales/foto.jpg`.
+- Local: `inspecciones/originales/foto.jpg` → `http://HOST/media/inspecciones/originales/foto.jpg` (con `request`; relativa sin él).
+- Bucket: URL firmada absoluta que expira; se devuelve tal cual.
 
 ### Nombres de archivo
 
 - **Original:** `uuid.uuid4().hex + extension` — garantiza unicidad sin depender del nombre original del archivo (que podría contener caracteres especiales o colisionar).
 - **Anotada:** `{foto_id}_{uuid4().hex[:8]}.jpg` — incluye el ID de la foto para facilitar rastreo, más un sufijo aleatorio corto para evitar colisiones en reintento.
 
+La subida pasa el `UploadedFile` directamente al storage, que lo escribe por bloques sin cargarlo entero en memoria.
+
 ### Eliminación de archivos
 
-Al eliminar una foto o una inspección completa, el backend elimina primero los archivos físicos antes de borrar los registros de la BD. Si el archivo ya no existe en disco (`os.path.exists`), se ignora silenciosamente para no bloquear la operación:
+Al eliminar una foto o una inspección completa, el backend elimina primero los archivos del storage y luego los registros de la BD. `borrar_archivo(clave)` nunca lanza: si el storage falla, registra el error con `logger.exception` y el borrado del registro continúa, de modo que un bucket caído no convierte el `DELETE` en un 500 (el archivo puede quedar huérfano y limpiarse después). Borrar un archivo que ya no existe no es un error.
 
 ```python
-for path_field in [foto.imagen_original, foto.imagen_anotada]:
-    if path_field:
-        full_path = os.path.join(settings.BASE_DIR, path_field)
-        if os.path.exists(full_path):
-            os.remove(full_path)
+borrar_archivo(foto.imagen_original)
+borrar_archivo(foto.imagen_anotada)
 foto.delete()
 ```
+
+Mover las fotos ya existentes de disco a un bucket queda fuera de este módulo (haría falta un comando de gestión puntual).
 
 ---
 
@@ -550,7 +556,7 @@ Ambos controles de `ratelimit.py` dejan pasar la petición si Redis no responde.
 
 ### `on_delete=CASCADE` en `FotoInspeccion`
 
-Al eliminar una `InspeccionCasco`, Django elimina automáticamente todos los `FotoInspeccion` asociados en cascada. Sin embargo, los archivos físicos en disco no se eliminan en cascada automáticamente — Django no conoce la semántica de negocio del almacenamiento. Por eso el endpoint `DELETE /inspecciones/<id>/` itera las fotos manualmente y borra los archivos antes de llamar `insp.delete()`.
+Al eliminar una `InspeccionCasco`, Django elimina automáticamente todos los `FotoInspeccion` asociados en cascada. Sin embargo, los archivos en el storage no se eliminan en cascada automáticamente — Django no conoce la semántica de negocio del almacenamiento. Por eso el endpoint `DELETE /inspecciones/<id>/` itera las fotos manualmente y borra sus archivos (`borrar_archivo`) antes de llamar `insp.delete()`.
 
 ### SSE en lugar de polling
 

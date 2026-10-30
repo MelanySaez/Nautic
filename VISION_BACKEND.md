@@ -15,7 +15,7 @@ Cliente HTTP
     │
     ▼
 Django views (vision/views.py)
-    │  Upload foto → guarda en disco → publica foto-created (Redis)
+    │  Upload foto → guarda en storage (disco o bucket) → publica foto-created (Redis)
     │  POST analizar → rate limit → procesar_foto.apply_async(kwargs={"foto_id": foto_id}) → RabbitMQ
     │  GET stream/ → StreamingHttpResponse (SSE) ← Redis SUBSCRIBE
     │
@@ -78,8 +78,8 @@ Foto individual analizada por YOLO. Máquina de estados asíncrona.
 |---|---|---|
 | `inspeccion` | FK → InspeccionCasco | Inspección padre (CASCADE) |
 | `seccion` | FK → SeccionCasco | Zona del casco (PROTECT) |
-| `imagen_original` | CharField(500) | Path relativo desde `BASE_DIR`: `media/inspecciones/originales/...` |
-| `imagen_anotada` | CharField(500) null | Path relativo de la imagen con bounding boxes |
+| `imagen_original` | CharField(500) | Clave en el storage, sin prefijo `media/`: `inspecciones/originales/<uuid><ext>` |
+| `imagen_anotada` | CharField(500) null | Clave en el storage de la imagen con bounding boxes: `inspecciones/anotadas/<foto_id>_<hex8>.jpg` |
 | `detecciones` | JSONField null | Lista colapsada por clase: `[{class_name, count, max_confidence}]` |
 | `tiempo_inferencia_ms` | FloatField null | Tiempo de inferencia reportado por nautic_core |
 | `severidad` | CharField(20) null | `critical` / `high` / `medium` / `low` |
@@ -285,10 +285,10 @@ Los errores de inferencia no exponen rutas del servidor. `api_ai_anomalias` resp
 1. Fetch `FotoInspeccion` por PK — si no existe, `track_concurrent_end` + return
 2. Idempotencia: si `estado == COMPLETADA`, `track_concurrent_end` + return (re-delivery por `acks_late`)
 3. Marca `EN_PROCESO` → save → publica `foto-updated`
-4. Lee bytes desde disco (`imagen_original`)
+4. Lee bytes desde el storage (`imagen_original`, vía `leer_archivo`)
 5. Valida integridad con `PIL.Image.open().verify()`
 6. Delega a `run_inference(imagen_bytes)` → `(bytes_anotada, resultados)` (llamada síncrona sobre `core_engine.vision.analyze`)
-7. Persiste imagen anotada en `media/inspecciones/anotadas/{foto_id}_{uuid8}.jpg`
+7. Persiste imagen anotada en el storage como `inspecciones/anotadas/{foto_id}_{uuid8}.jpg` (vía `guardar_anotada`; se guarda la clave que devuelve el storage)
 8. Agrupa detecciones por clase (`_agrupar_detecciones`)
 9. Calcula severidad máxima (`_calcular_severidad`)
 10. Marca `COMPLETADA` → save → publica `foto-updated` → `track_concurrent_end`
@@ -329,7 +329,7 @@ Clases estructurales (`ship_hull`, `propeller`, `bilge_keel`, `anode`, etc.) no 
 
 **`_agrupar_detecciones(detections)`** — Colapsa lista raw de detecciones YOLO a una entrada por clase única con `count` y `max_confidence`.
 
-**`_notificar(foto)`** — Publica `foto-updated` al canal Redis de la inspección con el estado completo de la foto.
+**`_notificar(foto)`** — Publica `foto-updated` al canal Redis de la inspección con el estado completo de la foto. `imagen_anotada` viaja como URL del storage (`/media/...` en local, URL firmada absoluta en bucket), no como clave.
 
 ---
 
@@ -481,15 +481,32 @@ uv run python manage.py runserver
 
 ---
 
+## Almacenamiento de fotos (`vision/almacenamiento.py`, `config/almacenamiento.py`)
+
+Las fotos (originales y anotadas) se leen, escriben y borran **siempre** con `default_storage`; nunca con `open()` / `os.remove()` / `os.makedirs()`. El backend se elige por entorno al arrancar:
+
+| `STORAGE_BACKEND` | Backend | Dónde viven las fotos |
+|---|---|---|
+| `local` (defecto) | `FileSystemStorage` | `MEDIA_ROOT` (`backend/media/`), servidas bajo `MEDIA_URL` (solo con `DEBUG`) |
+| `s3` | `storages.backends.s3.S3Storage` | Bucket S3-compatible privado, URL firmadas con vigencia limitada |
+
+Con `s3`: `S3_BUCKET` (obligatoria), `S3_ACCESS_KEY_ID` + `S3_SECRET_ACCESS_KEY` (opcionales, juntas; si faltan, cadena de credenciales de boto3), `S3_ENDPOINT_URL` (R2, MinIO), `S3_REGION`, `S3_LOCATION` (prefijo de claves) y `S3_URL_EXPIRE_SECONDS` (900 por defecto). Un backend desconocido o la ausencia del bucket lanzan `ImproperlyConfigured` al arrancar.
+
+- La base de datos guarda la **clave** del storage, no una URL; la URL se calcula en cada respuesta con `url_archivo(clave, request)`.
+- Como web y worker comparten el bucket, pueden correr en máquinas distintas.
+- Si el borrado de un archivo falla, se registra con `logger.exception` y el borrado del registro continúa.
+- Mover fotos ya existentes de disco a un bucket no está automatizado.
+
 ## Árbol de archivos del módulo
 
 ```
 backend/
-├── config/               # Proyecto Django: settings.py, urls.py, celery.py, wsgi/asgi
+├── config/               # Proyecto Django: settings.py, urls.py, celery.py, almacenamiento.py (STORAGES por entorno), wsgi/asgi
 └── vision/
     ├── models.py         # Buque, SeccionCasco, InspeccionCasco, FotoInspeccion
     ├── views.py          # Endpoints REST + SSE stream
     ├── tasks.py          # procesar_foto (Celery) + dead_letter
+    ├── almacenamiento.py # Claves, guardar/leer/borrar y URL de fotos vía default_storage
     ├── pubsub.py         # Cliente Redis + publicar_evento + suscribirse
     ├── ratelimit.py      # Fixed-window counter upload + concurrent tracker
     ├── inference.py      # run_inference() sobre core_engine.vision + verificar_configuracion()

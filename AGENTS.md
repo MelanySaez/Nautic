@@ -35,11 +35,12 @@ All endpoints live under `/api/`. The `vision` module needs infrastructure beyon
 │   ├── Dockerfile, .dockerignore, start.sh
 │   ├── .env, .env.example
 │   ├── config/                  # Django project package
-│   │   ├── settings.py, urls.py, celery.py
+│   │   ├── settings.py, urls.py, celery.py, almacenamiento.py
 │   │   ├── wsgi.py, asgi.py
 │   │   └── spectacular_hooks.py
 │   └── vision/                  # the only Django app
 │       ├── models.py, views.py, views_buques.py, busqueda.py, urls.py, tasks.py
+│       ├── almacenamiento.py
 │       ├── inference.py, pubsub.py, ratelimit.py
 │       ├── management/commands/seed_secciones_casco.py
 │       └── INSPECCION_IA.md
@@ -96,6 +97,22 @@ uv run celery -A config flower --port=5555 \
 Required environment: `NAUTIC_WEIGHTS_DIR` (directory with the model weights). Optional: `VISION_MODEL_ID` (default `yolo-seg`; valid ids come from the `core_engine` catalog: `yolo-seg`, `yolo-tiled`, `maskrcnn`, `rtdetr`).
 
 `vision.inference.verificar_configuracion()` validates both settings. It is enforced by the Django system check `vision.E001` and by Celery `worker_init`: a misconfigured worker **refuses to start**.
+
+### Photo storage
+
+Inspection photos (originals and annotated) live behind Django's storage API, selected by environment in `backend/config/almacenamiento.py` (`configurar_storages()` builds `settings.STORAGES`):
+
+| `STORAGE_BACKEND` | `default_storage` | Use |
+|---|---|---|
+| `local` (default) | `FileSystemStorage` on `MEDIA_ROOT` (`backend/media/`), URLs under `MEDIA_URL` | development |
+| `s3` | `storages.backends.s3.S3Storage` (private bucket, signed URLs) | production |
+
+`s3` reads `S3_BUCKET` (required), `S3_ACCESS_KEY_ID` / `S3_SECRET_ACCESS_KEY` (optional, set together; otherwise boto3's default credential chain), `S3_ENDPOINT_URL` (R2, MinIO), `S3_REGION`, `S3_LOCATION` (key prefix) and `S3_URL_EXPIRE_SECONDS` (default 900). An unknown backend or a missing bucket raises `ImproperlyConfigured` at startup. See `backend/.env.example`.
+
+- The database stores the **storage key** (`inspecciones/originales/<uuid>.jpg`), never a URL or a `media/` prefix. URLs come from `vision.almacenamiento.url_archivo()` at response time.
+- **Never use `open()`, `os.remove()`, `os.makedirs()` or `os.path.join(BASE_DIR, ...)` on photo paths.** Use the helpers in `vision/almacenamiento.py` (`guardar_original`, `guardar_anotada`, `leer_archivo`, `borrar_archivo`, `url_archivo`), which wrap `default_storage`. Persist the name `save()` returns.
+- Storage errors on delete are logged and never turn the response into a 500 (`borrar_archivo`).
+- Tests swap the backend with `override_settings(STORAGES=STORAGES_EN_MEMORIA)` from `vision/tests/utilidades.py`; never write photos to disk in tests.
 
 ---
 
@@ -213,6 +230,8 @@ pnpm add <pkg>     # add a dependency (pnpm add -D <pkg> for dev)
 | `backend/vision/urls.py` | URL routing for the vision app |
 | `backend/vision/tasks.py` | Celery task `procesar_foto` + dead-letter task |
 | `backend/vision/inference.py` | `run_inference()` adapter over `core_engine.vision.analyze` + config validation |
+| `backend/config/almacenamiento.py` | `configurar_storages(env)`: builds `STORAGES` (local or S3) from environment variables |
+| `backend/vision/almacenamiento.py` | Photo storage helpers over `default_storage` (keys, save, read, delete, URL) |
 | `backend/vision/pubsub.py` | Redis pub/sub used by SSE |
 | `backend/vision/ratelimit.py` | Per-IP upload and concurrency limits |
 | `backend/pyproject.toml`, `backend/uv.lock` | Dependencies (uv) |

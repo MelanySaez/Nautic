@@ -80,6 +80,7 @@ Con el servidor corriendo:
 
 - **Sin autenticación** en esta versión. Los campos de autoría (p. ej. `tomado_por`) son texto libre.
 - El idioma del dominio es español (modelos, rutas, variables de negocio).
+- **Fotos de inspección:** se guardan en disco local en desarrollo y en un bucket S3-compatible (URL firmadas que expiran) en producción; se elige con `STORAGE_BACKEND` (ver [`backend/.env.example`](backend/.env.example)).
 
 ## Licencia
 
