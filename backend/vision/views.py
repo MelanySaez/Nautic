@@ -18,6 +18,7 @@ from rest_framework.response import Response
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample
 from drf_spectacular.types import OpenApiTypes
 
+from .busqueda import BusquedaInvalida, LIMIT_MAXIMO, LIMIT_POR_DEFECTO, buscar_inspecciones
 from .inference import DEFAULT_CONFIDENCE, run_inference
 from .models import (
     Buque, SeccionCasco, InspeccionCasco, FotoInspeccion, NivelSeveridad,
@@ -285,7 +286,8 @@ def _inspeccion_to_dict(insp, include_fotos=False, request=None):
         'tomado_por': insp.tomado_por,
         'fecha_creacion': insp.fecha_creacion.isoformat(),
         'fecha_modificacion': insp.fecha_modificacion.isoformat(),
-        'total_fotos': insp.fotos.count(),
+        # `n_fotos` lo anota la búsqueda para evitar una consulta por inspección.
+        'total_fotos': insp.n_fotos if hasattr(insp, 'n_fotos') else insp.fotos.count(),
     }
     if include_fotos:
         fotos_qs = insp.fotos.select_related('seccion').order_by('fecha_creacion')
@@ -367,12 +369,33 @@ def api_vision_secciones(request):
     methods=['GET'],
     tags=['Inspección IA'],
     summary='Listar inspecciones de casco',
-    description='Lista inspecciones ordenadas por fecha. Acepta ?buque_id= para filtrar.',
+    description=(
+        'Busca inspecciones, de la más reciente a la más antigua (`-fecha_creacion, -id`). '
+        'Los filtros se combinan con AND. Paginación por cursor: la respuesta trae '
+        '`resultados`, `siguiente` (cursor opaco para la página siguiente, o null) y `hay_mas`; '
+        'no incluye total. Los parámetros desconocidos se ignoran. Un parámetro inválido '
+        'devuelve 400 con `{"error": "Datos inválidos.", "campos": {...}}`.'
+    ),
     parameters=[
-        OpenApiParameter('buque_id', int, OpenApiParameter.QUERY,
-                         description='Filtrar por ID de buque', required=False),
+        OpenApiParameter('buque', int, OpenApiParameter.QUERY, required=False,
+                         description='ID del buque (alias: `buque_id`)'),
+        OpenApiParameter('buque_id', int, OpenApiParameter.QUERY, required=False,
+                         description='Alias de `buque`'),
+        OpenApiParameter('desde', str, OpenApiParameter.QUERY, required=False,
+                         description='Creadas desde este día, inclusive (AAAA-MM-DD)'),
+        OpenApiParameter('hasta', str, OpenApiParameter.QUERY, required=False,
+                         description='Creadas hasta este día, inclusive (AAAA-MM-DD)'),
+        OpenApiParameter('severidad_min', str, OpenApiParameter.QUERY, required=False,
+                         enum=['low', 'medium', 'high', 'critical'],
+                         description='Severidad máxima mínima'),
+        OpenApiParameter('q', str, OpenApiParameter.QUERY, required=False,
+                         description='Texto contenido en el nombre (2-100 caracteres)'),
+        OpenApiParameter('limit', int, OpenApiParameter.QUERY, required=False,
+                         description=f'Resultados por página (1-{LIMIT_MAXIMO}, por defecto {LIMIT_POR_DEFECTO})'),
+        OpenApiParameter('cursor', str, OpenApiParameter.QUERY, required=False,
+                         description='Valor `siguiente` de la página anterior'),
     ],
-    responses={200: OpenApiTypes.OBJECT},
+    responses={200: OpenApiTypes.OBJECT, 400: OpenApiTypes.OBJECT},
 )
 @extend_schema(
     methods=['POST'],
@@ -399,15 +422,19 @@ def api_vision_secciones(request):
 @api_view(['GET', 'POST'])
 def api_vision_inspecciones(request):
     """
-    GET  /api/vision/inspecciones/          → lista inspecciones (filtra por ?buque_id=)
+    GET  /api/vision/inspecciones/          → búsqueda paginada por cursor (ver vision/busqueda.py)
     POST /api/vision/inspecciones/          → crea una nueva inspección
     """
     if request.method == 'GET':
-        qs = InspeccionCasco.objects.select_related('buque').order_by('-fecha_creacion')
-        buque_id = request.query_params.get('buque_id')
-        if buque_id:
-            qs = qs.filter(buque_id=buque_id)
-        return Response([_inspeccion_to_dict(i, request=request) for i in qs])
+        try:
+            pagina, siguiente, hay_mas = buscar_inspecciones(request.query_params)
+        except BusquedaInvalida as exc:
+            return Response({'error': 'Datos inválidos.', 'campos': exc.errores}, status=400)
+        return Response({
+            'resultados': [_inspeccion_to_dict(i, request=request) for i in pagina],
+            'siguiente': siguiente,
+            'hay_mas': hay_mas,
+        })
 
     # POST: crear inspección
     buque_id = request.data.get('buque_id')
