@@ -39,7 +39,7 @@ All endpoints live under `/api/`. The `vision` module needs infrastructure beyon
 │   │   ├── wsgi.py, asgi.py
 │   │   └── spectacular_hooks.py
 │   └── vision/                  # the only Django app
-│       ├── models.py, views.py, views_buques.py, urls.py, tasks.py
+│       ├── models.py, views.py, views_buques.py, busqueda.py, urls.py, tasks.py
 │       ├── inference.py, pubsub.py, ratelimit.py
 │       ├── management/commands/seed_secciones_casco.py
 │       └── INSPECCION_IA.md
@@ -101,7 +101,7 @@ Required environment: `NAUTIC_WEIGHTS_DIR` (directory with the model weights). O
 
 ## Test Commands
 
-Backend tests live in `backend/vision/tests/` (currently `test_buques_api.py`, covering the Buques API). The vision pipeline itself has no tests yet.
+Backend tests live in `backend/vision/tests/` (`test_buques_api.py` for the Buques API, `test_inspecciones_api.py` and `test_busqueda_inspecciones.py` for inspection name/severity and search). The vision pipeline itself has no tests yet.
 
 ```bash
 cd backend
@@ -177,6 +177,16 @@ pnpm add <pkg>     # add a dependency (pnpm add -D <pkg> for dev)
 - No authentication in this version (no JWT middleware, no login). Authorship fields such as `tomado_por` are free text.
 - UI and API language: the domain is Spanish; the frontend UI copy is Spanish (no i18n layer yet).
 
+### Inspections search (`vision/busqueda.py`)
+
+- `GET /api/vision/inspecciones/` returns `{resultados, siguiente, hay_mas}` (no `total`). Order is fixed: `-fecha_creacion, -id`.
+- Filters (combined with AND): `buque` (alias `buque_id`), `desde` / `hasta` (`YYYY-MM-DD`, `hasta` inclusive), `severidad_min` (`low|medium|high|critical`), `q` (2-100 chars, case-insensitive match on `nombre`). Plus `limit` (1-100, default 20) and `cursor` (the opaque `siguiente` of the previous page).
+- Invalid parameters return 400 `{"error": "Datos inválidos.", "campos": {...}}`, with every invalid field reported at once. **Unknown query parameters are ignored**, not rejected.
+- To add a criterion, add one `Filtro` entry (parser + `aplicar`) to `FILTROS`; the view does not change. `describir_filtros()` exposes the registry as JSON so a future natural-language interpreter can derive its schema.
+- `InspeccionCasco.severidad_max` (`NivelSeveridad`, 1=low .. 4=critical) is denormalized from the photos: the Celery task raises it with a conditional UPDATE and the photo delete view recomputes it. Never write it from anywhere else.
+- `InspeccionCasco.nombre` is optional on create; when blank the backend stores `Inspección #<id> — <buque>`. `PATCH /api/vision/inspecciones/<id>/` edits `nombre` and `descripcion` only.
+- Migration `0002` runs `CREATE EXTENSION pg_trgm`: the PostgreSQL `contrib` package must be installed (Fedora: `postgresql-contrib`) and the DB user must be allowed to create extensions.
+
 ### Vision module (async pipeline)
 
 - Django views only enqueue: `procesar_foto.apply_async()` → RabbitMQ queue `vision`. Never run inference inline in a view (the direct endpoint `/api/ai/anomalias/` is the one documented exception: no persistence, no queue).
@@ -196,8 +206,9 @@ pnpm add <pkg>     # add a dependency (pnpm add -D <pkg> for dev)
 | `backend/config/settings.py` | Django settings (DB, apps, CORS, Celery, Redis, vision, rate limits) |
 | `backend/config/urls.py` | Root routing — mounts `vision` and the OpenAPI docs |
 | `backend/config/celery.py` | Celery app definition |
-| `backend/vision/models.py` | `Buque`, `SeccionCasco`, `InspeccionCasco`, `FotoInspeccion` |
+| `backend/vision/models.py` | `Buque`, `SeccionCasco`, `InspeccionCasco`, `FotoInspeccion`, `NivelSeveridad` + `severidad_max` helpers |
 | `backend/vision/views.py` | Vision REST endpoints + SSE stream |
+| `backend/vision/busqueda.py` | Inspection search: declarative filter registry (`FILTROS`) + cursor pagination (`buscar_inspecciones`) |
 | `backend/vision/views_buques.py` | Buques REST endpoints (`/api/buques/`): list, create, detail |
 | `backend/vision/urls.py` | URL routing for the vision app |
 | `backend/vision/tasks.py` | Celery task `procesar_foto` + dead-letter task |
