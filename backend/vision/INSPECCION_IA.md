@@ -200,7 +200,7 @@ El listado es una búsqueda: filtros combinables con AND, orden fijo `-fecha_cre
 - *Registro declarativo de filtros* (`FILTROS`): cada criterio es una entrada con parser y función `aplicar`. Agregar un criterio no toca la vista, y `describir_filtros()` lo expone como JSON para derivar el esquema de un futuro intérprete de lenguaje natural.
 - *Cursor keyset* `(fecha_creacion, id)` en lugar de offset: el costo no crece con la página y las inserciones nuevas no duplican ni saltan filas. Se piden `limit + 1` filas para calcular `hay_mas` sin `COUNT`.
 - *`severidad_max` desnormalizada* en la inspección: filtrar por severidad sin joins ni agregaciones sobre fotos.
-- *Búsqueda por nombre* con `icontains` servido por un índice GIN de trigramas (extensión `pg_trgm`).
+- *Búsqueda por nombre* con `ILIKE` (lookup `contiene_ilike`; `icontains` emite `UPPER(...) LIKE` y no usaría el índice) servido por un índice GIN de trigramas (extensión `pg_trgm`).
 - Los parámetros de consulta desconocidos se ignoran; los conocidos inválidos devuelven 400 con `campos`.
 
 ### Rate limiting (`vision/ratelimit.py`)

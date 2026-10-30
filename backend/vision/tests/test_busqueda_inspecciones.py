@@ -132,6 +132,21 @@ class FiltrosTests(BusquedaBase):
 
         self.assertEqual(self._ids(q='50%'), [a.id])
 
+    def test_q_usa_ilike_para_aprovechar_el_indice_trigram(self):
+        # icontains emits UPPER(nombre) LIKE ..., which the GIN index on the bare
+        # column cannot serve; the filter must stay on ILIKE.
+        qs = FILTROS['q'].aplicar(InspeccionCasco.objects.all(), 'dique')
+
+        sql = str(qs.query)
+        self.assertIn('ILIKE', sql)
+        self.assertNotIn('UPPER', sql)
+
+    def test_guion_bajo_es_literal(self):
+        a = _crear(self.caribe, nombre='casco_proa')
+        _crear(self.caribe, nombre='cascoXproa')
+
+        self.assertEqual(self._ids(q='o_p'), [a.id])
+
     def test_combinacion_de_filtros(self):
         buscada = _crear(self.caribe, nombre='Dique seco', fecha=datetime(2026, 2, 10, 9), severidad=4)
         _crear(self.gorgona, nombre='Dique seco', fecha=datetime(2026, 2, 10, 9), severidad=4)

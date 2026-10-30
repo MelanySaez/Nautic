@@ -128,7 +128,7 @@ class InspeccionCasco(models.Model):
             models.Index(fields=['buque', '-fecha_creacion', '-id'], name='insp_buque_fecha_idx'),
             models.Index(fields=['severidad_max', '-fecha_creacion', '-id'], name='insp_sev_fecha_idx'),
             models.Index(fields=['-fecha_creacion', '-id'], name='insp_fecha_idx'),
-            # Sirve las búsquedas nombre__icontains (ILIKE '%...%').
+            # Sirve el filtro q (lookup contiene_ilike → ILIKE '%...%', ver busqueda.py).
             GinIndex(fields=['nombre'], opclasses=['gin_trgm_ops'], name='insp_nombre_trgm_idx'),
         ]
 

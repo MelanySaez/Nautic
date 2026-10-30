@@ -25,11 +25,34 @@ from datetime import date, datetime, time, timedelta
 from typing import Any, Callable, Optional
 
 from django.conf import settings
-from django.db.models import Count, OuterRef, Q, Subquery
+from django.db.models import CharField, Count, Lookup, OuterRef, Q, Subquery
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
 from .models import FotoInspeccion, InspeccionCasco, NivelSeveridad
+
+
+
+@CharField.register_lookup
+class ContieneILike(Lookup):
+    """
+    Case-insensitive substring match emitted as ``col ILIKE '%...%'``.
+
+    Django's ``icontains`` emits ``UPPER(col) LIKE UPPER(...)``, which cannot use
+    the trigram GIN index on the bare column; ``ILIKE`` can. ``%``, ``_`` and
+    ``\\`` in the value are escaped so they match literally.
+    """
+    lookup_name = 'contiene_ilike'
+
+    def get_db_prep_lookup(self, value, connection):
+        patron = '%' + connection.ops.prep_for_like_query(value) + '%'
+        return '%s', [patron]
+
+    def as_sql(self, compiler, connection):
+        lhs, lhs_params = self.process_lhs(compiler, connection)
+        rhs, rhs_params = self.process_rhs(compiler, connection)
+        return f'{lhs} ILIKE {rhs}', [*lhs_params, *rhs_params]
+
 
 LIMIT_POR_DEFECTO = 20
 LIMIT_MAXIMO = 100
@@ -180,7 +203,7 @@ FILTROS = {
                 'sin distinguir mayúsculas).'
             ),
             parsear=_parsear_texto,
-            aplicar=lambda qs, texto: qs.filter(nombre__icontains=texto),
+            aplicar=lambda qs, texto: qs.filter(nombre__contiene_ilike=texto),
         ),
     )
 }
