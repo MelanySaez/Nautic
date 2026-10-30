@@ -9,6 +9,7 @@ import {
   type FotoDto,
   type InspeccionDetalleDto,
   type InspeccionDto,
+  type ListaInspeccionesDto,
   type SeccionDto,
 } from './dtos'
 
@@ -20,8 +21,9 @@ export class HttpInspeccionesRepository implements InspeccionesRepository {
   }
 
   async listar(): Promise<Inspeccion[]> {
-    const dtos = await this.api.get<InspeccionDto[]>('/api/vision/inspecciones/')
-    return dtos.map(aInspeccion)
+    // Single page of the largest allowed size; "load more" and server-side filters come with the search UI.
+    const lista = await this.api.get<ListaInspeccionesDto>('/api/vision/inspecciones/?limit=100')
+    return lista.resultados.map(aInspeccion)
   }
 
   async obtener(id: number): Promise<InspeccionDetalle> {

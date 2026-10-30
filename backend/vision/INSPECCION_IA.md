@@ -104,11 +104,15 @@ Sesión de inspección: agrupa todas las fotos de una campaña de revisión de u
 ```python
 class InspeccionCasco(models.Model):
     buque              = models.ForeignKey(Buque, on_delete=models.CASCADE, related_name='inspecciones_casco')
+    nombre             = models.CharField(max_length=255, blank=True, default='')   # vacío al crear → "Inspección #<id> — <buque>"
+    severidad_max      = models.PositiveSmallIntegerField(null=True, blank=True, choices=NivelSeveridad.choices)
     descripcion        = models.TextField(blank=True)
     tomado_por         = models.CharField(max_length=255, blank=True)
     fecha_creacion     = models.DateTimeField(auto_now_add=True)
     fecha_modificacion = models.DateTimeField(auto_now=True)
 ```
+
+`severidad_max` guarda la peor severidad de las fotos completadas (`NivelSeveridad`: 1 `low`, 2 `medium`, 3 `high`, 4 `critical`) para poder filtrar y ordenar en SQL. La tarea Celery la sube con un `UPDATE ... WHERE severidad_max IS NULL OR severidad_max < n` (atómico, nunca la baja) y borrar una foto la recalcula desde las que quedan. En el JSON de la inspección se expone como texto (`"high"`) o `null`.
 
 **Decisión:** El campo `tomado_por` es texto libre, no una FK a un usuario, porque el sistema es versión lite y no tiene módulo de autenticación. Esto simplifica la creación sin requerir login.
 
@@ -176,9 +180,10 @@ Todos registrados en `vision/urls.py` (montado en la raíz por `backend/config/u
 | Método | URL | Descripción |
 |---|---|---|
 | `GET` | `/api/vision/secciones/` | Catálogo completo de secciones del casco |
-| `GET` | `/api/vision/inspecciones/` | Lista todas las inspecciones (acepta `?buque_id=`) |
-| `POST` | `/api/vision/inspecciones/` | Crear nueva inspección |
+| `GET` | `/api/vision/inspecciones/` | Busca inspecciones (`buque`, `desde`, `hasta`, `severidad_min`, `q`, `limit`, `cursor`) → `{resultados, siguiente, hay_mas}` |
+| `POST` | `/api/vision/inspecciones/` | Crear nueva inspección (`nombre` opcional) |
 | `GET` | `/api/vision/inspecciones/<id>/` | Detalle de inspección con todas sus fotos |
+| `PATCH` | `/api/vision/inspecciones/<id>/` | Editar `nombre` y/o `descripcion` |
 | `DELETE` | `/api/vision/inspecciones/<id>/` | Eliminar inspección + archivos físicos |
 | `POST` | `/api/vision/inspecciones/<id>/fotos/` | Subir foto (multipart) |
 | `GET` | `/api/vision/fotos/<id>/` | Estado de una foto (consulta puntual / fallback) |
@@ -186,6 +191,17 @@ Todos registrados en `vision/urls.py` (montado en la raíz por `backend/config/u
 | `DELETE` | `/api/vision/fotos/<id>/` | Eliminar foto + archivos físicos |
 | `POST` | `/api/vision/inspecciones/<id>/analizar/` | Iniciar análisis de todas las fotos pendientes |
 | `GET` | `/api/vision/inspecciones/<id>/stream/` | Stream SSE de eventos de la inspección |
+
+### Búsqueda de inspecciones (`vision/busqueda.py`)
+
+El listado es una búsqueda: filtros combinables con AND, orden fijo `-fecha_creacion, -id` y paginación por cursor opaco (sin `total`, que obligaría a contar toda la tabla). Detalle de parámetros y errores en `VISION_BACKEND.md`.
+
+**Decisiones:**
+- *Registro declarativo de filtros* (`FILTROS`): cada criterio es una entrada con parser y función `aplicar`. Agregar un criterio no toca la vista, y `describir_filtros()` lo expone como JSON para derivar el esquema de un futuro intérprete de lenguaje natural.
+- *Cursor keyset* `(fecha_creacion, id)` en lugar de offset: el costo no crece con la página y las inserciones nuevas no duplican ni saltan filas. Se piden `limit + 1` filas para calcular `hay_mas` sin `COUNT`.
+- *`severidad_max` desnormalizada* en la inspección: filtrar por severidad sin joins ni agregaciones sobre fotos.
+- *Búsqueda por nombre* con `icontains` servido por un índice GIN de trigramas (extensión `pg_trgm`).
+- Los parámetros de consulta desconocidos se ignoran; los conocidos inválidos devuelven 400 con `campos`.
 
 ### Rate limiting (`vision/ratelimit.py`)
 
@@ -485,7 +501,7 @@ Se usa azul (no verde) para "Bajo" porque verde implicaría que no hay problema,
 
 ```
 1. Crear (o elegir) un Buque                     ← hoy: shell/DB; sin endpoint
-2. POST /api/vision/inspecciones/                ← buque_id, descripcion, tomado_por → InspeccionCasco
+2. POST /api/vision/inspecciones/                ← buque_id, nombre (opcional), descripcion, tomado_por → InspeccionCasco
 3. GET  /api/vision/secciones/                   ← catálogo de secciones del casco
 4. POST /api/vision/inspecciones/<id>/fotos/     ← multipart (imagen, seccion_id) → 202, foto en estado=pendiente
    └── Se publica foto-created en Redis
