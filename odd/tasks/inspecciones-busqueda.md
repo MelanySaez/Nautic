@@ -96,4 +96,4 @@ Resolved: user installed `postgresql-contrib`; `migrate` applied 0002 to NauticD
   Assess from 772dfa0: medium, under_budget (162 lines).
 
 ## Next step
-Push and PR on user request. Follow-ups: frontend search UI; object storage for photos.
+Push and PR on user request. Follow-ups: frontend search UI (handoff: `odd/tasks/inspecciones-busqueda-frontend.md`); object storage for photos.
