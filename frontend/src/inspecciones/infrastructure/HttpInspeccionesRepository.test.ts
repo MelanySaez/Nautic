@@ -9,6 +9,8 @@ const inspeccionDto = {
   id: 7,
   buque_id: 2,
   buque_nombre: 'ARA Libertad',
+  nombre: 'Inspección #7 — ARA Libertad',
+  severidad_max: 'high',
   descripcion: 'Control anual',
   tomado_por: 'Juan Gómez',
   fecha_creacion: '2026-10-01T10:00:00Z',
@@ -48,12 +50,12 @@ describe('HttpInspeccionesRepository', () => {
     return { url: String(url), init: init ?? {} }
   }
 
-  it('lists inspections mapped to the domain model', async () => {
-    fetchMock.mockResolvedValue(respuesta(200, [inspeccionDto]))
+  it('lists inspections from the paginated response, mapped to the domain model', async () => {
+    fetchMock.mockResolvedValue(respuesta(200, { resultados: [inspeccionDto], siguiente: null, hay_mas: false }))
 
     const inspecciones = await repo.listar()
 
-    expect(ultimaLlamada().url).toBe('http://api.test/api/vision/inspecciones/')
+    expect(ultimaLlamada().url).toBe('http://api.test/api/vision/inspecciones/?limit=100')
     expect(inspecciones).toEqual([
       {
         id: 7,
@@ -66,6 +68,39 @@ describe('HttpInspeccionesRepository', () => {
         totalFotos: 1,
       },
     ])
+  })
+
+  it('follows the cursor until the server has no more pages, keeping the order', async () => {
+    const otro = { ...inspeccionDto, id: 6 }
+    fetchMock
+      .mockResolvedValueOnce(respuesta(200, { resultados: [inspeccionDto], siguiente: 'abc+/=&x', hay_mas: true }))
+      .mockResolvedValueOnce(respuesta(200, { resultados: [otro], siguiente: null, hay_mas: false }))
+
+    const inspecciones = await repo.listar()
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(String(fetchMock.mock.calls[0][0])).toBe('http://api.test/api/vision/inspecciones/?limit=100')
+    expect(String(fetchMock.mock.calls[1][0])).toBe(
+      'http://api.test/api/vision/inspecciones/?limit=100&cursor=abc%2B%2F%3D%26x',
+    )
+    expect(inspecciones.map((i) => i.id)).toEqual([7, 6])
+  })
+
+  it('stops after a safety cap of pages if the server never ends the pagination', async () => {
+    fetchMock.mockImplementation(async () =>
+      respuesta(200, { resultados: [inspeccionDto], siguiente: 'siempre', hay_mas: true }),
+    )
+
+    const inspecciones = await repo.listar()
+
+    expect(fetchMock).toHaveBeenCalledTimes(100)
+    expect(inspecciones).toHaveLength(100)
+  })
+
+  it('returns an empty list when the server has no inspections', async () => {
+    fetchMock.mockResolvedValue(respuesta(200, { resultados: [], siguiente: null, hay_mas: false }))
+
+    await expect(repo.listar()).resolves.toEqual([])
   })
 
   it('gets the inspection detail with its photos, treating missing detections as empty', async () => {
