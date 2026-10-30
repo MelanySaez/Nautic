@@ -6,20 +6,22 @@ Este repositorio es un **monorepo**: backend Django en `backend/` y frontend Rea
 
 ## Enfoque actual
 
-El proyecto se organiza en tres secciones y hoy avanza **backend primero**: cada sección se cierra en la API (con tests) y deja un documento de traspaso en `odd/tasks/` para que el frontend se construya sobre un contrato ya verificado.
+El proyecto se organiza en tres secciones y avanza **backend primero**: cada sección se cierra en la API, con tests, antes de construir su interfaz sobre un contrato ya verificado.
 
 | Sección | Qué es | Backend | Frontend |
 |---|---|---|---|
-| **Buques** | Entidad buque con ficha técnica (dimensiones, autonomía, capacidades…) | Crear, listar (`offset`/`limit`) y ver ficha: `GET/POST /api/buques/`, `GET /api/buques/<id>/`. Sin edición ni borrado | Pendiente. Usa datos de ejemplo en memoria; plan en [`odd/tasks/buques-frontend.md`](odd/tasks/buques-frontend.md) |
-| **Inspecciones** | Sesiones de inspección por buque | Listado, alta, detalle y borrado. **En revisión** (PR #5 → #6 → #7): nombre de inspección, severidad máxima y búsqueda combinable por buque, fechas, severidad y nombre con paginación por cursor | Listado, alta y detalle. La pantalla de búsqueda está planificada en [`odd/tasks/inspecciones-busqueda-frontend.md`](odd/tasks/inspecciones-busqueda-frontend.md) (llega con la PR #7) |
-| **Visión IA** | Análisis del casco; todo análisis pertenece a una inspección | Implementado: fotos → Celery → inferencia → SSE | Carga de fotos por zona y resultados en vivo |
+| **Buques** | Entidad buque con ficha técnica (dimensiones, autonomía, capacidades…) | Alta, listado y ficha | Pendiente (hoy usa datos de ejemplo) |
+| **Inspecciones** | Sesiones de inspección por buque | Alta, listado, detalle y borrado | Alta, listado y detalle |
+| **Visión IA** | Análisis del casco; todo análisis pertenece a una inspección | Fotos → cola Celery → inferencia → resultados en vivo (SSE) | Carga de fotos por zona y resultados en vivo |
 
-### Próximos pasos
+### Hoja de ruta
 
-1. Frontend de **Buques** (adaptador HTTP, listado, alta y ficha).
-2. **Pantalla de búsqueda** de inspecciones en el frontend (filtros en el servidor y "Cargar más").
-3. **Búsqueda en lenguaje natural**: un intérprete (p. ej. un modelo tipo Jev o un LLM) que traduzca la consulta a los mismos filtros; el registro de filtros del backend ya está pensado para ello.
-4. **Preparación para despliegue**: guardar las fotos en un almacenamiento de objetos (bucket S3-compatible con URLs firmadas) en lugar del disco del servidor.
+- **Búsqueda de inspecciones** combinable (buque, fechas, severidad, nombre) en la API y en la interfaz.
+- **Interfaz de Buques** sobre la API existente.
+- **Búsqueda en lenguaje natural** que traduzca la consulta a esos mismos filtros.
+- **Preparación para despliegue**: fotos en un almacenamiento de objetos (bucket) en lugar del disco del servidor.
+
+El detalle de cada feature (alcance, decisiones, estado y traspasos pendientes) está en [`odd/tasks/`](odd/tasks/); el trabajo en curso, en las pull requests.
 
 ## Estructura
 
@@ -138,7 +140,7 @@ Con el servidor corriendo:
 
 - **Sin autenticación** en esta versión. Los campos de autoría (p. ej. `tomado_por`) son texto libre.
 - El idioma del dominio es español (modelos, rutas, variables de negocio).
-- Las fotos se guardan hoy en el disco del servidor (`backend/media/`): válido para desarrollo, no para un despliegue en contenedores (ver "Próximos pasos").
+- Las fotos se guardan hoy en el disco del servidor (`backend/media/`): válido para desarrollo, no para un despliegue en contenedores (ver "Hoja de ruta").
 
 ## Licencia
 
