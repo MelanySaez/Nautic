@@ -3,7 +3,6 @@ import json
 import logging
 import os
 import time
-import uuid
 
 from PIL import Image
 from django.conf import settings
@@ -18,6 +17,7 @@ from rest_framework.response import Response
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample
 from drf_spectacular.types import OpenApiTypes
 
+from .almacenamiento import borrar_archivo, guardar_original, url_archivo
 from .busqueda import BusquedaInvalida, LIMIT_MAXIMO, LIMIT_POR_DEFECTO, buscar_inspecciones
 from .inference import DEFAULT_CONFIDENCE, run_inference
 from .models import (
@@ -240,16 +240,6 @@ def api_ai_anomalias(request):
 # Helpers de serialización
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _media_url(path, request=None):
-    """Convierte un path relativo (incluye prefijo media/) en URL absoluta."""
-    if not path:
-        return None
-    s = path.replace('\\', '/')
-    if request:
-        return request.build_absolute_uri('/' + s.lstrip('/'))
-    return '/' + s.lstrip('/')
-
-
 def _seccion_to_dict(s):
     return {
         'id': s.id,
@@ -264,8 +254,8 @@ def _foto_to_dict(f, request=None):
     return {
         'id': f.id,
         'seccion': _seccion_to_dict(f.seccion),
-        'imagen_original': _media_url(f.imagen_original, request),
-        'imagen_anotada': _media_url(f.imagen_anotada, request),
+        'imagen_original': url_archivo(f.imagen_original, request),
+        'imagen_anotada': url_archivo(f.imagen_anotada, request),
         'detecciones': f.detecciones,
         'tiempo_inferencia_ms': f.tiempo_inferencia_ms,
         'severidad': f.severidad,
@@ -505,11 +495,8 @@ def api_vision_inspeccion_detalle(request, inspeccion_id):
 
     if request.method == 'DELETE':
         for foto in insp.fotos.all():
-            for path_field in [foto.imagen_original, foto.imagen_anotada]:
-                if path_field:
-                    full_path = os.path.join(settings.BASE_DIR, path_field)
-                    if os.path.exists(full_path):
-                        os.remove(full_path)
+            borrar_archivo(foto.imagen_original)
+            borrar_archivo(foto.imagen_anotada)
         insp.delete()
         return Response(status=204)
 
@@ -596,20 +583,15 @@ def api_vision_subir_foto(request, inspeccion_id):
     if not img_ok:
         return Response({'error': img_error}, status=400)
 
-    # Guardar imagen original en media/inspecciones/originales/
-    extension = os.path.splitext(archivo.name)[1].lower() or '.jpg'
-    nombre_original = f"media/inspecciones/originales/{uuid.uuid4().hex}{extension}"
-    ruta_original = os.path.join(settings.BASE_DIR, nombre_original)
-    os.makedirs(os.path.dirname(ruta_original), exist_ok=True)
-    with open(ruta_original, 'wb') as fh:
-        for chunk in archivo.chunks():
-            fh.write(chunk)
+    # Guardar la imagen original en el storage (disco local o bucket) y
+    # persistir la clave que devuelve, no la solicitada.
+    clave_original = guardar_original(archivo)
 
     # Crear registro con estado=pendiente
     foto = FotoInspeccion.objects.create(
         inspeccion=insp,
         seccion=seccion,
-        imagen_original=nombre_original,
+        imagen_original=clave_original,
     )
 
     foto_dict = _foto_to_dict(foto, request)
@@ -652,11 +634,8 @@ def api_vision_foto_detalle(request, foto_id):
     if request.method == 'DELETE':
         inspeccion_id = foto.inspeccion_id
         foto_id_borrado = foto.pk
-        for path_field in [foto.imagen_original, foto.imagen_anotada]:
-            if path_field:
-                full_path = os.path.join(settings.BASE_DIR, path_field)
-                if os.path.exists(full_path):
-                    os.remove(full_path)
+        borrar_archivo(foto.imagen_original)
+        borrar_archivo(foto.imagen_anotada)
         foto.delete()
         recalcular_severidad_max(inspeccion_id)
         publicar_evento(

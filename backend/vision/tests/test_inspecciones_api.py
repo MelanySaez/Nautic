@@ -1,12 +1,9 @@
 import importlib
-import io
-import os
-import shutil
-import tempfile
 from unittest import mock
 
-from PIL import Image
 from django.apps import apps
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
 from django.db import connection
 from django.test import TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
@@ -22,6 +19,7 @@ from vision.models import (
     subir_severidad_max,
 )
 from vision.tasks import procesar_foto
+from vision.tests.utilidades import STORAGES_EN_MEMORIA, png_bytes
 
 URL_LISTA = '/api/vision/inspecciones/'
 
@@ -293,9 +291,7 @@ class TareaActualizaSeveridadTests(TestCase):
     """procesar_foto raises severidad_max; inference and I/O side effects are stubbed."""
 
     def setUp(self):
-        self.tmp = tempfile.mkdtemp()
-        self.addCleanup(shutil.rmtree, self.tmp, ignore_errors=True)
-        patcher = override_settings(BASE_DIR=self.tmp)
+        patcher = override_settings(STORAGES=STORAGES_EN_MEMORIA)
         patcher.enable()
         self.addCleanup(patcher.disable)
         for objetivo in ('vision.tasks.publicar_evento', 'vision.tasks.track_concurrent_end'):
@@ -306,13 +302,8 @@ class TareaActualizaSeveridadTests(TestCase):
         self.insp = InspeccionCasco.objects.create(buque=_crear_buque())
         self.seccion = SeccionCasco.objects.create(codigo='FWD-BTM', nombre='Fondo - Proa')
 
-    def _foto_en_disco(self):
-        buffer = io.BytesIO()
-        Image.new('RGB', (4, 4)).save(buffer, format='PNG')
-        ruta = 'originales/foto.png'
-        os.makedirs(os.path.join(self.tmp, 'originales'), exist_ok=True)
-        with open(os.path.join(self.tmp, ruta), 'wb') as fh:
-            fh.write(buffer.getvalue())
+    def _foto_en_storage(self):
+        ruta = default_storage.save('inspecciones/originales/foto.png', ContentFile(png_bytes()))
         return FotoInspeccion.objects.create(
             inspeccion=self.insp, seccion=self.seccion, imagen_original=ruta,
         )
@@ -327,18 +318,18 @@ class TareaActualizaSeveridadTests(TestCase):
         return InspeccionCasco.objects.get(pk=self.insp.pk).severidad_max
 
     def test_foto_procesada_sube_la_severidad_de_la_inspeccion(self):
-        self._procesar(self._foto_en_disco(), ['marine_growth'])
+        self._procesar(self._foto_en_storage(), ['marine_growth'])
 
         self.assertEqual(self._sev(), NivelSeveridad.MEDIUM)
 
     def test_una_foto_menos_grave_no_la_baja(self):
-        self._procesar(self._foto_en_disco(), ['corrosion'])
-        self._procesar(self._foto_en_disco(), ['paint_peel'])
+        self._procesar(self._foto_en_storage(), ['corrosion'])
+        self._procesar(self._foto_en_storage(), ['paint_peel'])
 
         self.assertEqual(self._sev(), NivelSeveridad.CRITICAL)
 
     def test_foto_sin_detecciones_deja_null(self):
-        self._procesar(self._foto_en_disco(), [])
+        self._procesar(self._foto_en_storage(), [])
 
         self.assertIsNone(self._sev())
 

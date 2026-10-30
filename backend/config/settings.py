@@ -85,6 +85,15 @@ STATIC_URL = "/static/"
 # Configuración para archivos media (carga de imágenes como hacías en Flask)
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"  # Aquí se guardarán las imágenes cargadas por usuarios
+
+# Almacenamiento de archivos. Las fotos de inspección se leen y escriben SIEMPRE
+# a través de default_storage (vision/almacenamiento.py), nunca con open()/os.*.
+# "default" guarda en MEDIA_ROOT y sirve en MEDIA_URL.
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
+}
+
 # Configuración CORS para aceptar peticiones desde cualquier origen (útil para React)
 # CORS_ALLOW_ALL_ORIGINS = True
 
