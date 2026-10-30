@@ -208,6 +208,11 @@ class ParametrosInvalidosTests(BusquedaBase):
         self.assertIn('q', self._campos(q='  a  '))
         self.assertIn('q', self._campos(q='x' * 101))
 
+    def test_q_con_caracter_nul_es_400_y_no_500(self):
+        self.assertEqual(
+            self._campos(q='ab\x00cd')['q'], ['Contiene caracteres no permitidos.'],
+        )
+
     def test_q_en_los_limites_es_valido(self):
         self.assertEqual(self._get(q='ab').status_code, 200)
         self.assertEqual(self._get(q='x' * 100).status_code, 200)

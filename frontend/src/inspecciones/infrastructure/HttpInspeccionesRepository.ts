@@ -13,6 +13,10 @@ import {
   type SeccionDto,
 } from './dtos'
 
+const TAMANO_PAGINA = 100
+// Guards against a server that keeps answering hay_mas=true forever.
+const MAX_PAGINAS = 100
+
 export class HttpInspeccionesRepository implements InspeccionesRepository {
   private readonly api: ApiClient
 
@@ -21,9 +25,17 @@ export class HttpInspeccionesRepository implements InspeccionesRepository {
   }
 
   async listar(): Promise<Inspeccion[]> {
-    // Single page of the largest allowed size; "load more" and server-side filters come with the search UI.
-    const lista = await this.api.get<ListaInspeccionesDto>('/api/vision/inspecciones/?limit=100')
-    return lista.resultados.map(aInspeccion)
+    // Walks every page so callers keep getting the complete list until the search UI does server-side filtering.
+    const inspecciones: Inspeccion[] = []
+    let cursor: string | null = null
+    for (let pagina = 0; pagina < MAX_PAGINAS; pagina++) {
+      const consulta: string = `limit=${TAMANO_PAGINA}` + (cursor ? `&cursor=${encodeURIComponent(cursor)}` : '')
+      const lista: ListaInspeccionesDto = await this.api.get<ListaInspeccionesDto>(`/api/vision/inspecciones/?${consulta}`)
+      inspecciones.push(...lista.resultados.map(aInspeccion))
+      if (!lista.hay_mas || !lista.siguiente) break
+      cursor = lista.siguiente
+    }
+    return inspecciones
   }
 
   async obtener(id: number): Promise<InspeccionDetalle> {

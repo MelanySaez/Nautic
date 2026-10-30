@@ -133,6 +133,8 @@ def _parsear_severidad(raw):
 
 def _parsear_texto(raw):
     texto = raw.strip()
+    if '\x00' in texto:
+        raise ValorInvalido('Contiene caracteres no permitidos.')
     if not (_Q_MIN <= len(texto) <= _Q_MAX):
         raise ValorInvalido(f'Debe tener entre {_Q_MIN} y {_Q_MAX} caracteres.')
     return texto

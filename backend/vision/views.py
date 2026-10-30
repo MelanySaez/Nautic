@@ -304,6 +304,8 @@ def _validar_nombre(valor):
     if not isinstance(valor, str):
         return None, 'Debe ser texto.'
     valor = valor.strip()
+    if '\x00' in valor:
+        return None, 'Contiene caracteres no permitidos.'
     if len(valor) > _NOMBRE_MAX:
         return None, f'No puede superar {_NOMBRE_MAX} caracteres.'
     return valor, None

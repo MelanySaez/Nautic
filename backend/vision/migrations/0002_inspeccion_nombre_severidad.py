@@ -4,7 +4,7 @@ import django.contrib.postgres.indexes
 from django.contrib.postgres.operations import TrigramExtension
 from django.db import migrations, models
 from django.db.models import Case, CharField, IntegerField, Max, OuterRef, Subquery, Value, When
-from django.db.models.functions import Cast, Concat
+from django.db.models.functions import Cast, Concat, Left
 
 # Same text -> int mapping as vision.models.NivelSeveridad (frozen here so the
 # migration does not depend on application code that may change later).
@@ -19,12 +19,16 @@ def rellenar_nombre_y_severidad(apps, schema_editor):
 
     nombre_buque = Buque.objects.filter(pk=OuterRef('buque_id')).values('nombre')[:1]
     Inspeccion.objects.filter(nombre='').update(
-        nombre=Concat(
-            Value('Inspección #'),
-            Cast('id', CharField()),
-            Value(' — '),
-            Subquery(nombre_buque),
-            output_field=CharField(),
+        # Left(..., 255) keeps a long vessel name from overflowing the column.
+        nombre=Left(
+            Concat(
+                Value('Inspección #'),
+                Cast('id', CharField()),
+                Value(' — '),
+                Subquery(nombre_buque),
+                output_field=CharField(),
+            ),
+            255,
         )
     )
 

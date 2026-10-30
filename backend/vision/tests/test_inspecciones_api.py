@@ -7,7 +7,9 @@ from unittest import mock
 
 from PIL import Image
 from django.apps import apps
+from django.db import connection
 from django.test import TestCase, override_settings
+from django.test.utils import CaptureQueriesContext
 from rest_framework.test import APIClient
 
 from vision.models import (
@@ -106,6 +108,23 @@ class CrearInspeccionNombreTests(TestCase):
 
         self.assertEqual(res.status_code, 201)
 
+    def test_nombre_con_caracter_nul_es_400(self):
+        res = self._post(nombre='abc\x00def')
+
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(res.json()['campos']['nombre'], ['Contiene caracteres no permitidos.'])
+
+    def test_buque_de_nombre_largo_genera_un_nombre_que_cabe(self):
+        buque = Buque.objects.create(nombre='B' * 255, tipo='Fragata')
+
+        res = self.client.post(URL_LISTA, {'buque_id': buque.id}, format='json')
+
+        self.assertEqual(res.status_code, 201, res.content)
+        nombre = res.json()['nombre']
+        self.assertLessEqual(len(nombre), 255)
+        self.assertTrue(nombre.startswith(f'Inspección #{res.json()["id"]} — BBB'))
+        self.assertTrue(nombre.endswith('…'))
+
 
 class EditarInspeccionTests(TestCase):
     def setUp(self):
@@ -131,6 +150,21 @@ class EditarInspeccionTests(TestCase):
 
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.json()['nombre'], f'Inspección #{self.insp.id} — ARC Caribe')
+
+    def test_nombre_vacio_con_buque_de_nombre_largo_cabe_en_255(self):
+        buque = Buque.objects.create(nombre='B' * 255, tipo='Fragata')
+        insp = InspeccionCasco.objects.create(buque=buque, nombre='Original')
+
+        res = self.client.patch(_url_detalle(insp.id), {'nombre': ''}, format='json')
+
+        self.assertEqual(res.status_code, 200, res.content)
+        self.assertLessEqual(len(res.json()['nombre']), 255)
+
+    def test_nombre_con_caracter_nul_es_400(self):
+        res = self._patch({'nombre': 'abc\x00def'})
+
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(res.json()['campos']['nombre'], ['Contiene caracteres no permitidos.'])
 
     def test_edita_descripcion_sin_tocar_nombre(self):
         res = self._patch({'descripcion': 'otra'})
@@ -208,6 +242,17 @@ class SeveridadMaxTests(TestCase):
 
         self.assertEqual(recalcular_severidad_max(self.insp.id), 3)
         self.assertEqual(self._sev(), 3)
+
+    def test_recalcular_bloquea_la_fila_de_la_inspeccion(self):
+        # Without the row lock, a concurrent subir_severidad_max from the worker
+        # could be overwritten by a stale lower value computed here.
+        self._foto('low')
+        with CaptureQueriesContext(connection) as consultas:
+            self.assertEqual(recalcular_severidad_max(self.insp.id), 1)
+
+        sqls = [q['sql'] for q in consultas.captured_queries]
+        self.assertTrue(any('FOR UPDATE' in sql for sql in sqls), sqls)
+        self.assertEqual(self._sev(), 1)
 
     def test_recalcular_sin_fotos_deja_null(self):
         subir_severidad_max(self.insp.id, NivelSeveridad.HIGH)
@@ -326,3 +371,16 @@ class BackfillMigracionTests(TestCase):
         self.assertEqual(con_nombre.nombre, 'Mío')
         self.assertEqual(vieja.severidad_max, NivelSeveridad.HIGH)
         self.assertIsNone(vacia.severidad_max)
+
+    def test_rellena_un_nombre_que_cabe_con_buque_de_nombre_largo(self):
+        migracion = importlib.import_module(
+            'vision.migrations.0002_inspeccion_nombre_severidad'
+        )
+        buque = _crear_buque('B' * 255)
+        insp = InspeccionCasco.objects.create(buque=buque)
+
+        migracion.rellenar_nombre_y_severidad(apps, None)
+
+        insp.refresh_from_db()
+        self.assertEqual(len(insp.nombre), 255)
+        self.assertTrue(insp.nombre.startswith(f'Inspección #{insp.id} — BBB'))

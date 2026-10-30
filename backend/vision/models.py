@@ -1,5 +1,5 @@
 from django.contrib.postgres.indexes import GinIndex
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Q
 
 
@@ -138,7 +138,14 @@ class InspeccionCasco(models.Model):
 
 def nombre_por_defecto(inspeccion):
     """Nombre generado cuando el usuario no da uno: ``Inspección #<id> — <buque>``."""
-    return f"Inspección #{inspeccion.pk} — {inspeccion.buque.nombre}"
+    prefijo = f"Inspección #{inspeccion.pk} — "
+    maximo = InspeccionCasco._meta.get_field('nombre').max_length
+    buque = inspeccion.buque.nombre
+    disponible = maximo - len(prefijo)
+    if len(buque) > disponible:
+        # A long vessel name must not push the value past the column size.
+        buque = buque[:max(disponible - 1, 0)] + '…'
+    return prefijo + buque
 
 
 def subir_severidad_max(inspeccion_id, nivel):
@@ -160,14 +167,19 @@ def recalcular_severidad_max(inspeccion_id):
     Recalcula ``severidad_max`` desde las fotos completadas que quedan
     (se usa al borrar una foto). Devuelve el nuevo valor (int o None).
     """
-    textos = FotoInspeccion.objects.filter(
-        inspeccion_id=inspeccion_id,
-        estado=FotoInspeccion.Estado.COMPLETADA,
-        severidad__isnull=False,
-    ).values_list('severidad', flat=True).distinct()
-    niveles = [n for n in map(NivelSeveridad.desde_texto, textos) if n is not None]
-    nuevo = max(niveles) if niveles else None
-    InspeccionCasco.objects.filter(pk=inspeccion_id).update(severidad_max=nuevo)
+    # The row lock makes read + write one unit: a concurrent subir_severidad_max
+    # from the worker waits here and then re-evaluates its condition against the
+    # recomputed value, so a stale lower value can never overwrite it.
+    with transaction.atomic():
+        list(InspeccionCasco.objects.select_for_update().filter(pk=inspeccion_id).values_list('pk', flat=True))
+        textos = FotoInspeccion.objects.filter(
+            inspeccion_id=inspeccion_id,
+            estado=FotoInspeccion.Estado.COMPLETADA,
+            severidad__isnull=False,
+        ).values_list('severidad', flat=True).distinct()
+        niveles = [n for n in map(NivelSeveridad.desde_texto, textos) if n is not None]
+        nuevo = max(niveles) if niveles else None
+        InspeccionCasco.objects.filter(pk=inspeccion_id).update(severidad_max=nuevo)
     return nuevo
 
 
