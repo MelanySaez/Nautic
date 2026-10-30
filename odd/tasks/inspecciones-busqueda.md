@@ -85,7 +85,15 @@ Resolved: user installed `postgresql-contrib`; `migrate` applied 0002 to NauticD
   lookup (ILIKE, escaped wildcards) registered in `VisionConfig.ready()`. EXPLAIN now:
   `Bitmap Index Scan on insp_nombre_trgm_idx`. Regression test asserts ILIKE (RED without the fix,
   GREEN with it). Suite: 97 OK. Commit recorded in git log (`fix(inspecciones): match name search
-  with ILIKE ...`).
+  with ILIKE ...`) a6aba0f.
+- Review of slice 72ff79c..772dfa0: medium, granted (user pre-authorized), lens reliability,
+  lineage review-e30a1e289058ba61 → APPROVED + acknowledged (authority burned). 4 advisories.
+- T5 1870b10 (delegated direct) fixes all 4 advisories, each RED → GREEN: severity recompute locks
+  the inspection row (`select_for_update` in `atomic`); default name truncated to 255 (runtime `…`,
+  backfill `Left(...,255)`); NUL rejected in `q` and `nombre` (400); frontend `listar()` follows the
+  cursor until `hay_mas` is false (cap 100 pages). Checks: backend 104 OK (parent re-ran), `check`
+  OK, `makemigrations --check` no changes, `pnpm test` 75 OK (parent re-ran), lint clean, build OK.
+  Assess from 772dfa0: medium, under_budget (162 lines).
 
 ## Next step
-Review of the slice 72ff79c..HEAD; then push/PR on user request.
+Push and PR on user request. Follow-ups: frontend search UI; object storage for photos.
