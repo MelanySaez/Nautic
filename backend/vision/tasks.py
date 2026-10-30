@@ -22,7 +22,7 @@ from celery import shared_task
 from django.conf import settings
 
 from .inference import run_inference
-from .models import FotoInspeccion
+from .models import FotoInspeccion, NivelSeveridad, subir_severidad_max
 from .pubsub import publicar_evento
 from .ratelimit import track_concurrent_end
 
@@ -197,6 +197,10 @@ def procesar_foto(self, foto_id: int):
             "imagen_anotada", "detecciones", "tiempo_inferencia_ms",
             "severidad", "estado", "error_detalle",
         ])
+        # Mantener la peor severidad de la inspección (UPDATE condicional atómico).
+        subir_severidad_max(
+            foto.inspeccion_id, NivelSeveridad.desde_texto(foto.severidad)
+        )
         logger.info(
             "Foto %s procesada (%.2f ms, severidad=%s, detecciones=%d)",
             foto_id, foto.tiempo_inferencia_ms, foto.severidad, len(raw_detections),
