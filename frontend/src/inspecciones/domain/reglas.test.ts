@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { Foto, Inspeccion } from './inspeccion'
-import { aplicarEvento, filtrarInspecciones, resumirProgreso, severidadMaxima } from './reglas'
+import type { Foto } from './inspeccion'
+import { aplicarEvento, resumirProgreso, severidadMaxima } from './reglas'
 
 const seccion = { id: 1, codigo: 'KEEL', nombre: 'Quilla', descripcion: '', orden: 1 }
 
@@ -19,22 +19,6 @@ function foto(overrides: Partial<Foto> = {}): Foto {
     modeloVersion: null,
     taxonomiaVersion: null,
     fechaCreacion: '2026-10-01T10:00:00Z',
-    ...overrides,
-  }
-}
-
-function inspeccion(overrides: Partial<Inspeccion> = {}): Inspeccion {
-  return {
-    id: 1,
-    buqueId: 1,
-    buqueNombre: 'ARA Almirante Brown',
-    nombre: 'Inspección #1 — ARA Almirante Brown',
-    severidadMax: null,
-    descripcion: '',
-    tomadoPor: 'María Pérez',
-    fechaCreacion: '2026-10-01T10:00:00Z',
-    fechaModificacion: '2026-10-01T10:00:00Z',
-    totalFotos: 0,
     ...overrides,
   }
 }
@@ -119,24 +103,5 @@ describe('aplicarEvento', () => {
 
   it('removes a deleted photo', () => {
     expect(aplicarEvento([foto(), foto({ id: 2 })], { tipo: 'foto-eliminada', fotoId: 1 }).map((f) => f.id)).toEqual([2])
-  })
-})
-
-describe('filtrarInspecciones', () => {
-  const inspecciones = [
-    inspeccion({ id: 1, buqueNombre: 'ARA Almirante Brown', tomadoPor: 'María Pérez' }),
-    inspeccion({ id: 2, buqueNombre: 'ARA Libertad', tomadoPor: 'Juan Gómez' }),
-  ]
-
-  it('matches the vessel name ignoring case and accents', () => {
-    expect(filtrarInspecciones(inspecciones, 'libertad').map((i) => i.id)).toEqual([2])
-  })
-
-  it('matches the inspector name ignoring accents', () => {
-    expect(filtrarInspecciones(inspecciones, 'maria').map((i) => i.id)).toEqual([1])
-  })
-
-  it('returns everything for a blank query', () => {
-    expect(filtrarInspecciones(inspecciones, '   ')).toHaveLength(2)
   })
 })

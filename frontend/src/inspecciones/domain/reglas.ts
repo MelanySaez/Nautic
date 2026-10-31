@@ -1,4 +1,4 @@
-import type { EventoInspeccion, Foto, Inspeccion, Severidad } from './inspeccion'
+import type { EventoInspeccion, Foto, Severidad } from './inspeccion'
 
 export interface ResumenProgreso {
   total: number
@@ -48,16 +48,4 @@ export function aplicarEvento(fotos: Foto[], evento: EventoInspeccion): Foto[] {
     case 'foto-eliminada':
       return fotos.filter((f) => f.id !== evento.fotoId)
   }
-}
-
-function normalizar(texto: string): string {
-  return texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
-}
-
-export function filtrarInspecciones(inspecciones: Inspeccion[], consulta: string): Inspeccion[] {
-  const termino = normalizar(consulta)
-  if (!termino) return inspecciones
-  return inspecciones.filter(
-    (i) => normalizar(i.buqueNombre).includes(termino) || normalizar(i.tomadoPor).includes(termino),
-  )
 }
