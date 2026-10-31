@@ -11,6 +11,7 @@ function renderizar(dependencias = crearDependenciasFalsas().dependencias, ruta 
       { path: '/', element: <ListaInspeccionesPage /> },
       { path: '/vision', element: <p>Formulario nuevo</p> },
       { path: '/vision/:id', element: <p>Carga de fotos</p> },
+      { path: '/inspecciones/:id/resultados', element: <p>Resultados</p> },
     ],
     dependencias,
     ruta,
@@ -133,14 +134,14 @@ describe('ListaInspeccionesPage', () => {
     expect(router.state.location.pathname).toBe('/vision')
   })
 
-  it('opens the photo upload of an inspection', async () => {
+  it('opens the results of an inspection', async () => {
     const { dependencias } = crearDependenciasFalsas()
     dependencias.inspecciones.buscar.mockResolvedValue(unaPagina([unaInspeccion({ id: 42, nombre: 'Control anual' })]))
     const { router } = renderizar(dependencias)
 
     await userEvent.click(await screen.findByRole('link', { name: 'Abrir inspección Control anual' }))
 
-    expect(router.state.location.pathname).toBe('/vision/42')
+    expect(router.state.location.pathname).toBe('/inspecciones/42/resultados')
   })
 
   it('deletes an inspection after confirmation', async () => {

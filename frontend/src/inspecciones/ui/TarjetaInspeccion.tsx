@@ -28,7 +28,7 @@ export function TarjetaInspeccion({
           </div>
           <h3 className="truncate text-xl font-semibold tracking-tight">
             <Link
-              to={`/vision/${id}`}
+              to={`/inspecciones/${id}/resultados`}
               aria-label={`Abrir inspección ${nombre}`}
               className="after:absolute after:inset-0 focus-visible:outline-none"
             >

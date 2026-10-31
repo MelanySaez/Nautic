@@ -159,6 +159,8 @@ From `frontend/`: touched test files only (`pnpm vitest run <files>`), `pnpm lin
   shows only the first page (merge both slices together); the stale-response guard has no test; an
   empty state and "Cargar más" can show together after deleting every loaded card. Product question
   for the user: cards open `/vision/:id` (upload) rather than the results page where rename lives.
+  Resolved (user, 2026-10-31): history cards open `/inspecciones/:id/resultados`; RED then GREEN in
+  `ListaInspeccionesPage.test.tsx` (14 passed), lint and build clean.
 
 ## Next step
 Manual smoke against the backend (filters, Cargar más, rename), then open the stacked PRs (slice 1 = T1+T2, slice 2 = T3-T5).
