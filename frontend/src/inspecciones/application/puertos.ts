@@ -20,6 +20,8 @@ export interface InspeccionesRepository {
   buscar(filtro: FiltroInspecciones, cursor?: string): Promise<PaginaInspecciones>
   obtener(id: number): Promise<InspeccionDetalle>
   crear(datos: NuevaInspeccion): Promise<Inspeccion>
+  /** Renames an inspection; a blank name makes the backend regenerate the default one. */
+  renombrar(id: number, nombre: string): Promise<Inspeccion>
   eliminar(id: number): Promise<void>
   /** Hull sections declared by one vessel, in display order. */
   listarSecciones(buqueId: number): Promise<SeccionCasco[]>

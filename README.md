@@ -11,12 +11,11 @@ El proyecto se organiza en tres secciones y avanza **backend primero**: cada sec
 | Sección | Qué es | Backend | Frontend |
 |---|---|---|---|
 | **Buques** | Entidad buque con ficha técnica (dimensiones, autonomía, capacidades…) | Alta (con sus secciones del casco: las 20 estándar o una lista propia), listado y ficha | Pendiente (hoy usa datos de ejemplo) |
-| **Inspecciones** | Sesiones de inspección por buque | Alta, listado, detalle y borrado | Alta, listado y detalle |
+| **Inspecciones** | Sesiones de inspección por buque | Alta, listado con búsqueda y paginación, detalle, renombrado y borrado | Alta, historial con filtros (buque, fechas, severidad, nombre) y «Cargar más», resultados y renombrado |
 | **Visión IA** | Análisis del casco; todo análisis pertenece a una inspección | Fotos → cola Celery → inferencia → resultados en vivo (SSE) | Carga de fotos por zona y resultados en vivo |
 
 ### Hoja de ruta
 
-- **Búsqueda de inspecciones** combinable (buque, fechas, severidad, nombre) en la API y en la interfaz.
 - **Interfaz de Buques** sobre la API existente.
 - **Búsqueda en lenguaje natural** que traduzca la consulta a esos mismos filtros.
 

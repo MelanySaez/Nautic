@@ -59,6 +59,10 @@ export class HttpInspeccionesRepository implements InspeccionesRepository {
     return aInspeccion(dto)
   }
 
+  async renombrar(id: number, nombre: string): Promise<Inspeccion> {
+    return aInspeccion(await this.api.patch<InspeccionDto>(`/api/vision/inspecciones/${id}/`, { nombre: nombre.trim() }))
+  }
+
   eliminar(id: number): Promise<void> {
     return this.api.delete(`/api/vision/inspecciones/${id}/`)
   }
