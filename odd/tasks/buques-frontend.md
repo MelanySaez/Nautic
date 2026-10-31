@@ -281,7 +281,7 @@ Conventional Commit per task, tests and docs alongside the behavior.
       `frontend/README.md` (tree line and Buques paragraph). Acceptance: no reference to the seed
       remains (`grep -r "BUQUES_SEMILLA\|EnMemoria" frontend/src` empty); manual check that the
       selector in "Nueva inspección" lists real DB vessels.
-- [ ] T5 — `ListaBuquesPage` (`buques/ui/`). Loads via `useRecurso(buques.listar)`; presentational
+- [x] T5 — `ListaBuquesPage` (`buques/ui/`). Loads via `useRecurso(buques.listar)`; presentational
       `TarjetaBuque` (nombre, tipo, etapa badge, `imagen` placeholder) linking to `/buques/:id`; search
       box by nombre/tipo (pure helper `filtrarBuques` in `buques/domain/`, like
       `filtrarInspecciones`); `Cargando`, `MensajeError` with retry, `Vacio` with a "Nuevo buque" CTA;
@@ -391,6 +391,7 @@ Backend evidence: `buques-backend.md` (28 tests OK, `manage.py check` clean).
   minimal tests and targeted runs only); selector order now relies on the API's `nombre, id` order;
   a 400 with `campos` but no `error`/`detail` loses its field messages (the backend always sends
   `error` with `campos`).
+- T5 done (commit `feat(frontend): add the vessel list page`), route: delegated direct (single writer). RED: `ListaBuquesPage.test.tsx` failed to load (module `./ListaBuquesPage` did not exist; no tests ran). GREEN: 4 tests in that file passed (`pnpm vitest run src/buques/ui/ListaBuquesPage.test.tsx`). Filter helper `filtrarBuques` is covered through the page test.
 
 ## Next step
 Slice 2: T5-T8 (list, create, detail pages, routes and nav). Slice 1 ready for push/PR (user decision).
