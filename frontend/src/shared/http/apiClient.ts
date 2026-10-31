@@ -81,6 +81,14 @@ export class ApiClient {
     })
   }
 
+  patch<T>(ruta: string, cuerpo: unknown): Promise<T> {
+    return this.request<T>(ruta, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(cuerpo),
+    })
+  }
+
   delete(ruta: string): Promise<void> {
     return this.request<void>(ruta, { method: 'DELETE' })
   }

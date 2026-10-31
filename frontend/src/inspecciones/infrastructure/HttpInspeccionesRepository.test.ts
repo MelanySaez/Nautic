@@ -163,6 +163,18 @@ describe('HttpInspeccionesRepository', () => {
     expect(creada.id).toBe(7)
   })
 
+  it('renames an inspection with a PATCH carrying only the name', async () => {
+    fetchMock.mockResolvedValue(respuesta(200, { ...inspeccionDto, nombre: 'Casco proa', fotos: [] }))
+
+    const renombrada = await repo.renombrar(7, '  Casco proa ')
+
+    const { url, init } = ultimaLlamada()
+    expect(url).toBe('http://api.test/api/vision/inspecciones/7/')
+    expect(init.method).toBe('PATCH')
+    expect(JSON.parse(String(init.body))).toEqual({ nombre: 'Casco proa' })
+    expect(renombrada.nombre).toBe('Casco proa')
+  })
+
   it('deletes an inspection', async () => {
     fetchMock.mockResolvedValue(respuesta(204))
 

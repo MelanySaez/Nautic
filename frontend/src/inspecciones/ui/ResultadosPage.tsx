@@ -1,9 +1,14 @@
 import { useState, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router'
+import { useDependencias } from '../../app/useDependencias'
+import { ApiError } from '../../shared/http/apiClient'
+import { Boton } from '../../shared/ui/Boton'
 import { Cargando, MensajeError, Vacio } from '../../shared/ui/Estados'
 import { Icon } from '../../shared/ui/Icon'
 import { clasesControlCompacto } from '../../shared/ui/clasesControl'
+import { mensajeDe } from '../../shared/ui/formato'
 import { resumirProgreso, severidadMaxima } from '../domain/reglas'
+import { FormularioNombre } from './FormularioNombre'
 import { InsigniaSeveridad } from './Insignias'
 import { TarjetaResultado } from './TarjetaResultado'
 import { useModelos } from './useModelos'
@@ -25,7 +30,12 @@ export function ResultadosPage({ inspeccionId }: { inspeccionId: number }) {
 
 function Resultados({ datos }: { datos: DatosInspeccion }) {
   const { detalle, secciones } = datos
+  const { inspecciones } = useDependencias()
   const [zonaId, setZonaId] = useState('')
+  const [nombre, setNombre] = useState(detalle.nombre)
+  const [renombrando, setRenombrando] = useState(false)
+  const [guardandoNombre, setGuardandoNombre] = useState(false)
+  const [errorNombre, setErrorNombre] = useState<string | null>(null)
   const catalogo = useModelos()
   // A failed catalog only costs the friendly label: photos fall back to the raw model id.
   const modelos = catalogo.tipo === 'listo' ? catalogo.datos : []
@@ -35,6 +45,20 @@ function Resultados({ datos }: { datos: DatosInspeccion }) {
   const progreso = resumirProgreso(detalle.fotos)
   const sinAnalizar = progreso.pendientes + progreso.enProceso
   const maxima = severidadMaxima(analizadas)
+  async function guardarNombre(nuevo: string) {
+    setErrorNombre(null)
+    setGuardandoNombre(true)
+    try {
+      // The server answers with the stored name, which is the generated one when the input was blank.
+      setNombre((await inspecciones.renombrar(detalle.id, nuevo)).nombre)
+      setRenombrando(false)
+    } catch (error) {
+      setErrorNombre(error instanceof ApiError && error.campos?.nombre?.[0] ? error.campos.nombre[0] : mensajeDe(error))
+    } finally {
+      setGuardandoNombre(false)
+    }
+  }
+
   const zonasConResultados = secciones
     .filter((s) => analizadas.some((f) => f.seccion.id === s.id))
     .sort((a, b) => a.orden - b.orden)
@@ -51,8 +75,32 @@ function Resultados({ datos }: { datos: DatosInspeccion }) {
         </Link>
         <div className="min-w-0 flex-1">
           <p className="label-caps text-ink-dim">Resultados del análisis · INS-{String(detalle.id).padStart(4, '0')}</p>
-          <h1 className="truncate text-2xl font-semibold tracking-tight md:text-3xl">{detalle.buqueNombre}</h1>
+          {renombrando ? (
+            <FormularioNombre
+              valorInicial={nombre}
+              guardando={guardandoNombre}
+              error={errorNombre}
+              alGuardar={guardarNombre}
+              alCancelar={() => setRenombrando(false)}
+            />
+          ) : (
+            <>
+              <h1 className="truncate text-2xl font-semibold tracking-tight md:text-3xl">{nombre}</h1>
+              <p className="truncate text-sm text-ink-muted">{detalle.buqueNombre}</p>
+            </>
+          )}
         </div>
+        {!renombrando && (
+          <Boton
+            variante="secundario"
+            onClick={() => {
+              setErrorNombre(null)
+              setRenombrando(true)
+            }}
+          >
+            Renombrar inspección
+          </Boton>
+        )}
       </header>
 
       <section aria-label="Resumen" className="grid grid-cols-2 gap-3 md:grid-cols-4">

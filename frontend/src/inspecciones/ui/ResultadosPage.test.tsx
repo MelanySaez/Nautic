@@ -1,8 +1,9 @@
-import { act, screen, within } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import type { Foto } from '../domain/inspeccion'
-import { crearDependenciasFalsas, renderizarRutas, SECCION_QUILLA, unaFoto, unDetalle, unModelo } from '../../test/dobles'
+import { ApiError } from '../../shared/http/apiClient'
+import { crearDependenciasFalsas, renderizarRutas, SECCION_QUILLA, unaFoto, unaInspeccion, unDetalle, unModelo } from '../../test/dobles'
 import { ResultadosRuta } from './ResultadosPage'
 
 const SECCION_PROA = { id: 1, codigo: 'FWD-BTM', nombre: 'Fondo - Proa', descripcion: '', orden: 1 }
@@ -37,6 +38,37 @@ function renderizar(fotos: Foto[]) {
 }
 
 describe('ResultadosPage', () => {
+  it('renames the inspection and shows the new name as the title', async () => {
+    const { dependencias } = renderizar([CORROIDA])
+    dependencias.inspecciones.renombrar.mockResolvedValue(unaInspeccion({ id: 7, nombre: 'Casco proa' }))
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Renombrar inspección' }))
+    const campo = screen.getByRole('textbox', { name: 'Nombre' })
+    await userEvent.clear(campo)
+    await userEvent.type(campo, 'Casco proa')
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Casco proa' })).toBeInTheDocument()
+    expect(dependencias.inspecciones.renombrar).toHaveBeenCalledWith(7, 'Casco proa')
+    expect(screen.queryByRole('textbox', { name: 'Nombre' })).not.toBeInTheDocument()
+  })
+
+  it('shows the server message next to the name when the rename is rejected', async () => {
+    const { dependencias } = renderizar([CORROIDA])
+    dependencias.inspecciones.renombrar.mockRejectedValue(
+      new ApiError(400, 'Datos inválidos.', { nombre: ['Debe tener 255 caracteres como máximo.'] }),
+    )
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Renombrar inspección' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+
+    await waitFor(() =>
+      expect(screen.getByRole('textbox', { name: 'Nombre' })).toHaveAccessibleDescription(
+        'Debe tener 255 caracteres como máximo.',
+      ),
+    )
+  })
+
   it('shows each analyzed photo with its severity, inference time and detections', async () => {
     renderizar([CORROIDA])
 
