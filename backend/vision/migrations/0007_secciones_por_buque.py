@@ -6,7 +6,8 @@ def copiar_secciones_por_buque(apps, schema_editor):
 
     Global sections are the rows without a vessel. Each photo moves to the copy
     (same ``codigo``) owned by its inspection's vessel; the global rows are then
-    deleted. With no global sections (empty or never-seeded DB) nothing happens.
+    deleted. With no global sections (never-seeded DB) each existing vessel gets
+    the standard set instead, the same default a new vessel gets.
     """
     Buque = apps.get_model('vision', 'Buque')
     Seccion = apps.get_model('vision', 'SeccionCasco')
@@ -14,6 +15,13 @@ def copiar_secciones_por_buque(apps, schema_editor):
 
     globales = list(Seccion.objects.filter(buque__isnull=True).order_by('orden', 'codigo'))
     if not globales:
+        from vision.secciones import SECCIONES_ESTANDAR
+
+        Seccion.objects.bulk_create(
+            Seccion(buque=buque, **datos)
+            for buque in Buque.objects.all()
+            for datos in SECCIONES_ESTANDAR
+        )
         return
 
     for buque in Buque.objects.all():

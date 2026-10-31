@@ -44,3 +44,16 @@ class SeccionesPorBuqueMigracionTests(TransactionTestCase):
         for foto, buque in ((foto_a, a), (foto_b, b)):
             seccion = Foto.objects.get(pk=foto.pk).seccion
             self.assertEqual((seccion.codigo, seccion.buque_id), ('KEEL', buque.id))
+
+    def test_sin_catalogo_global_cada_buque_recibe_las_estandar(self):
+        from vision.secciones import SECCIONES_ESTANDAR
+
+        apps = self._migrar(ANTES)
+        buque = apps.get_model('vision', 'Buque').objects.create(nombre='A', tipo='Fragata')
+
+        apps = self._migrar(DESPUES)
+
+        codigos = apps.get_model('vision', 'SeccionCasco').objects.filter(
+            buque_id=buque.id,
+        ).values_list('codigo', flat=True)
+        self.assertEqual(sorted(codigos), sorted(s['codigo'] for s in SECCIONES_ESTANDAR))
