@@ -59,7 +59,7 @@ Para usar solo el modelo por defecto basta `-p "yolo11s-seg-0.1.0.pt"`. Si solo 
 ```bash
 cd backend
 cp .env.example .env     # completa DB_PASSWORD, SECRET_KEY y NAUTIC_WEIGHTS_DIR
-uv sync                  # instala dependencias (incluye nautic_core v3.0.0 con los 4 modelos)
+uv sync                  # instala dependencias (incluye nautic_core v3.1.0 con los 4 modelos)
 
 createdb NauticDB        # o: psql -U postgres -c 'CREATE DATABASE "NauticDB";'
 uv run python manage.py migrate
