@@ -27,6 +27,9 @@ const fotoDto = {
   severidad: null,
   estado: 'pendiente',
   error_detalle: null,
+  modelo: 'yolo-seg',
+  modelo_version: '1.2.0',
+  taxonomia_version: '2026.1',
   fecha_creacion: '2026-10-01T10:05:00Z',
 }
 
@@ -119,6 +122,9 @@ describe('HttpInspeccionesRepository', () => {
       severidad: null,
       estado: 'pendiente',
       errorDetalle: null,
+      modelo: 'yolo-seg',
+      modeloVersion: '1.2.0',
+      taxonomiaVersion: '2026.1',
       fechaCreacion: '2026-10-01T10:05:00Z',
     })
   })
@@ -139,13 +145,19 @@ describe('HttpInspeccionesRepository', () => {
   it('creates an inspection sending the snake_case payload', async () => {
     fetchMock.mockResolvedValue(respuesta(201, inspeccionDto))
 
-    const creada = await repo.crear({ buqueId: 2, tomadoPor: 'Juan Gómez', descripcion: 'Control anual' })
+    const creada = await repo.crear({
+      buqueId: 2,
+      nombre: 'Control anual 2026',
+      tomadoPor: 'Juan Gómez',
+      descripcion: 'Control anual',
+    })
 
     const { url, init } = ultimaLlamada()
     expect(url).toBe('http://api.test/api/vision/inspecciones/')
     expect(init.method).toBe('POST')
     expect(JSON.parse(String(init.body))).toEqual({
       buque_id: 2,
+      nombre: 'Control anual 2026',
       tomado_por: 'Juan Gómez',
       descripcion: 'Control anual',
     })
@@ -193,6 +205,32 @@ describe('HttpInspeccionesRepository', () => {
       url: 'http://api.test/api/vision/inspecciones/7/analizar/',
       init: { method: 'POST' },
     })
+  })
+
+  it('sends the chosen model when analyzing and only then', async () => {
+    fetchMock.mockImplementation(async () => respuesta(202, { iniciadas: 1, omitidas_por_limite: 0 }))
+
+    await repo.analizar(7, 'rtdetr')
+    expect(JSON.parse(String(ultimaLlamada().init.body))).toEqual({ modelo: 'rtdetr' })
+
+    await repo.analizar(7)
+    expect(ultimaLlamada().init.body).toBeUndefined()
+  })
+
+  it('sends the chosen model when retrying a photo', async () => {
+    fetchMock.mockResolvedValue(respuesta(202, fotoDto))
+
+    await repo.reintentarFoto(11, 'maskrcnn')
+
+    expect(JSON.parse(String(ultimaLlamada().init.body))).toEqual({ modelo: 'maskrcnn' })
+  })
+
+  it('surfaces the field errors of a rejected model', async () => {
+    fetchMock.mockResolvedValue(
+      respuesta(400, { error: 'Datos inválidos.', campos: { modelo: ['Modelo desconocido.'] } }),
+    )
+
+    await expect(repo.analizar(7, 'x')).rejects.toMatchObject({ status: 400, campos: { modelo: ['Modelo desconocido.'] } })
   })
 
   it('retries and deletes a single photo', async () => {

@@ -8,6 +8,7 @@ import type {
   SeccionCasco,
   Severidad,
 } from '../domain/inspeccion'
+import type { ModeloIA } from '../domain/modelo'
 
 // Wire shapes of the Django vision API (snake_case), mapped to the domain at the edge.
 
@@ -35,6 +36,9 @@ export interface FotoDto {
   severidad: Severidad | null
   estado: EstadoFoto
   error_detalle: string | null
+  modelo: string | null
+  modelo_version: string | null
+  taxonomia_version: string | null
   fecha_creacion: string
 }
 
@@ -71,6 +75,26 @@ export interface FotoActualizadaDto {
   tiempo_inferencia_ms: number | null
   imagen_anotada: string | null
   error_detalle: string | null
+  modelo: string | null
+  modelo_version: string | null
+  taxonomia_version: string | null
+}
+
+export interface ModeloDto {
+  id: string
+  label: string
+  descripcion: string
+  arquitectura: string
+  version: string
+  produce_mascaras: boolean
+  confianza_por_defecto: number
+  por_defecto: boolean
+  disponible: boolean
+}
+
+/** Body of `GET /api/vision/modelos/`. */
+export interface ModelosDto {
+  modelos: ModeloDto[]
 }
 
 export function aSeccion(dto: SeccionDto): SeccionCasco {
@@ -98,6 +122,9 @@ export function aFoto(dto: FotoDto): Foto {
     severidad: dto.severidad,
     estado: dto.estado,
     errorDetalle: dto.error_detalle,
+    modelo: dto.modelo,
+    modeloVersion: dto.modelo_version,
+    taxonomiaVersion: dto.taxonomia_version,
     fechaCreacion: dto.fecha_creacion,
   }
 }
@@ -131,5 +158,22 @@ export function aActualizacionFoto(
     tiempoInferenciaMs: dto.tiempo_inferencia_ms,
     imagenAnotada: resolverMedia(dto.imagen_anotada),
     errorDetalle: dto.error_detalle,
+    modelo: dto.modelo,
+    modeloVersion: dto.modelo_version,
+    taxonomiaVersion: dto.taxonomia_version,
+  }
+}
+
+export function aModelo(dto: ModeloDto): ModeloIA {
+  return {
+    id: dto.id,
+    label: dto.label,
+    descripcion: dto.descripcion,
+    arquitectura: dto.arquitectura,
+    version: dto.version,
+    produceMascaras: dto.produce_mascaras,
+    confianzaPorDefecto: dto.confianza_por_defecto,
+    porDefecto: dto.por_defecto,
+    disponible: dto.disponible,
   }
 }

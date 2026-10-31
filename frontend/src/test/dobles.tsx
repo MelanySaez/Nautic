@@ -4,6 +4,7 @@ import { vi } from 'vitest'
 import type { Dependencias } from '../app/composicion'
 import { DependenciasProvider } from '../app/DependenciasProvider'
 import type { Buque, BuqueDetalle, NuevoBuque } from '../buques/domain/buque'
+import type { ModeloIA } from '../inspecciones/domain/modelo'
 import type { EventoInspeccion, Foto, Inspeccion, InspeccionDetalle, SeccionCasco } from '../inspecciones/domain/inspeccion'
 
 export const SECCION_QUILLA: SeccionCasco = { id: 3, codigo: 'KEEL', nombre: 'Quilla', descripcion: '', orden: 9 }
@@ -79,7 +80,25 @@ export function unaFoto(overrides: Partial<Foto> = {}): Foto {
     severidad: null,
     estado: 'pendiente',
     errorDetalle: null,
+    modelo: null,
+    modeloVersion: null,
+    taxonomiaVersion: null,
     fechaCreacion: '2026-10-01T10:05:00Z',
+    ...overrides,
+  }
+}
+
+export function unModelo(overrides: Partial<ModeloIA> = {}): ModeloIA {
+  return {
+    id: 'yolo-seg',
+    label: 'YOLO segmentación',
+    descripcion: 'Detecta y segmenta daños del casco.',
+    arquitectura: 'yolo',
+    version: '1.0.0',
+    produceMascaras: true,
+    confianzaPorDefecto: 0.25,
+    porDefecto: true,
+    disponible: true,
     ...overrides,
   }
 }
@@ -100,9 +119,12 @@ export function crearDependenciasFalsas() {
       eliminar: vi.fn(async () => {}),
       listarSecciones: vi.fn(async (_buqueId: number) => [SECCION_QUILLA]),
       subirFoto: vi.fn(async () => unaFoto()),
-      analizar: vi.fn(async () => ({ iniciadas: 0, omitidasPorLimite: 0 })),
-      reintentarFoto: vi.fn(async () => unaFoto()),
+      analizar: vi.fn(async (_inspeccionId: number, _modeloId?: string) => ({ iniciadas: 0, omitidasPorLimite: 0 })),
+      reintentarFoto: vi.fn(async (_fotoId: number, _modeloId?: string) => unaFoto()),
       eliminarFoto: vi.fn(async () => {}),
+    },
+    modelos: {
+      listar: vi.fn(async () => [unModelo()]),
     },
     eventos: {
       suscribir: vi.fn((_id: number, alRecibir: (evento: EventoInspeccion) => void) => {

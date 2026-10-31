@@ -45,6 +45,8 @@ export class HttpInspeccionesRepository implements InspeccionesRepository {
   async crear(datos: NuevaInspeccion): Promise<Inspeccion> {
     const dto = await this.api.post<InspeccionDto>('/api/vision/inspecciones/', {
       buque_id: datos.buqueId,
+      // Omitted when blank so the backend generates the default name.
+      ...(datos.nombre?.trim() ? { nombre: datos.nombre.trim() } : {}),
       tomado_por: datos.tomadoPor,
       descripcion: datos.descripcion,
     })
@@ -67,15 +69,16 @@ export class HttpInspeccionesRepository implements InspeccionesRepository {
     return aFoto(await this.api.post<FotoDto>(`/api/vision/inspecciones/${inspeccionId}/fotos/`, formulario))
   }
 
-  async analizar(inspeccionId: number): Promise<ResultadoAnalisis> {
+  async analizar(inspeccionId: number, modeloId?: string): Promise<ResultadoAnalisis> {
     const dto = await this.api.post<{ iniciadas: number; omitidas_por_limite: number }>(
       `/api/vision/inspecciones/${inspeccionId}/analizar/`,
+      modeloId ? { modelo: modeloId } : undefined,
     )
     return { iniciadas: dto.iniciadas, omitidasPorLimite: dto.omitidas_por_limite }
   }
 
-  async reintentarFoto(fotoId: number): Promise<Foto> {
-    return aFoto(await this.api.post<FotoDto>(`/api/vision/fotos/${fotoId}/`))
+  async reintentarFoto(fotoId: number, modeloId?: string): Promise<Foto> {
+    return aFoto(await this.api.post<FotoDto>(`/api/vision/fotos/${fotoId}/`, modeloId ? { modelo: modeloId } : undefined))
   }
 
   eliminarFoto(fotoId: number): Promise<void> {
