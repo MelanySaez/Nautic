@@ -51,7 +51,7 @@ Backend: off (source: no project/session configuration); runner
 
 ## Checklist
 - [x] T1 — Model catalog endpoint. Route: delegated direct (writer trigger: 2+ non-trivial files).
-- [ ] T2 — Model selection on analyze + persistence + docs. Route: delegated direct (same trigger).
+- [x] T2 — Model selection on analyze + persistence + docs. Route: delegated direct (same trigger).
 
 ## Acceptance criteria
 - `GET /api/vision/modelos/` lists the 4 catalog models with `id, label, descripcion, produce_mascaras,
@@ -76,6 +76,13 @@ Branch `feat/seleccion-modelo-ia` from `main` (d32f130).
   Checks observed: `manage.py test vision --noinput` 150 tests OK (15 new in `test_modelos.py`);
   `check` no issues; `makemigrations --check --dry-run` no changes; `migrate` nothing to apply.
   Native review: not run (RDD not enabled by the user). Review tier: not assessed here.
+- T2 done: commit c07a24a `feat(vision): choose the AI model when analyzing an inspection`. Route: delegated direct.
+  Checks observed: `manage.py test vision --noinput` 182 tests OK (32 new in `test_seleccion_modelo.py`, 1 existing
+  assertion updated for `model_id=`); `check` no issues; `makemigrations --check --dry-run` no changes;
+  `migrate` applied `0004_foto_modelo_id` on the dev DB. Dev catalog: rtdetr reports `disponible=false`
+  (`transformers` not installed), the other three true.
+  Docs updated: AGENTS.md, VISION_BACKEND.md, backend/vision/INSPECCION_IA.md.
+  Native review: not run (RDD not enabled by the user).
 
 ## Next step
-T2.
+Open the two slices as stacked PRs (user decision); frontend model selector handoff.
