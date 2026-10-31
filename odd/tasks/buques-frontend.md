@@ -396,5 +396,11 @@ Backend evidence: `buques-backend.md` (28 tests OK, `manage.py check` clean).
 - T7 done (commit `feat(frontend): add the vessel technical sheet page`), route: delegated direct (single writer). RED: `BuqueDetallePage.test.tsx` failed to load (module `./BuqueDetallePage` did not exist; no tests ran). GREEN: 3 tests in that file passed (sheet by group with units and dashes, 404 message + back link, non-numeric id); `tsc -b` and lint clean. JSON fields not shown and `imagen` is a placeholder, per the Decisions section.
 - T8 done (commit `feat(frontend): route the vessel screens and add the nav link`), route: delegated direct (single writer). RED: with the test updated first, `AppLayout.test.tsx` failed 2 tests (no link named "Buques"). GREEN: `pnpm vitest run` on ListaBuquesPage, NuevoBuquePage, BuqueDetallePage and AppLayout tests: 4 files, 15 tests passed; `pnpm lint` clean; `pnpm build` clean. Full suite not run (user rule). Manual smoke against the real backend NOT done. AGENTS.md and frontend/README.md updated.
 
+- Review slice 2 (feat/buques-frontend-01-datos..5e0bd4c): medium, slice_budget_reached, granted (user
+  pre-authorized), APPROVED + acknowledged. Applied: a technical group opened by an error collapsed
+  on the first keystroke that cleared it (`GrupoNumerico` now keeps its own open state); RED then
+  GREEN in `NuevoBuquePage.test.tsx` (5 passed), lint and build clean. Open advisories (left by the
+  minimal-tests rule): client-side numeric checks and the detail page loading/retry are untested.
+
 ## Next step
 Slice 2 (T5-T8) implemented; manual smoke against the real backend pending. Slices 1 and 2 ready for push/PR (user decision).

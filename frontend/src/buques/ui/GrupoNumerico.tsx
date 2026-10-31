@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Campo } from '../../shared/ui/Campo'
 import { CLASES_CONTROL } from '../../shared/ui/clasesControl'
 import { etiquetaDeCampo, type GrupoTecnico } from '../domain/fichaTecnica'
@@ -15,9 +16,15 @@ export function GrupoNumerico({
   alCambiar: (clave: string, valor: string) => void
 }) {
   const conError = grupo.campos.some((c) => errores[c.clave])
+  // An error opens the group; clearing it must not collapse it while the user is fixing the value.
+  const [abierto, setAbierto] = useState(conError)
+  if (conError && !abierto) setAbierto(true)
 
   return (
-    <details open={conError} className="group rounded-lg border border-line bg-surface">
+    <details
+      open={abierto}
+      onToggle={(e) => setAbierto(e.currentTarget.open)}
+      className="group rounded-lg border border-line bg-surface">
       <summary className="label-caps flex cursor-pointer items-center justify-between gap-4 px-4 py-3 text-ink-muted">
         {grupo.titulo}
         <span className="text-ink-dim normal-case">Opcional</span>

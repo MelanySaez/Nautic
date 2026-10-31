@@ -75,6 +75,10 @@ describe('NuevoBuquePage', () => {
     expect(screen.getByText('Asegúrese de que este valor tenga como máximo 255 caracteres.')).toBeInTheDocument()
     expect(screen.getByRole('alert')).toHaveTextContent('campo_raro: Campo desconocido o no editable.')
     expect(screen.getByRole('button', { name: 'Crear buque' })).toBeEnabled()
+
+    // Fixing the value clears the error, but the group must stay open.
+    await userEvent.type(screen.getByLabelText('Puntal (m)'), '5')
+    expect(screen.getByLabelText('Puntal (m)').closest('details')).toHaveAttribute('open')
   })
 
   it('shows a generic error in the alert', async () => {
