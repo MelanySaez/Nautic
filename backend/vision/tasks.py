@@ -44,8 +44,18 @@ def _calcular_severidad(detections):
     severidades = severidad_por_clase()
     peor = None
     for det in detections:
-        nivel = NivelSeveridad.desde_texto(severidades.get(det.get("class_name")))
-        if nivel is not None and (peor is None or nivel > peor):
+        texto = severidades.get(det.get("class_name"))
+        if texto is None:
+            continue
+        nivel = NivelSeveridad.desde_texto(texto)
+        if nivel is None:
+            # The taxonomy uses a level NivelSeveridad does not know: never drop it silently.
+            logger.warning(
+                "Severidad desconocida %r para la clase %r; se ignora.",
+                texto, det.get("class_name"),
+            )
+            continue
+        if peor is None or nivel > peor:
             peor = nivel
     return NivelSeveridad.a_texto(peor)
 

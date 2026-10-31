@@ -4,6 +4,7 @@ from unittest import mock
 from django.test import SimpleTestCase
 
 from vision.inference import severidad_por_clase
+from vision.models import NivelSeveridad
 from vision.tasks import _calcular_severidad
 
 
@@ -12,10 +13,13 @@ def _det(class_name):
 
 
 class SeveridadPorClaseTests(SimpleTestCase):
-    def test_matches_the_core_engine_taxonomy(self):
-        from core_engine.vision.domain import severity_map
-
-        self.assertEqual(severidad_por_clase(), severity_map())
+    def test_every_taxonomy_level_is_a_known_nivel(self):
+        # Compatibility contract with nautic_core: a level NivelSeveridad does not
+        # know would be ignored, under-reporting the photo severity.
+        severidades = severidad_por_clase()
+        self.assertTrue(severidades)
+        for clase, texto in severidades.items():
+            self.assertIsNotNone(NivelSeveridad.desde_texto(texto), (clase, texto))
 
     def test_component_classes_have_no_severity(self):
         severidades = severidad_por_clase()
@@ -50,4 +54,6 @@ class CalcularSeveridadTests(SimpleTestCase):
             return_value={"corrosion": "extreme", "defect": "high"},
         ):
             detecciones = [_det("corrosion"), _det("defect")]
-            self.assertEqual(_calcular_severidad(detecciones), "high")
+            with self.assertLogs("vision.tasks", level="WARNING") as logs:
+                self.assertEqual(_calcular_severidad(detecciones), "high")
+        self.assertIn("extreme", logs.output[0])
