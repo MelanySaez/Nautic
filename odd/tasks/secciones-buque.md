@@ -105,5 +105,11 @@ Branch `feat/secciones-buque-01-backend` from `feat/buques-frontend-02-pantallas
   NuevoBuquePage, CargaPorZonaPage -> 53 passed; ResultadosPage (shares the hook) -> 6 passed;
   `pnpm lint` -> clean; `pnpm build` -> OK.
 
+- Review slice 2 (feat/secciones-buque-01-backend..bb8463d): medium, slice_budget_reached, granted
+  (user pre-authorized), APPROVED + acknowledged. Warning "nested per-item server errors" checked and
+  not applicable: `validar_secciones` returns a flat list of messages, which the block renders.
+  Not applied: `?? []` fallback for `secciones` in `aBuqueDetalle` (the DTO declares it required and
+  both slices merge together).
+
 ## Next step
 Push/PR at the user's decision (slice 2 = T3; merge with slice 1 together).
