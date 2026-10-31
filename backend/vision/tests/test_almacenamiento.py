@@ -29,7 +29,9 @@ class AlmacenamientoBase(TestCase):
         self.insp = InspeccionCasco.objects.create(
             buque=Buque.objects.create(nombre='ARC Caribe', tipo='Fragata')
         )
-        self.seccion = SeccionCasco.objects.create(codigo='FWD-BTM', nombre='Fondo - Proa')
+        self.seccion = SeccionCasco.objects.create(
+            buque=self.insp.buque, codigo='FWD-BTM', nombre='Fondo - Proa'
+        )
         # Redis is not needed: SSE publishing is stubbed in the views and the task.
         self.eventos_tarea = self._parchear('vision.tasks.publicar_evento')
         self._parchear('vision.views.publicar_evento')
@@ -70,6 +72,23 @@ class SubirFotoTests(AlmacenamientoBase):
         self.assertTrue(foto.imagen_original.endswith('.png'))
         self.assertNotIn('media/', foto.imagen_original)
         self.assertEqual(default_storage.open(foto.imagen_original).read(), png_bytes())
+
+    def test_rechaza_una_seccion_de_otro_buque(self):
+        otra = SeccionCasco.objects.create(
+            buque=Buque.objects.create(nombre='ARC Otro', tipo='Fragata'),
+            codigo='FWD-BTM', nombre='Fondo - Proa',
+        )
+        archivo = SimpleUploadedFile('casco.png', png_bytes(), content_type='image/png')
+
+        res = self.client.post(
+            _fotos_url(self.insp.id),
+            {'imagen': archivo, 'seccion_id': otra.id},
+            format='multipart',
+        )
+
+        self.assertEqual(res.status_code, 400)
+        self.assertIn('error', res.json())
+        self.assertFalse(FotoInspeccion.objects.exists())
 
     def test_la_respuesta_trae_la_url_del_storage_en_absoluto(self):
         res = self._subir()
@@ -239,7 +258,7 @@ class MigracionPrefijoMediaTests(TestCase):
             'vision.migrations.0003_claves_de_almacenamiento'
         )
         insp = InspeccionCasco.objects.create(buque=Buque.objects.create(nombre='ARC', tipo='Fragata'))
-        self.seccion = SeccionCasco.objects.create(codigo='MID', nombre='Medio')
+        self.seccion = SeccionCasco.objects.create(buque=insp.buque, codigo='MID', nombre='Medio')
         self.insp = insp
 
     def _foto(self, original, anotada=None):

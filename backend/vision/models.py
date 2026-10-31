@@ -84,10 +84,16 @@ class Buque(models.Model):
 
 class SeccionCasco(models.Model):
     """
-    Catálogo genérico de zonas físicas del casco.
-    Aplica a cualquier buque — no depende de ninguna inspección.
+    Zona física del casco de un buque.
+    Cada buque declara las suyas al crearse (ver ``vision/secciones.py``);
+    no dependen de ninguna inspección. ``codigo`` es único dentro del buque.
     """
-    codigo = models.CharField(max_length=20, unique=True)       # ej: "FWD-BTM"
+    buque = models.ForeignKey(
+        Buque,
+        on_delete=models.CASCADE,
+        related_name='secciones'
+    )
+    codigo = models.CharField(max_length=20)                    # ej: "FWD-BTM"
     nombre = models.CharField(max_length=100)                   # ej: "Fondo - Proa"
     descripcion = models.TextField(blank=True, default='')
     orden = models.IntegerField(default=0)                      # para ordenar en la UI
@@ -95,6 +101,9 @@ class SeccionCasco(models.Model):
     class Meta:
         db_table = 'seccion_casco'
         ordering = ['orden', 'codigo']
+        constraints = [
+            models.UniqueConstraint(fields=['buque', 'codigo'], name='seccion_buque_codigo_uniq'),
+        ]
 
     def __str__(self):
         return f"{self.codigo} — {self.nombre}"

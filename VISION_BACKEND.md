@@ -40,11 +40,12 @@ SSE endpoint → browser (EventSource)
 ## Modelos de datos (`vision/models.py`)
 
 ### `SeccionCasco`
-Catálogo estático de zonas físicas del casco. Aplica a todos los buques.
+Zona física del casco de un buque. Cada buque declara las suyas al crearse (las 20 estándar de `SECCIONES_ESTANDAR` o una lista propia); no existe un catálogo global.
 
 | Campo | Tipo | Descripción |
 |---|---|---|
-| `codigo` | CharField(20) unique | Identificador corto: `FWD-BTM`, `MID-SS-P` |
+| `buque` | FK → Buque | Buque dueño de la sección (CASCADE) |
+| `codigo` | CharField(20) | Identificador corto, único por buque (`UniqueConstraint(buque, codigo)`): `FWD-BTM`, `MID-SS-P` |
 | `nombre` | CharField(100) | Nombre legible: `Fondo - Proa` |
 | `descripcion` | TextField | Descripción extendida (opcional) |
 | `orden` | IntegerField | Orden de presentación en la UI |
@@ -113,7 +114,7 @@ Registrados en `vision/urls.py` y montados en la raíz por `backend/config/urls.
 | Método | URL | Vista | Descripción |
 |--------|-----|-------|-------------|
 | POST | `/api/ai/anomalias/` | `api_ai_anomalias` | Inferencia directa sin persistencia (retorna imagen JPEG o JSON con base64). Acepta `confidence`; ya no acepta ni devuelve `iou` |
-| GET | `/api/vision/secciones/` | `api_vision_secciones` | Catálogo completo de secciones del casco |
+| GET | `/api/vision/secciones/?buque=<id>` | `api_vision_secciones` | Secciones del casco de un buque (`buque` requerido: 400 si falta o es inválido, 404 si no existe) |
 | GET | `/api/vision/modelos/` | `api_vision_modelos` | Catálogo de modelos de IA: `{modelos: [{id, label, descripcion, arquitectura, version, produce_mascaras, confianza_por_defecto, por_defecto, disponible}]}`. Ver [Selección de modelo](#selección-de-modelo) |
 | GET | `/api/vision/inspecciones/` | `api_vision_inspecciones` | Busca inspecciones: `{resultados, siguiente, hay_mas}`. Ver [Búsqueda de inspecciones](#búsqueda-de-inspecciones) |
 | POST | `/api/vision/inspecciones/` | `api_vision_inspecciones` | Crear inspección (`buque_id`, `nombre` opcional, `descripcion`, `tomado_por`) |
@@ -518,6 +519,7 @@ backend/
 ├── config/               # Proyecto Django: settings.py, urls.py, celery.py, almacenamiento.py (STORAGES por entorno), wsgi/asgi
 └── vision/
     ├── models.py         # Buque, SeccionCasco, InspeccionCasco, FotoInspeccion
+    ├── secciones.py      # SECCIONES_ESTANDAR + creación/validación de secciones por buque
     ├── views.py          # Endpoints REST + SSE stream
     ├── tasks.py          # procesar_foto (Celery) + dead_letter
     ├── almacenamiento.py # Claves, guardar/leer/borrar y URL de fotos vía default_storage
@@ -527,8 +529,6 @@ backend/
     ├── urls.py           # Routing del módulo
     ├── apps.py           # AppConfig + system check vision.E001
     ├── migrations/       # Migraciones del módulo
-    ├── management/
-    │   └── commands/seed_secciones_casco.py   # Puebla el catálogo de secciones
     └── INSPECCION_IA.md  # Documentación funcional + decisiones de diseño
 ```
 

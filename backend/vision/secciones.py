@@ -1,23 +1,19 @@
 """
-Comando para poblar el catálogo de secciones del casco (SeccionCasco).
+Secciones del casco de cada buque.
 
-Las secciones están organizadas en dos ejes:
+Cada ``Buque`` declara sus propias secciones al crearse: las estándar
+(``SECCIONES_ESTANDAR``) o una lista personalizada. Las estándar se organizan
+en dos ejes:
   - Longitudinal: FWD (proa) | MID (centro) | AFT (popa)
   - Vertical:     BTM (fondo) | BLG (pantoque) | SS-P (costado babor)
                   | SS-S (costado estribor) | DK (borde cubierta)
 
 Más zonas especiales: quilla, línea de flotación, zona hélice, tomas de mar.
-
-Uso:
-    python manage.py seed_secciones_casco
-    python manage.py seed_secciones_casco --reset   (borra y recrea todo)
 """
 
-from django.core.management.base import BaseCommand
-from vision.models import SeccionCasco
+from .models import SeccionCasco
 
-
-SECCIONES = [
+SECCIONES_ESTANDAR = [
     # ── Fondo (BTM) ────────────────────────────────────────────────
     {
         'codigo': 'FWD-BTM',
@@ -182,39 +178,115 @@ SECCIONES = [
 ]
 
 
-class Command(BaseCommand):
-    help = 'Pobla el catálogo de secciones del casco (SeccionCasco).'
+_CODIGO_MAX = SeccionCasco._meta.get_field('codigo').max_length
+_NOMBRE_MAX = SeccionCasco._meta.get_field('nombre').max_length
 
-    def add_arguments(self, parser):
-        parser.add_argument(
-            '--reset',
-            action='store_true',
-            help='Elimina todas las secciones existentes antes de insertar.',
+
+def seccion_to_dict(s):
+    return {
+        'id': s.id,
+        'codigo': s.codigo,
+        'nombre': s.nombre,
+        'descripcion': s.descripcion,
+        'orden': s.orden,
+    }
+
+
+def crear_secciones_estandar(buque):
+    """Create the standard set for ``buque``. Returns the created sections."""
+    return SeccionCasco.objects.bulk_create(
+        SeccionCasco(buque=buque, **datos) for datos in SECCIONES_ESTANDAR
+    )
+
+
+def crear_secciones_personalizadas(buque, secciones):
+    """
+    Create the sections of a validated custom list (see ``validar_secciones``);
+    ``orden`` follows the list position.
+    """
+    return SeccionCasco.objects.bulk_create(
+        SeccionCasco(
+            buque=buque,
+            codigo=s['codigo'],
+            nombre=s['nombre'],
+            descripcion=s['descripcion'],
+            orden=posicion,
         )
+        for posicion, s in enumerate(secciones, start=1)
+    )
 
-    def handle(self, *args, **options):
-        if options['reset']:
-            deleted, _ = SeccionCasco.objects.all().delete()
-            self.stdout.write(self.style.WARNING(f'  {deleted} secciones eliminadas.'))
 
-        creadas = 0
-        actualizadas = 0
+def _texto_opcional(valor, maximo, etiqueta):
+    """Returns (texto_limpio, error). ``None``/missing counts as empty text."""
+    if valor is None:
+        return '', None
+    if not isinstance(valor, str):
+        return None, f'{etiqueta}: debe ser texto.'
+    valor = valor.strip()
+    if maximo is not None and len(valor) > maximo:
+        return None, f'{etiqueta}: máximo {maximo} caracteres.'
+    return valor, None
 
-        for datos in SECCIONES:
-            obj, created = SeccionCasco.objects.update_or_create(
-                codigo=datos['codigo'],
-                defaults={
-                    'nombre': datos['nombre'],
-                    'descripcion': datos['descripcion'],
-                    'orden': datos['orden'],
-                },
-            )
-            if created:
-                creadas += 1
-            else:
-                actualizadas += 1
 
-        self.stdout.write(self.style.SUCCESS(
-            f'\n  Secciones del casco listas: {creadas} creadas, {actualizadas} actualizadas.'
-        ))
-        self.stdout.write(f'  Total en catálogo: {SeccionCasco.objects.count()} secciones.\n')
+def validar_secciones(valor):
+    """
+    Validate the custom sections of a vessel creation payload.
+
+    ``valor`` is a list of ``{nombre, codigo?, descripcion?}``. Returns
+    ``(secciones_limpias, errores)``: ``errores`` is a list of messages (empty
+    when valid) and each clean section has ``nombre``, ``codigo`` (generated as
+    ``SEC-01``... when blank, unique within the list) and ``descripcion``.
+    """
+    if not isinstance(valor, list):
+        return None, ['Debe ser "estandar" o una lista de secciones.']
+    if not valor:
+        return None, ['Debe declarar al menos una sección.']
+
+    errores = []
+    limpias = []
+    for posicion, item in enumerate(valor, start=1):
+        etiqueta = f'Sección {posicion}'
+        if not isinstance(item, dict):
+            errores.append(f'{etiqueta}: debe ser un objeto.')
+            continue
+        desconocidos = set(item) - {'nombre', 'codigo', 'descripcion'}
+        if desconocidos:
+            errores.append(f'{etiqueta}: campos desconocidos ({", ".join(sorted(desconocidos))}).')
+
+        nombre, error = _texto_opcional(item.get('nombre'), _NOMBRE_MAX, f'{etiqueta} nombre')
+        if error:
+            errores.append(error)
+        elif not nombre:
+            errores.append(f'{etiqueta}: el nombre es requerido.')
+        codigo, error = _texto_opcional(item.get('codigo'), _CODIGO_MAX, f'{etiqueta} codigo')
+        if error:
+            errores.append(error)
+        descripcion, error = _texto_opcional(item.get('descripcion'), None, f'{etiqueta} descripcion')
+        if error:
+            errores.append(error)
+        limpias.append({'nombre': nombre, 'codigo': codigo, 'descripcion': descripcion})
+
+    if errores:
+        return None, errores
+
+    # Explicit codes must be unique (case-insensitive); only then fill the blanks.
+    vistos = set()
+    for s in limpias:
+        if not s['codigo']:
+            continue
+        clave = s['codigo'].casefold()
+        if clave in vistos:
+            errores.append(f'Código duplicado: {s["codigo"]}.')
+        vistos.add(clave)
+    if errores:
+        return None, errores
+
+    for posicion, s in enumerate(limpias, start=1):
+        if s['codigo']:
+            continue
+        numero = posicion
+        while f'SEC-{numero:02d}'.casefold() in vistos:
+            numero += 1
+        s['codigo'] = f'SEC-{numero:02d}'
+        vistos.add(s['codigo'].casefold())
+    return limpias, []

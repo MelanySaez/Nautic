@@ -15,7 +15,7 @@ Intended product (roadmap, **not implemented yet**): three sections.
 
 | Section | Purpose | Status |
 |---|---|---|
-| **Buques** | Vessel entity with a technical sheet | Model + endpoints (create / list / detail) in `vision/views_buques.py`; no update/delete |
+| **Buques** | Vessel entity with a technical sheet and its own hull sections | Model + endpoints (create / list / detail) in `vision/views_buques.py`; no update/delete |
 | **Inspecciones** | Inspection sessions per vessel | Model + endpoints exist (`InspeccionCasco`) |
 | **Visión IA** | YOLO hull analysis; every analysis belongs to a concrete inspection | Implemented (photos → Celery → SSE) |
 
@@ -39,10 +39,9 @@ All endpoints live under `/api/`. The `vision` module needs infrastructure beyon
 │   │   ├── wsgi.py, asgi.py
 │   │   └── spectacular_hooks.py
 │   └── vision/                  # the only Django app
-│       ├── models.py, views.py, views_buques.py, busqueda.py, urls.py, tasks.py
+│       ├── models.py, views.py, views_buques.py, busqueda.py, secciones.py, urls.py, tasks.py
 │       ├── almacenamiento.py
 │       ├── inference.py, pubsub.py, ratelimit.py
-│       ├── management/commands/seed_secciones_casco.py
 │       └── INSPECCION_IA.md
 └── frontend/                    # React + TypeScript SPA (pnpm)
     ├── package.json, vite.config.ts
@@ -68,7 +67,6 @@ uv sync                                    # install dependencies from uv.lock
 uv add <package>                           # add a dependency (updates pyproject.toml + uv.lock)
 
 uv run python manage.py migrate
-uv run python manage.py seed_secciones_casco   # seed the hull-section catalog
 uv run python manage.py runserver              # dev server on :8000
 uv run python manage.py check                  # system checks (includes vision.E001)
 ```
@@ -118,7 +116,7 @@ Inspection photos (originals and annotated) live behind Django's storage API, se
 
 ## Test Commands
 
-Backend tests live in `backend/vision/tests/` (`test_buques_api.py` for the Buques API, `test_inspecciones_api.py` and `test_busqueda_inspecciones.py` for inspection name/severity and search, `test_modelos.py` and `test_seleccion_modelo.py` for the model catalog and model selection). The vision pipeline itself has no tests yet.
+Backend tests live in `backend/vision/tests/` (`test_buques_api.py` for the Buques API, `test_inspecciones_api.py` and `test_busqueda_inspecciones.py` for inspection name/severity and search, `test_modelos.py` and `test_seleccion_modelo.py` for the model catalog and model selection, `test_secciones_migracion.py` for the sections-per-vessel data migration). The vision pipeline itself has no tests yet.
 
 ```bash
 cd backend
@@ -204,6 +202,14 @@ pnpm add <pkg>     # add a dependency (pnpm add -D <pkg> for dev)
 - `InspeccionCasco.nombre` is optional on create; when blank the backend stores `Inspección #<id> — <buque>`. `PATCH /api/vision/inspecciones/<id>/` edits `nombre` and `descripcion` only.
 - Migration `0002` runs `CREATE EXTENSION pg_trgm`: the PostgreSQL `contrib` package must be installed (Fedora: `postgresql-contrib`) and the DB user must be allowed to create extensions.
 
+### Hull sections (`vision/secciones.py`)
+
+- Sections belong to a vessel: `SeccionCasco.buque` (FK, cascade) and `codigo` is unique **per vessel** (`UniqueConstraint(buque, codigo)`). There is no global catalog and no seed command.
+- `POST /api/buques/` takes an optional `secciones`: absent or `"estandar"` creates the 20 sections of `SECCIONES_ESTANDAR`; a non-empty list of `{nombre, codigo?, descripcion?}` creates exactly those, in order (`orden` = position; a blank `codigo` becomes `SEC-01`, `SEC-02`, ...). Invalid lists return 400 `{"error": "Datos inválidos.", "campos": {"secciones": [...]}}` and nothing is created (vessel and sections are saved in one transaction).
+- The vessel sheet (`GET /api/buques/<id>/` and the 201 response) returns `secciones: [{id, codigo, nombre, descripcion, orden}]`. `GET /api/vision/secciones/?buque=<id>` lists them (`buque` required: 400 when missing or invalid, 404 when the vessel does not exist).
+- `POST /api/vision/inspecciones/<id>/fotos/` rejects (400) a `seccion_id` that belongs to another vessel than the inspection's.
+- Sections cannot be edited after creation (no vessel update endpoint yet).
+
 ### Vision module (async pipeline)
 
 - Django views only enqueue: `procesar_foto.apply_async()` → RabbitMQ queue `vision`. Never run inference inline in a view (the direct endpoint `/api/ai/anomalias/` is the one documented exception: no persistence, no queue).
@@ -227,6 +233,7 @@ pnpm add <pkg>     # add a dependency (pnpm add -D <pkg> for dev)
 | `backend/vision/models.py` | `Buque`, `SeccionCasco`, `InspeccionCasco`, `FotoInspeccion`, `NivelSeveridad` + `severidad_max` helpers |
 | `backend/vision/views.py` | Vision REST endpoints + SSE stream |
 | `backend/vision/busqueda.py` | Inspection search: declarative filter registry (`FILTROS`) + cursor pagination (`buscar_inspecciones`) |
+| `backend/vision/secciones.py` | `SECCIONES_ESTANDAR` + per-vessel section creation and validation |
 | `backend/vision/views_buques.py` | Buques REST endpoints (`/api/buques/`): list, create, detail |
 | `backend/vision/urls.py` | URL routing for the vision app |
 | `backend/vision/tasks.py` | Celery task `procesar_foto` + dead-letter task |

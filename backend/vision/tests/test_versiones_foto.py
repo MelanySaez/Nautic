@@ -17,7 +17,9 @@ class VersionesPorFotoTests(TestCase):
         self.insp = InspeccionCasco.objects.create(
             buque=Buque.objects.create(nombre='ARC Caribe', tipo='Fragata')
         )
-        seccion = SeccionCasco.objects.create(codigo='FWD-BTM', nombre='Fondo - Proa')
+        seccion = SeccionCasco.objects.create(
+            buque=self.insp.buque, codigo='FWD-BTM', nombre='Fondo - Proa'
+        )
         clave = default_storage.save('inspecciones/originales/foto.png', ContentFile(png_bytes()))
         self.foto = FotoInspeccion.objects.create(
             inspeccion=self.insp, seccion=seccion, imagen_original=clave,

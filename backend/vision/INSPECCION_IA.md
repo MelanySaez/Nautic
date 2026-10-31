@@ -51,7 +51,7 @@ backend/vision/inference.py  ← run_inference() sobre core_engine.vision + vali
 backend/vision/pubsub.py     ← cliente Redis pub/sub para eventos SSE
 backend/vision/ratelimit.py  ← rate limiting por IP (uploads + concurrencia)
 backend/vision/urls.py       ← registro de rutas
-backend/vision/management/commands/seed_secciones_casco.py  ← comando para poblar el catálogo
+backend/vision/secciones.py  ← SECCIONES_ESTANDAR + creación/validación de las secciones de cada buque
 
 backend/config/celery.py     ← app Celery del proyecto
 backend/config/settings.py   ← config CELERY_*, REDIS_URL, SSE_*, VISION_*
@@ -79,17 +79,18 @@ Django view (stream)  → SUBSCRIBE Redis → StreamingHttpResponse (SSE) → br
 ## 3. Modelos de base de datos
 
 ### `SeccionCasco`
-Catálogo estático de zonas físicas del casco. Es genérico (no depende de ningún buque ni inspección). Se puebla con el comando `uv run python manage.py seed_secciones_casco` (desde `backend/`).
+Zona física del casco de un buque. Cada buque declara las suyas al crearse con `POST /api/buques/`: `secciones` omitido o `"estandar"` crea las 20 de `SECCIONES_ESTANDAR`; una lista `[{nombre, codigo?, descripcion?}]` crea exactamente esas, en ese orden. No depende de ninguna inspección.
 
 ```python
 class SeccionCasco(models.Model):
-    codigo      = models.CharField(max_length=20, unique=True)  # ej: "FWD-BTM"
+    buque       = models.ForeignKey(Buque, on_delete=models.CASCADE, related_name='secciones')
+    codigo      = models.CharField(max_length=20)               # ej: "FWD-BTM"; único por buque
     nombre      = models.CharField(max_length=100)              # ej: "Fondo - Proa"
     descripcion = models.TextField(blank=True)
     orden       = models.IntegerField(default=0)
 ```
 
-**Decisión:** Separar el catálogo de secciones como entidad independiente permite reutilizarlo en cualquier inspección sin duplicar datos. El campo `orden` permite controlar el orden de presentación en la interfaz sin depender del orden de inserción.
+**Decisión:** las secciones son del buque (no un catálogo global) porque los cascos difieren; `UniqueConstraint(buque, codigo)` hace único el código dentro de cada buque, y cualquier inspección del buque las reutiliza. Subir una foto exige que la sección pertenezca al buque de la inspección (400 si no). El campo `orden` permite controlar el orden de presentación en la interfaz sin depender del orden de inserción.
 
 ---
 
@@ -171,7 +172,7 @@ Cada entrada incluye:
 
 **Otras decisiones:**
 - `imagen_original` y `imagen_anotada` son `CharField`, no `ImageField`. Esto es consistente con `Buque.imagen` (que también guarda una ruta como texto) y permite mayor control manual sobre las rutas de almacenamiento.
-- La FK a `SeccionCasco` usa `on_delete=PROTECT` (no CASCADE): si una sección tiene fotos asociadas no se puede eliminar accidentalmente del catálogo.
+- La FK a `SeccionCasco` usa `on_delete=PROTECT` (no CASCADE): si una sección tiene fotos asociadas no se puede eliminar accidentalmente.
 - Los índices `(inspeccion, estado)` y `(seccion)` optimizan el filtrado de fotos pendientes (endpoint `/analizar/`) y la agrupación por sección de la vista de resultados.
 
 ---
@@ -182,7 +183,7 @@ Todos registrados en `vision/urls.py` (montado en la raíz por `backend/config/u
 
 | Método | URL | Descripción |
 |---|---|---|
-| `GET` | `/api/vision/secciones/` | Catálogo completo de secciones del casco |
+| `GET` | `/api/vision/secciones/?buque=<id>` | Secciones del casco de un buque (`buque` requerido) |
 | `GET` | `/api/vision/modelos/` | Catálogo de modelos de IA con `por_defecto` y `disponible` |
 | `GET` | `/api/vision/inspecciones/` | Busca inspecciones (`buque`, `desde`, `hasta`, `severidad_min`, `q`, `limit`, `cursor`) → `{resultados, siguiente, hay_mas}` |
 | `POST` | `/api/vision/inspecciones/` | Crear nueva inspección (`nombre` opcional) |
@@ -523,7 +524,7 @@ Se usa azul (no verde) para "Bajo" porque verde implicaría que no hay problema,
 ```
 1. Crear (o elegir) un Buque                     ← hoy: shell/DB; sin endpoint
 2. POST /api/vision/inspecciones/                ← buque_id, nombre (opcional), descripcion, tomado_por → InspeccionCasco
-3. GET  /api/vision/secciones/                   ← catálogo de secciones del casco
+3. GET  /api/vision/secciones/?buque=<id>        ← secciones del casco del buque
    GET  /api/vision/modelos/                     ← catálogo de modelos de IA (para elegir uno antes de analizar)
 4. POST /api/vision/inspecciones/<id>/fotos/     ← multipart (imagen, seccion_id) → 202, foto en estado=pendiente
    └── Se publica foto-created en Redis
