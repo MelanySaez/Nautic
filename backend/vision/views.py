@@ -19,7 +19,7 @@ from drf_spectacular.types import OpenApiTypes
 
 from .almacenamiento import borrar_archivo, guardar_original, url_archivo
 from .busqueda import BusquedaInvalida, LIMIT_MAXIMO, LIMIT_POR_DEFECTO, buscar_inspecciones
-from .inference import DEFAULT_CONFIDENCE, run_inference
+from .inference import DEFAULT_CONFIDENCE, listar_modelos, run_inference
 from .models import (
     Buque, SeccionCasco, InspeccionCasco, FotoInspeccion, NivelSeveridad,
     nombre_por_defecto, recalcular_severidad_max,
@@ -351,6 +351,51 @@ def api_vision_secciones(request):
     """
     secciones = SeccionCasco.objects.all()
     return Response([_seccion_to_dict(s) for s in secciones])
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Endpoints — Modelos de IA
+# ─────────────────────────────────────────────────────────────────────────────
+
+@extend_schema(
+    tags=['Inspección IA'],
+    summary='Listar modelos de IA',
+    description=(
+        'Catálogo de modelos de visión que se pueden elegir al analizar una inspección '
+        '(`modelo` en `POST /api/vision/inspecciones/<id>/analizar/`). `por_defecto` marca el '
+        'que se usa si no se elige ninguno; `disponible=false` indica que faltan los pesos o '
+        'las dependencias del modelo en el servidor y que elegirlo da 400.'
+    ),
+    responses={200: OpenApiTypes.OBJECT},
+    examples=[
+        OpenApiExample(
+            name='Respuesta',
+            response_only=True,
+            value={
+                'modelos': [
+                    {
+                        'id': 'yolo-seg',
+                        'label': 'YOLO segmentation',
+                        'descripcion': 'General-purpose detector with instance masks.',
+                        'arquitectura': 'yolo11s-seg',
+                        'version': '0.1.0',
+                        'produce_mascaras': True,
+                        'confianza_por_defecto': 0.15,
+                        'por_defecto': True,
+                        'disponible': True,
+                    }
+                ]
+            },
+        )
+    ],
+)
+@api_view(['GET'])
+def api_vision_modelos(request):
+    """
+    GET /api/vision/modelos/
+    Lista los modelos de IA del catálogo con su disponibilidad en este servidor.
+    """
+    return Response({'modelos': listar_modelos()})
 
 
 # ─────────────────────────────────────────────────────────────────────────────

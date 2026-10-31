@@ -13,6 +13,7 @@ Los pesos se resuelven con ``$NAUTIC_WEIGHTS_DIR/<archivo>`` (ver
 ``backend/.env.example``). Si no existen, ``FileNotFoundError`` lista las
 rutas probadas.
 """
+import importlib.util
 import logging
 import os
 from typing import Any, Dict, List, Optional, Tuple
@@ -30,6 +31,102 @@ DEFAULT_CONFIDENCE = 0.25
 def _modelo_id() -> str:
     """Id del modelo de ``core_engine`` a usar (``VISION_MODEL_ID``)."""
     return settings.VISION_MODEL_ID
+
+
+def modelo_por_defecto() -> str:
+    """Id del modelo que se usa cuando la petición no elige uno."""
+    return _modelo_id()
+
+
+def _requisitos_modelos() -> Dict[str, Tuple[str, Tuple[str, ...]]]:
+    """Requisitos de ejecución por modelo: ``(pesos, módulos Python)``.
+
+    Los nombres de pesos son las constantes ``WEIGHTS_NAME`` de los adaptadores
+    de ``core_engine`` (importarlos no carga torch ni ultralytics). Los módulos
+    son los que el adaptador importa al construir el detector. ``yolo-tiled``
+    reutiliza los pesos de ``yolo-seg``. Un modelo que no figura aquí (catálogo
+    más nuevo que este mapa) no se puede verificar y se trata como disponible.
+    """
+    from core_engine.vision.adapters import maskrcnn, rtdetr, yolo_seg
+
+    return {
+        "yolo-seg": (yolo_seg.WEIGHTS_NAME, ("ultralytics",)),
+        "yolo-tiled": (yolo_seg.WEIGHTS_NAME, ("ultralytics",)),
+        "maskrcnn": (maskrcnn.WEIGHTS_NAME, ("torch", "torchvision")),
+        "rtdetr": (rtdetr.WEIGHTS_NAME, ("torch", "transformers")),
+    }
+
+
+def motivo_no_disponible(model_id: str) -> Optional[str]:
+    """Por qué un modelo no puede ejecutarse en este servidor.
+
+    No importa torch ni ultralytics: sólo comprueba que los pesos se resuelvan
+    con el resolvedor de ``core_engine`` y que los módulos requeridos sean
+    importables (``find_spec``).
+
+    Returns:
+        ``None`` si el modelo está disponible; si no, un mensaje corto en
+        español, apto para el cliente (sin rutas del servidor; el detalle va
+        al log).
+    """
+    from core_engine.vision.weights import resolve_weights
+
+    requisitos = _requisitos_modelos().get(model_id)
+    if requisitos is None:
+        return None
+    pesos, modulos = requisitos
+
+    try:
+        resolve_weights(pesos)
+    except FileNotFoundError:
+        logger.debug("Pesos del modelo '%s' no encontrados (%s)", model_id, pesos)
+        return "Faltan los pesos del modelo en el servidor."
+
+    faltantes = [m for m in modulos if importlib.util.find_spec(m) is None]
+    if faltantes:
+        logger.debug(
+            "Dependencias del modelo '%s' no instaladas: %s",
+            model_id, ", ".join(faltantes),
+        )
+        return "Faltan dependencias del modelo en el servidor."
+    return None
+
+
+def modelo_disponible(model_id: str) -> bool:
+    """``True`` si el modelo tiene pesos y dependencias en este servidor."""
+    return motivo_no_disponible(model_id) is None
+
+
+def ids_modelos() -> List[str]:
+    """Ids del catálogo de ``core_engine``, en el orden del catálogo."""
+    from core_engine.vision import available_models
+
+    return [m.id for m in available_models()]
+
+
+def listar_modelos() -> List[Dict[str, Any]]:
+    """Catálogo de modelos para el cliente, en el orden de ``core_engine``.
+
+    Cada elemento lleva la descripción del modelo, ``por_defecto`` (es el de
+    ``VISION_MODEL_ID``) y ``disponible`` (pesos y dependencias presentes).
+    """
+    from core_engine.vision import available_models
+
+    por_defecto = modelo_por_defecto()
+    return [
+        {
+            "id": m.id,
+            "label": m.label,
+            "descripcion": m.description,
+            "arquitectura": m.architecture,
+            "version": m.version,
+            "produce_mascaras": m.produces_masks,
+            "confianza_por_defecto": m.default_confidence,
+            "por_defecto": m.id == por_defecto,
+            "disponible": modelo_disponible(m.id),
+        }
+        for m in available_models()
+    ]
 
 
 def verificar_configuracion() -> List[str]:
