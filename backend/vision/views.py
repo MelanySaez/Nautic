@@ -7,6 +7,7 @@ import uuid
 
 from PIL import Image
 from django.conf import settings
+from django.db import transaction
 from django.http import HttpResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
@@ -17,8 +18,12 @@ from rest_framework.response import Response
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample
 from drf_spectacular.types import OpenApiTypes
 
+from .busqueda import BusquedaInvalida, LIMIT_MAXIMO, LIMIT_POR_DEFECTO, buscar_inspecciones
 from .inference import DEFAULT_CONFIDENCE, run_inference
-from .models import Buque, SeccionCasco, InspeccionCasco, FotoInspeccion
+from .models import (
+    Buque, SeccionCasco, InspeccionCasco, FotoInspeccion, NivelSeveridad,
+    nombre_por_defecto, recalcular_severidad_max,
+)
 from .pubsub import publicar_evento, suscribirse
 from .ratelimit import check_upload_rate, get_client_ip, track_concurrent_start
 from .tasks import procesar_foto
@@ -275,16 +280,59 @@ def _inspeccion_to_dict(insp, include_fotos=False, request=None):
         'id': insp.id,
         'buque_id': insp.buque_id,
         'buque_nombre': insp.buque.nombre,
+        'nombre': insp.nombre,
+        'severidad_max': NivelSeveridad.a_texto(insp.severidad_max),
         'descripcion': insp.descripcion,
         'tomado_por': insp.tomado_por,
         'fecha_creacion': insp.fecha_creacion.isoformat(),
         'fecha_modificacion': insp.fecha_modificacion.isoformat(),
-        'total_fotos': insp.fotos.count(),
+        # `n_fotos` lo anota la búsqueda para evitar una consulta por inspección.
+        'total_fotos': insp.n_fotos if hasattr(insp, 'n_fotos') else insp.fotos.count(),
     }
     if include_fotos:
         fotos_qs = insp.fotos.select_related('seccion').order_by('fecha_creacion')
         d['fotos'] = [_foto_to_dict(f, request) for f in fotos_qs]
     return d
+
+
+_NOMBRE_MAX = InspeccionCasco._meta.get_field('nombre').max_length
+_CAMPOS_EDITABLES_INSPECCION = ('nombre', 'descripcion')
+
+
+def _validar_nombre(valor):
+    """Returns (nombre_limpio, mensaje_error|None). Blank is valid (means "generate")."""
+    if not isinstance(valor, str):
+        return None, 'Debe ser texto.'
+    valor = valor.strip()
+    if '\x00' in valor:
+        return None, 'Contiene caracteres no permitidos.'
+    if len(valor) > _NOMBRE_MAX:
+        return None, f'No puede superar {_NOMBRE_MAX} caracteres.'
+    return valor, None
+
+
+def _validar_edicion_inspeccion(data):
+    """
+    Validate a PATCH payload. Returns (limpios, errores) where errores maps
+    field -> [messages].
+    """
+    errores = {}
+    limpios = {}
+    for clave in data:
+        if clave not in _CAMPOS_EDITABLES_INSPECCION:
+            errores[clave] = ['Campo desconocido o no editable.']
+    if 'nombre' in data:
+        nombre, error = _validar_nombre(data['nombre'])
+        if error:
+            errores['nombre'] = [error]
+        else:
+            limpios['nombre'] = nombre
+    if 'descripcion' in data:
+        if isinstance(data['descripcion'], str):
+            limpios['descripcion'] = data['descripcion']
+        else:
+            errores['descripcion'] = ['Debe ser texto.']
+    return limpios, errores
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -323,12 +371,33 @@ def api_vision_secciones(request):
     methods=['GET'],
     tags=['Inspección IA'],
     summary='Listar inspecciones de casco',
-    description='Lista inspecciones ordenadas por fecha. Acepta ?buque_id= para filtrar.',
+    description=(
+        'Busca inspecciones, de la más reciente a la más antigua (`-fecha_creacion, -id`). '
+        'Los filtros se combinan con AND. Paginación por cursor: la respuesta trae '
+        '`resultados`, `siguiente` (cursor opaco para la página siguiente, o null) y `hay_mas`; '
+        'no incluye total. Los parámetros desconocidos se ignoran. Un parámetro inválido '
+        'devuelve 400 con `{"error": "Datos inválidos.", "campos": {...}}`.'
+    ),
     parameters=[
-        OpenApiParameter('buque_id', int, OpenApiParameter.QUERY,
-                         description='Filtrar por ID de buque', required=False),
+        OpenApiParameter('buque', int, OpenApiParameter.QUERY, required=False,
+                         description='ID del buque (alias: `buque_id`)'),
+        OpenApiParameter('buque_id', int, OpenApiParameter.QUERY, required=False,
+                         description='Alias de `buque`'),
+        OpenApiParameter('desde', str, OpenApiParameter.QUERY, required=False,
+                         description='Creadas desde este día, inclusive (AAAA-MM-DD)'),
+        OpenApiParameter('hasta', str, OpenApiParameter.QUERY, required=False,
+                         description='Creadas hasta este día, inclusive (AAAA-MM-DD)'),
+        OpenApiParameter('severidad_min', str, OpenApiParameter.QUERY, required=False,
+                         enum=['low', 'medium', 'high', 'critical'],
+                         description='Severidad máxima mínima'),
+        OpenApiParameter('q', str, OpenApiParameter.QUERY, required=False,
+                         description='Texto contenido en el nombre (2-100 caracteres)'),
+        OpenApiParameter('limit', int, OpenApiParameter.QUERY, required=False,
+                         description=f'Resultados por página (1-{LIMIT_MAXIMO}, por defecto {LIMIT_POR_DEFECTO})'),
+        OpenApiParameter('cursor', str, OpenApiParameter.QUERY, required=False,
+                         description='Valor `siguiente` de la página anterior'),
     ],
-    responses={200: OpenApiTypes.OBJECT},
+    responses={200: OpenApiTypes.OBJECT, 400: OpenApiTypes.OBJECT},
 )
 @extend_schema(
     methods=['POST'],
@@ -341,6 +410,10 @@ def api_vision_secciones(request):
             'required': ['buque_id'],
             'properties': {
                 'buque_id': {'type': 'integer', 'description': 'ID del buque'},
+                'nombre': {
+                    'type': 'string', 'maxLength': 255,
+                    'description': 'Nombre de la inspección (opcional; si falta se genera "Inspección #<id> — <buque>")',
+                },
                 'descripcion': {'type': 'string', 'description': 'Descripción de la inspección (opcional)'},
                 'tomado_por': {'type': 'string', 'description': 'Nombre del inspector (opcional)'},
             },
@@ -351,27 +424,45 @@ def api_vision_secciones(request):
 @api_view(['GET', 'POST'])
 def api_vision_inspecciones(request):
     """
-    GET  /api/vision/inspecciones/          → lista inspecciones (filtra por ?buque_id=)
+    GET  /api/vision/inspecciones/          → búsqueda paginada por cursor (ver vision/busqueda.py)
     POST /api/vision/inspecciones/          → crea una nueva inspección
     """
     if request.method == 'GET':
-        qs = InspeccionCasco.objects.select_related('buque').order_by('-fecha_creacion')
-        buque_id = request.query_params.get('buque_id')
-        if buque_id:
-            qs = qs.filter(buque_id=buque_id)
-        return Response([_inspeccion_to_dict(i, request=request) for i in qs])
+        try:
+            pagina, siguiente, hay_mas = buscar_inspecciones(request.query_params)
+        except BusquedaInvalida as exc:
+            return Response({'error': 'Datos inválidos.', 'campos': exc.errores}, status=400)
+        return Response({
+            'resultados': [_inspeccion_to_dict(i, request=request) for i in pagina],
+            'siguiente': siguiente,
+            'hay_mas': hay_mas,
+        })
 
     # POST: crear inspección
     buque_id = request.data.get('buque_id')
     if not buque_id:
         return Response({'error': 'El campo buque_id es requerido.'}, status=400)
 
+    nombre = ''
+    if request.data.get('nombre') is not None:
+        nombre, error = _validar_nombre(request.data['nombre'])
+        if error:
+            return Response(
+                {'error': 'Datos inválidos.', 'campos': {'nombre': [error]}}, status=400,
+            )
+
     buque = get_object_or_404(Buque, pk=buque_id)
-    insp = InspeccionCasco.objects.create(
-        buque=buque,
-        descripcion=request.data.get('descripcion', ''),
-        tomado_por=request.data.get('tomado_por', ''),
-    )
+    # El nombre generado necesita el id: se crea y se actualiza en la misma transacción.
+    with transaction.atomic():
+        insp = InspeccionCasco.objects.create(
+            buque=buque,
+            nombre=nombre,
+            descripcion=request.data.get('descripcion', ''),
+            tomado_por=request.data.get('tomado_por', ''),
+        )
+        if not insp.nombre:
+            insp.nombre = nombre_por_defecto(insp)
+            insp.save(update_fields=['nombre'])
     return Response(_inspeccion_to_dict(insp, request=request), status=201)
 
 
@@ -380,10 +471,31 @@ def api_vision_inspecciones(request):
     summary='Detalle de una inspección',
     description='Devuelve la inspección con todas sus fotos, secciones y detecciones del modelo YOLO.',
 )
-@api_view(['GET', 'DELETE'])
+@extend_schema(
+    methods=['PATCH'],
+    tags=['Inspección IA'],
+    summary='Editar una inspección',
+    description=(
+        'Edita `nombre` y/o `descripcion`. Un `nombre` vacío regenera el nombre por defecto '
+        '"Inspección #<id> — <buque>". Los demás campos se rechazan con 400.'
+    ),
+    request={
+        'application/json': {
+            'type': 'object',
+            'properties': {
+                'nombre': {'type': 'string', 'maxLength': 255},
+                'descripcion': {'type': 'string'},
+            },
+            'additionalProperties': False,
+        }
+    },
+    responses={200: OpenApiTypes.OBJECT, 400: OpenApiTypes.OBJECT, 404: OpenApiTypes.OBJECT},
+)
+@api_view(['GET', 'PATCH', 'DELETE'])
 def api_vision_inspeccion_detalle(request, inspeccion_id):
     """
     GET    /api/vision/inspecciones/<id>/  → detalle con fotos
+    PATCH  /api/vision/inspecciones/<id>/  → edita nombre y/o descripcion
     DELETE /api/vision/inspecciones/<id>/  → elimina la inspección y todos sus archivos físicos
     """
     insp = get_object_or_404(
@@ -400,6 +512,21 @@ def api_vision_inspeccion_detalle(request, inspeccion_id):
                         os.remove(full_path)
         insp.delete()
         return Response(status=204)
+
+    if request.method == 'PATCH':
+        data = request.data
+        if not hasattr(data, 'keys'):
+            return Response({'error': 'Se esperaba un objeto JSON.'}, status=400)
+        limpios, errores = _validar_edicion_inspeccion(data)
+        if errores:
+            return Response({'error': 'Datos inválidos.', 'campos': errores}, status=400)
+        if 'nombre' in limpios:
+            insp.nombre = limpios['nombre'] or nombre_por_defecto(insp)
+        if 'descripcion' in limpios:
+            insp.descripcion = limpios['descripcion']
+        if limpios:
+            insp.save(update_fields=[*limpios.keys(), 'fecha_modificacion'])
+        return Response(_inspeccion_to_dict(insp, include_fotos=True, request=request))
 
     return Response(_inspeccion_to_dict(insp, include_fotos=True, request=request))
 
@@ -531,6 +658,7 @@ def api_vision_foto_detalle(request, foto_id):
                 if os.path.exists(full_path):
                     os.remove(full_path)
         foto.delete()
+        recalcular_severidad_max(inspeccion_id)
         publicar_evento(
             inspeccion_id,
             event='foto-deleted',

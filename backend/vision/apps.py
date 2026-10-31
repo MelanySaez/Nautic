@@ -17,3 +17,7 @@ class VisionConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     name = "vision"
     verbose_name = "Vision Artificial"
+
+    def ready(self):
+        # Registers the CharField `contiene_ilike` lookup used by the search.
+        from . import busqueda  # noqa: F401

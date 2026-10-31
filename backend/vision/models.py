@@ -1,4 +1,36 @@
-from django.db import models
+from django.contrib.postgres.indexes import GinIndex
+from django.db import models, transaction
+from django.db.models import Q
+
+
+class NivelSeveridad(models.IntegerChoices):
+    """
+    Severidad ordenada numéricamente para poder filtrar y ordenar en SQL.
+    Las etiquetas coinciden con los valores de texto de
+    ``FotoInspeccion.severidad`` (ver ``tasks._calcular_severidad``).
+    """
+    LOW = 1, 'low'
+    MEDIUM = 2, 'medium'
+    HIGH = 3, 'high'
+    CRITICAL = 4, 'critical'
+
+    @classmethod
+    def desde_texto(cls, texto):
+        """'high' -> 3. Devuelve None si el texto no es un nivel conocido."""
+        for nivel in cls:
+            if nivel.label == texto:
+                return nivel.value
+        return None
+
+    @classmethod
+    def a_texto(cls, valor):
+        """3 -> 'high'. Devuelve None para None o valores desconocidos."""
+        if valor is None:
+            return None
+        try:
+            return cls(valor).label
+        except ValueError:
+            return None
 
 
 class Buque(models.Model):
@@ -78,6 +110,12 @@ class InspeccionCasco(models.Model):
         on_delete=models.CASCADE,
         related_name='inspecciones_casco'
     )
+    # Si queda vacío al crear, la vista genera "Inspección #<id> — <buque>".
+    nombre = models.CharField(max_length=255, blank=True, default='')
+    # Peor severidad entre las fotos completadas (desnormalizada para filtrar).
+    severidad_max = models.PositiveSmallIntegerField(
+        null=True, blank=True, choices=NivelSeveridad.choices,
+    )
     descripcion = models.TextField(blank=True, default='')
     tomado_por = models.CharField(max_length=255, blank=True, default='')
     fecha_creacion = models.DateTimeField(auto_now_add=True)
@@ -86,9 +124,63 @@ class InspeccionCasco(models.Model):
     class Meta:
         db_table = 'inspeccion_casco'
         ordering = ['-fecha_creacion']
+        indexes = [
+            models.Index(fields=['buque', '-fecha_creacion', '-id'], name='insp_buque_fecha_idx'),
+            models.Index(fields=['severidad_max', '-fecha_creacion', '-id'], name='insp_sev_fecha_idx'),
+            models.Index(fields=['-fecha_creacion', '-id'], name='insp_fecha_idx'),
+            # Sirve el filtro q (lookup contiene_ilike → ILIKE '%...%', ver busqueda.py).
+            GinIndex(fields=['nombre'], opclasses=['gin_trgm_ops'], name='insp_nombre_trgm_idx'),
+        ]
 
     def __str__(self):
         return f"Inspección #{self.pk} — {self.buque} ({self.fecha_creacion.date()})"
+
+
+def nombre_por_defecto(inspeccion):
+    """Nombre generado cuando el usuario no da uno: ``Inspección #<id> — <buque>``."""
+    prefijo = f"Inspección #{inspeccion.pk} — "
+    maximo = InspeccionCasco._meta.get_field('nombre').max_length
+    buque = inspeccion.buque.nombre
+    disponible = maximo - len(prefijo)
+    if len(buque) > disponible:
+        # A long vessel name must not push the value past the column size.
+        buque = buque[:max(disponible - 1, 0)] + '…'
+    return prefijo + buque
+
+
+def subir_severidad_max(inspeccion_id, nivel):
+    """
+    Sube ``severidad_max`` a ``nivel`` (int) con un UPDATE condicional: es
+    atómico y nunca la baja, así que es seguro con workers concurrentes.
+    Devuelve True si cambió alguna fila.
+    """
+    if nivel is None:
+        return False
+    filas = InspeccionCasco.objects.filter(pk=inspeccion_id).filter(
+        Q(severidad_max__isnull=True) | Q(severidad_max__lt=nivel)
+    ).update(severidad_max=nivel)
+    return filas > 0
+
+
+def recalcular_severidad_max(inspeccion_id):
+    """
+    Recalcula ``severidad_max`` desde las fotos completadas que quedan
+    (se usa al borrar una foto). Devuelve el nuevo valor (int o None).
+    """
+    # The row lock makes read + write one unit: a concurrent subir_severidad_max
+    # from the worker waits here and then re-evaluates its condition against the
+    # recomputed value, so a stale lower value can never overwrite it.
+    with transaction.atomic():
+        list(InspeccionCasco.objects.select_for_update().filter(pk=inspeccion_id).values_list('pk', flat=True))
+        textos = FotoInspeccion.objects.filter(
+            inspeccion_id=inspeccion_id,
+            estado=FotoInspeccion.Estado.COMPLETADA,
+            severidad__isnull=False,
+        ).values_list('severidad', flat=True).distinct()
+        niveles = [n for n in map(NivelSeveridad.desde_texto, textos) if n is not None]
+        nuevo = max(niveles) if niveles else None
+        InspeccionCasco.objects.filter(pk=inspeccion_id).update(severidad_max=nuevo)
+    return nuevo
 
 
 class FotoInspeccion(models.Model):
