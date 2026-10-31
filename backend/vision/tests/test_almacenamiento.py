@@ -3,6 +3,7 @@ import logging
 from unittest import mock
 
 from django.apps import apps
+from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -135,7 +136,7 @@ class TareaStorageTests(AlmacenamientoBase):
 
         run = self._procesar(foto)
 
-        run.assert_called_once_with(png_bytes())
+        run.assert_called_once_with(png_bytes(), model_id=settings.VISION_MODEL_ID)
         foto.refresh_from_db()
         self.assertEqual(foto.estado, FotoInspeccion.Estado.COMPLETADA)
         self.assertRegex(foto.imagen_anotada, rf'^inspecciones/anotadas/{foto.id}_[0-9a-f]{{8}}\.jpg$')

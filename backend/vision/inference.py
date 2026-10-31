@@ -23,8 +23,9 @@ from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
-# Umbral de confianza por defecto de la API de visión (el default calibrado de
-# cada modelo en core_engine es distinto; aquí se conserva el histórico 0.25).
+# Umbral que usa el endpoint directo ``/api/ai/anomalias/`` cuando el cliente no
+# envía ``confidence``. El pipeline de inspecciones no lo usa: ahí cada modelo
+# aplica su propio umbral calibrado (``ModelInfo.default_confidence``).
 DEFAULT_CONFIDENCE = 0.25
 
 
@@ -104,6 +105,17 @@ def ids_modelos() -> List[str]:
     return [m.id for m in available_models()]
 
 
+def severidad_por_clase() -> Dict[str, str]:
+    """Severidad de cada clase de anomalía según la taxonomía de ``core_engine``.
+
+    Las clases de componente (casco, hélice, ánodo...) no tienen severidad y no
+    aparecen. Importar la taxonomía no carga torch ni ultralytics.
+    """
+    from core_engine.vision.domain import severity_map
+
+    return severity_map()
+
+
 def listar_modelos() -> List[Dict[str, Any]]:
     """Catálogo de modelos para el cliente, en el orden de ``core_engine``.
 
@@ -173,15 +185,18 @@ def run_inference(
     image_bytes: bytes,
     confidence: Optional[float] = None,
     incluir_mascaras: bool = False,
+    model_id: Optional[str] = None,
 ) -> Tuple[bytes, Dict[str, Any]]:
     """Ejecuta inferencia + anotación sobre una imagen codificada.
 
     Args:
         image_bytes: imagen codificada (JPEG, PNG, ...).
-        confidence: umbral mínimo de confianza; ``None`` usa
-            ``DEFAULT_CONFIDENCE``.
+        confidence: umbral mínimo de confianza; ``None`` deja que el modelo
+            use su propio umbral calibrado (``ModelInfo.default_confidence``).
         incluir_mascaras: si es ``False`` (default) elimina la máscara RLE de
             cada detección para mantener el payload liviano, igual que en v2.
+        model_id: id del modelo de ``core_engine``; ``None`` usa
+            ``VISION_MODEL_ID``.
 
     Returns:
         ``(jpeg_anotado, resultado)``. ``resultado`` es el dict de
@@ -189,16 +204,13 @@ def run_inference(
 
     Raises:
         FileNotFoundError: si los pesos del modelo no se encuentran.
-        ValueError: imagen no decodificable o ``VISION_MODEL_ID`` desconocido.
+        ValueError: imagen no decodificable o modelo desconocido.
     """
     from core_engine.vision import analyze
 
-    if confidence is None:
-        confidence = DEFAULT_CONFIDENCE
-
     anotada, resultado = analyze(
         image_bytes,
-        model_id=_modelo_id(),
+        model_id=model_id or _modelo_id(),
         confidence=confidence,
         annotate=True,
     )

@@ -221,6 +221,9 @@ class FotoInspeccion(models.Model):
         default=Estado.PENDIENTE
     )
     error_detalle = models.TextField(blank=True, null=True)
+    # Id del modelo de core_engine con el que se analizó (o se va a analizar)
+    # la foto. Se fija al disparar el análisis; null mientras nunca se pidió.
+    modelo_id = models.CharField(max_length=50, blank=True, null=True)
     fecha_creacion = models.DateTimeField(auto_now_add=True)
 
     class Meta:

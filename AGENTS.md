@@ -94,7 +94,7 @@ uv run celery -A config flower --port=5555 \
   --broker_api=http://guest:guest@localhost:15672/api/
 ```
 
-Required environment: `NAUTIC_WEIGHTS_DIR` (directory with the model weights). Optional: `VISION_MODEL_ID` (default `yolo-seg`; valid ids come from the `core_engine` catalog: `yolo-seg`, `yolo-tiled`, `maskrcnn`, `rtdetr`).
+Required environment: `NAUTIC_WEIGHTS_DIR` (directory with the model weights). Optional: `VISION_MODEL_ID` (default model, used when a request does not choose one; default `yolo-seg`; valid ids come from the `core_engine` catalog: `yolo-seg`, `yolo-tiled`, `maskrcnn`, `rtdetr`). A model is only usable if its weights are in `NAUTIC_WEIGHTS_DIR` and its Python dependencies are installed (`GET /api/vision/modelos/` reports it as `disponible`).
 
 `vision.inference.verificar_configuracion()` validates both settings. It is enforced by the Django system check `vision.E001` and by Celery `worker_init`: a misconfigured worker **refuses to start**.
 
@@ -118,7 +118,7 @@ Inspection photos (originals and annotated) live behind Django's storage API, se
 
 ## Test Commands
 
-Backend tests live in `backend/vision/tests/` (`test_buques_api.py` for the Buques API, `test_inspecciones_api.py` and `test_busqueda_inspecciones.py` for inspection name/severity and search). The vision pipeline itself has no tests yet.
+Backend tests live in `backend/vision/tests/` (`test_buques_api.py` for the Buques API, `test_inspecciones_api.py` and `test_busqueda_inspecciones.py` for inspection name/severity and search, `test_modelos.py` and `test_seleccion_modelo.py` for the model catalog and model selection). The vision pipeline itself has no tests yet.
 
 ```bash
 cd backend
@@ -208,10 +208,11 @@ pnpm add <pkg>     # add a dependency (pnpm add -D <pkg> for dev)
 
 - Django views only enqueue: `procesar_foto.apply_async()` → RabbitMQ queue `vision`. Never run inference inline in a view (the direct endpoint `/api/ai/anomalias/` is the one documented exception: no persistence, no queue).
 - The Celery worker (`vision/tasks.py`) persists results to Postgres and publishes events to Redis; Django streams them to the browser as SSE from `/api/vision/inspecciones/<id>/stream/`. Clients consume them with `EventSource` — **do not add polling loops**.
-- Inference goes through `vision.inference.run_inference()`. Never call `core_engine` directly from views or tasks. `core_engine` caches each detector per process, so there is no singleton to manage.
+- Inference goes through `vision.inference.run_inference()`. Never call `core_engine` directly from views or tasks (the model catalog and its availability checks live in `vision/inference.py` too: `listar_modelos()`, `modelo_disponible()`). `core_engine` caches each detector per process, so there is no singleton to manage.
 - `run_inference()` takes no `iou` parameter (removed in nautic_core v3).
 - Postgres (`FotoInspeccion.estado`) is the source of truth — there is no Celery result backend.
 - Failures that exhaust retries go to the `vision.dead` DLQ, visible in Flower.
+- **Model selection**: the model is chosen when analyzing, not at upload. `GET /api/vision/modelos/` lists the catalog (`id, label, descripcion, arquitectura, version, produce_mascaras, confianza_por_defecto, por_defecto, disponible`). `POST /api/vision/inspecciones/<id>/analizar/` and the photo retry `POST /api/vision/fotos/<id>/` accept an optional `{"modelo": "<id>"}` (default: `VISION_MODEL_ID`, or the photo's own `modelo_id` on retry). An unknown or unavailable model returns 400 and nothing is enqueued or changed. Each photo stores the model in `FotoInspeccion.modelo_id` (exposed as `modelo` in the photo dict and SSE events) and the worker runs `run_inference(..., model_id=foto.modelo_id)`. When no confidence is given each model uses its own calibrated default (`run_inference` no longer forces 0.25).
 - Rate limiting is per IP, Redis-backed and fail-open. Limits: `VISION_RATE_LIMIT_UPLOADS_PER_MINUTE` and `VISION_RATE_LIMIT_MAX_CONCURRENT` in `backend/config/settings.py`.
 
 ---
@@ -229,7 +230,7 @@ pnpm add <pkg>     # add a dependency (pnpm add -D <pkg> for dev)
 | `backend/vision/views_buques.py` | Buques REST endpoints (`/api/buques/`): list, create, detail |
 | `backend/vision/urls.py` | URL routing for the vision app |
 | `backend/vision/tasks.py` | Celery task `procesar_foto` + dead-letter task |
-| `backend/vision/inference.py` | `run_inference()` adapter over `core_engine.vision.analyze` + config validation |
+| `backend/vision/inference.py` | `run_inference(model_id=...)` adapter over `core_engine.vision.analyze`, model catalog/availability helpers + config validation |
 | `backend/config/almacenamiento.py` | `configurar_storages(env)`: builds `STORAGES` (local or S3) from environment variables |
 | `backend/vision/almacenamiento.py` | Photo storage helpers over `default_storage` (keys, save, read, delete, URL) |
 | `backend/vision/pubsub.py` | Redis pub/sub used by SSE |

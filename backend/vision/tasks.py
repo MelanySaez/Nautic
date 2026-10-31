@@ -19,7 +19,7 @@ from PIL import Image
 from celery import shared_task
 
 from .almacenamiento import guardar_anotada, leer_archivo, url_archivo
-from .inference import run_inference
+from .inference import modelo_por_defecto, run_inference, severidad_por_clase
 from .models import FotoInspeccion, NivelSeveridad, subir_severidad_max
 from .pubsub import publicar_evento
 from .ratelimit import track_concurrent_end
@@ -35,25 +35,29 @@ _MAX_RETRIES = 3
 # categorización de las detecciones que devuelve nautic_core)
 # ─────────────────────────────────────────────────────────────────────────────
 
-_SEVERITY_MAP = {
-    "corrosion":     "critical",
-    "defect":        "high",
-    "marine_growth": "medium",
-    "paint_peel":    "low",
-}
-_SEVERITY_ORDER = ["critical", "high", "medium", "low"]
-
-
 def _calcular_severidad(detections):
-    """Nivel de severidad más alto entre las detecciones."""
-    worst = None
+    """Nivel de severidad más alto entre las detecciones.
+
+    La severidad de cada clase viene de la taxonomía de ``core_engine``
+    (``severidad_por_clase``); las clases sin severidad se ignoran.
+    """
+    severidades = severidad_por_clase()
+    peor = None
     for det in detections:
-        sev = _SEVERITY_MAP.get(det.get("class_name"))
-        if not sev:
+        texto = severidades.get(det.get("class_name"))
+        if texto is None:
             continue
-        if worst is None or _SEVERITY_ORDER.index(sev) < _SEVERITY_ORDER.index(worst):
-            worst = sev
-    return worst
+        nivel = NivelSeveridad.desde_texto(texto)
+        if nivel is None:
+            # The taxonomy uses a level NivelSeveridad does not know: never drop it silently.
+            logger.warning(
+                "Severidad desconocida %r para la clase %r; se ignora.",
+                texto, det.get("class_name"),
+            )
+            continue
+        if peor is None or nivel > peor:
+            peor = nivel
+    return NivelSeveridad.a_texto(peor)
 
 
 def _agrupar_detecciones(detections):
@@ -83,6 +87,7 @@ def _notificar(foto: FotoInspeccion) -> None:
             "severidad": foto.severidad,
             "detecciones": foto.detecciones,
             "tiempo_inferencia_ms": foto.tiempo_inferencia_ms,
+            "modelo": foto.modelo_id,
             # URL (not the storage key): the browser uses it as-is. Relative
             # (``/media/...``) on local storage, absolute and signed on a bucket.
             "imagen_anotada": url_archivo(foto.imagen_anotada),
@@ -172,7 +177,11 @@ def procesar_foto(self, foto_id: int):
             raise ValueError("El archivo almacenado no es una imagen válida.")
 
         # Procesado + anotación íntegramente vía nautic_core
-        imagen_anotada_bytes, resultados = run_inference(imagen_bytes)
+        # Modelo elegido al disparar el análisis; fotos anteriores a esa
+        # elección (modelo_id nulo) usan el modelo por defecto.
+        imagen_anotada_bytes, resultados = run_inference(
+            imagen_bytes, model_id=foto.modelo_id or modelo_por_defecto()
+        )
 
         # Persistir imagen anotada en el storage; se guarda la clave devuelta.
         clave_anotada = guardar_anotada(foto_id, imagen_anotada_bytes)

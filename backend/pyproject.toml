@@ -14,7 +14,7 @@ dependencies = [
     "celery==5.4.0",
     "redis==5.2.1",
     "flower==2.0.1",
-    "nautic-core",
+    "nautic-core[all]",
     "django-storages[s3]==1.14.6",
 ]
 
