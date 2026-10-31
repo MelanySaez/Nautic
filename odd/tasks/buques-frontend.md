@@ -383,8 +383,14 @@ Backend evidence: `buques-backend.md` (28 tests OK, `manage.py check` clean).
 - T1 done (commit 2885f93 `feat(frontend): expose field errors on ApiError`), route: delegated direct (single writer). RED: `apiClient.test.ts` "keeps the per-field messages of a 400 response..." and "drops entries that are not arrays of strings..." failed (`ApiError.campos` was undefined). GREEN: 7 new tests; full suite 82 passed, lint clean, build clean.
 - T2 done (commit 7acf289 `feat(frontend): model vessel detail and extend the port`), route: delegated direct (single writer). RED: after adding `unBuque`/`unDetalleBuque`/`obtener`/`crear` to `src/test/dobles.tsx`, `tsc -b` failed (TS2305 no exported `BuqueDetalle`/`NuevoBuque`; TS2353 `etapa`/`obtener` unknown on `Buque`/`BuquesRepository`). GREEN: `tsc -b` clean, 82 tests passed, lint clean, build clean. `EnMemoriaBuquesRepository.obtener/crear` throw (removed in T4); seed and its test updated to the new `Buque`.
 - T3 done (commit c7df226 `feat(frontend): add HTTP vessel adapter and DTO mappers`), route: delegated direct (single writer). RED: `HttpBuquesRepository.test.ts` failed to load (module `./HttpBuquesRepository` did not exist; no tests ran). GREEN: 12 tests in that file passed; `tsc -b` clean, lint clean, build clean. Per the user's scope change, the full suite is no longer run: only touched/created test files.
-- T4 done (commit: see git log `feat(frontend): wire the HTTP vessel adapter`), route: delegated direct (single writer). RED: before the change `grep -rn "BUQUES_SEMILLA\|EnMemoria" src` returned 9 matches (no new test per the scope change; the grep is the check). GREEN: grep empty; touched/related test files passed (NuevaInspeccionPage, HttpBuquesRepository, apiClient, HttpInspeccionesRepository: 41 tests); lint and build clean. Manual smoke against the real backend NOT done (no running backend in this task). AGENTS.md and frontend/README.md updated.
+- T4 done (commit 9a13836 `feat(frontend): back the vessel port with the HTTP adapter`), route: delegated direct (single writer). RED: before the change `grep -rn "BUQUES_SEMILLA\|EnMemoria" src` returned 9 matches (no new test per the scope change; the grep is the check). GREEN: grep empty; touched/related test files passed (NuevaInspeccionPage, HttpBuquesRepository, apiClient, HttpInspeccionesRepository: 41 tests); lint and build clean. Manual smoke against the real backend NOT done (no running backend in this task). AGENTS.md and frontend/README.md updated.
+
+- Review slice 1 (main..9a13836, ~760 authored lines): medium, slice_budget_reached, granted (user
+  pre-authorized), APPROVED + acknowledged. Advisories (open): `listar()` silently returns a partial
+  fleet if the 100-page guard trips (untested); full suite and manual smoke not run (user asked for
+  minimal tests and targeted runs only); selector order now relies on the API's `nombre, id` order;
+  a 400 with `campos` but no `error`/`detail` loses its field messages (the backend always sends
+  `error` with `campos`).
 
 ## Next step
-Create branch from `feat/buques-backend` (or `main` after merge), resolve open question 1 (form
-fields) with the product owner, then start T1 with a failing test.
+Slice 2: T5-T8 (list, create, detail pages, routes and nav). Slice 1 ready for push/PR (user decision).
