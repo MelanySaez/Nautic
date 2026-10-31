@@ -92,7 +92,7 @@ Detalles en [`frontend/README.md`](frontend/README.md).
 | Variable | Descripción |
 |---|---|
 | `NAUTIC_WEIGHTS_DIR` | **Obligatoria.** Directorio local con los pesos (no admite URLs) |
-| `VISION_MODEL_ID` | Modelo a usar: `yolo-seg` (default), `yolo-tiled`, `maskrcnn`, `rtdetr`. La app usa un modelo a la vez |
+| `VISION_MODEL_ID` | Modelo por defecto cuando el análisis no elige otro: `yolo-seg` (default), `yolo-tiled`, `maskrcnn`, `rtdetr`. Cada análisis puede elegir cualquier modelo disponible (`GET /api/vision/modelos/`) |
 
 Si alguna es inválida, `manage.py check` (y por tanto `migrate` y `runserver`) falla con `vision.E001` y el worker de Celery se niega a arrancar.
 
