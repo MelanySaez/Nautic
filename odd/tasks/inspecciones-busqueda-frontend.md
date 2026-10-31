@@ -19,7 +19,7 @@ and it is exactly the cost the backend search was built to avoid. Inspections gr
 (each one adds photos), so this must be replaced before real data accumulates.
 
 ## Status
-IN PROGRESS (2026-10-31), branch `feat/inspecciones-historial-01-datos` from `main` (b415dd2). Third
+IMPLEMENTED, pending manual smoke and PRs (2026-10-31), branch `feat/inspecciones-historial-01-datos` from `main` (b415dd2). Third
 frontend section: Inspecciones is the history of inspections already created (creation and analysis
 live in Visión IA, `odd/tasks/vision-ia-frontend.md`).
 
@@ -133,13 +133,14 @@ do it once and share it).
 - [x] T3 — `ListaInspeccionesPage` with server filters in the URL, debounce, "Cargar más", stale
       response guard, empty/error states; remove `filtrarInspecciones`.
 - [x] T4 — Rename on the detail/results page (PATCH). (Name on create: done in Visión IA.)
-- [ ] T5 — Cards show `nombre` and the severity badge; docs (AGENTS.md, frontend README).
+- [x] T5 — Cards show `nombre` and the severity badge; docs (AGENTS.md, frontend README).
 
 ## Progress / Evidence
 - T1 `feat(inspecciones): map nombre and severidadMax, add search filter and page types` — route: delegated direct (single writer). RED: the adapter test expecting `nombre`/`severidadMax` in the mapped inspection failed (fields missing). GREEN: `pnpm vitest run src/inspecciones/infrastructure/HttpInspeccionesRepository.test.ts src/inspecciones/domain/reglas.test.ts` 30/30; `pnpm lint` exit 0; `pnpm build` ok.
 - T2 `feat(inspecciones): replace the walk-all listar with a paginated buscar port` — route: delegated direct (single writer). RED: 3 new adapter tests (query building + cursor passthrough, blank filters omitted, `campos` surfaced) and the 2 error tests failed with `repo.buscar is not a function`. GREEN: `pnpm vitest run src/inspecciones/infrastructure/HttpInspeccionesRepository.test.ts src/inspecciones/ui/ListaInspeccionesPage.test.tsx` 29/29; `pnpm lint` exit 0; `pnpm build` ok. Page size sent: `limit=24`. `ListaInspeccionesPage` is transitional (first page only, still `filtrarInspecciones`) until T3.
 - T3 `feat(inspecciones): search inspections on the server with URL filters and Cargar más` — route: delegated direct (single writer). RED: 4 new page tests failed (URL filters sent, debounced name search, Cargar más, `campos` error next to control). GREEN: `pnpm vitest run src/inspecciones/ui/ListaInspeccionesPage.test.tsx src/inspecciones/domain/reglas.test.ts` 21/21 (+ `src/app/router.test.tsx` as a caller check); `pnpm lint` exit 0 with no warnings; `pnpm build` ok. `filtrarInspecciones` and its tests removed. New files: `ui/filtroUrl.ts`, `ui/useBusquedaInspecciones.ts`, `ui/FiltrosInspecciones.tsx`. The stale-response guard is a per-search key stored with the state.
 - T4 `feat(inspecciones): rename an inspection from the results page` — route: delegated direct (single writer). RED: adapter PATCH test and 2 results-page tests (rename updates the title; `campos.nombre` shown next to the field) failed with `repo.renombrar is not a function`. GREEN: `pnpm vitest run src/inspecciones/infrastructure/HttpInspeccionesRepository.test.ts src/inspecciones/ui/ResultadosPage.test.tsx src/shared/http/apiClient.test.ts` 35/35; `pnpm lint` exit 0; `pnpm build` ok. Added `ApiClient.patch`, port `renombrar(id, nombre)`, `ui/FormularioNombre.tsx`.
+- T5 `feat(inspecciones): show the name and maximum severity on inspection cards` — route: delegated direct (single writer). RED: the card test (name as title, vessel, "Alta" badge) and the open-link test failed before the card changed. GREEN: `pnpm vitest run src/inspecciones/ui/ListaInspeccionesPage.test.tsx` 13/13; `pnpm lint` exit 0; `pnpm build` ok. Docs updated: `AGENTS.md` (Inspections history bullet), `README.md` (section table, roadmap), `frontend/README.md` (domain note, history behavior). The card still links to `/vision/:id` (upload page, which has "Ver resultados"); the rename lives on the results page.
 
 ## Acceptance criteria
 - The list never downloads more than one page per user action.
@@ -152,4 +153,4 @@ do it once and share it).
 From `frontend/`: touched test files only (`pnpm vitest run <files>`), `pnpm lint`, `pnpm build`; manual smoke against the backend.
 
 ## Next step
-T5.
+Manual smoke against the backend (filters, Cargar más, rename), then open the stacked PRs (slice 1 = T1+T2, slice 2 = T3-T5).

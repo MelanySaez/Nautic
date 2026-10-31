@@ -2,6 +2,7 @@ import { Link } from 'react-router'
 import { Icon } from '../../shared/ui/Icon'
 import { formatearFecha } from '../../shared/ui/formato'
 import type { Inspeccion } from '../domain/inspeccion'
+import { InsigniaSeveridad } from './Insignias'
 
 export function TarjetaInspeccion({
   inspeccion,
@@ -12,25 +13,29 @@ export function TarjetaInspeccion({
   eliminando: boolean
   alEliminar: () => void
 }) {
-  const { id, buqueNombre, descripcion, tomadoPor, fechaCreacion, totalFotos } = inspeccion
+  const { id, nombre, buqueNombre, severidadMax, descripcion, tomadoPor, fechaCreacion, totalFotos } = inspeccion
 
   return (
     <article
-      aria-label={buqueNombre}
+      aria-label={nombre}
       className="group relative flex flex-col gap-4 rounded-lg border border-line bg-surface p-4 transition-colors hover:border-accent"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="label-caps text-ink-dim">INS-{String(id).padStart(4, '0')}</p>
+          <div className="flex items-center gap-2">
+            <p className="label-caps text-ink-dim">INS-{String(id).padStart(4, '0')}</p>
+            {severidadMax && <InsigniaSeveridad severidad={severidadMax} />}
+          </div>
           <h3 className="truncate text-xl font-semibold tracking-tight">
             <Link
               to={`/vision/${id}`}
-              aria-label={`Abrir inspección de ${buqueNombre}`}
+              aria-label={`Abrir inspección ${nombre}`}
               className="after:absolute after:inset-0 focus-visible:outline-none"
             >
-              {buqueNombre}
+              {nombre}
             </Link>
           </h3>
+          <p className="truncate text-sm text-ink-muted">{buqueNombre}</p>
         </div>
         <button
           type="button"

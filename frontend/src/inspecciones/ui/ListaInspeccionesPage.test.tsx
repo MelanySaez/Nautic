@@ -19,15 +19,24 @@ function renderizar(dependencias = crearDependenciasFalsas().dependencias, ruta 
 }
 
 describe('ListaInspeccionesPage', () => {
-  it('lists inspections with vessel, inspector, description and photo count', async () => {
+  it('lists inspections with name, vessel, maximum severity, inspector, description and photo count', async () => {
     const { dependencias } = crearDependenciasFalsas()
     dependencias.inspecciones.buscar.mockResolvedValue(unaPagina([
-      unaInspeccion({ id: 1, buqueNombre: 'ARA Almirante Brown', tomadoPor: 'María Pérez', totalFotos: 12 }),
+      unaInspeccion({
+        id: 1,
+        nombre: 'Control de casco 2026',
+        buqueNombre: 'ARA Almirante Brown',
+        severidadMax: 'high',
+        tomadoPor: 'María Pérez',
+        totalFotos: 12,
+      }),
     ]))
 
     renderizar(dependencias)
 
-    const tarjeta = await screen.findByRole('article', { name: 'ARA Almirante Brown' })
+    const tarjeta = await screen.findByRole('article', { name: 'Control de casco 2026' })
+    expect(tarjeta).toHaveTextContent('ARA Almirante Brown')
+    expect(tarjeta).toHaveTextContent('Alta')
     expect(tarjeta).toHaveTextContent('María Pérez')
     expect(tarjeta).toHaveTextContent('Control anual de casco')
     expect(tarjeta).toHaveTextContent('12 fotos')
@@ -116,10 +125,10 @@ describe('ListaInspeccionesPage', () => {
 
   it('opens the photo upload of an inspection', async () => {
     const { dependencias } = crearDependenciasFalsas()
-    dependencias.inspecciones.buscar.mockResolvedValue(unaPagina([unaInspeccion({ id: 42 })]))
+    dependencias.inspecciones.buscar.mockResolvedValue(unaPagina([unaInspeccion({ id: 42, nombre: 'Control anual' })]))
     const { router } = renderizar(dependencias)
 
-    await userEvent.click(await screen.findByRole('link', { name: 'Abrir inspección de ARA Almirante Brown' }))
+    await userEvent.click(await screen.findByRole('link', { name: 'Abrir inspección Control anual' }))
 
     expect(router.state.location.pathname).toBe('/vision/42')
   })
