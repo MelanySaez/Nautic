@@ -96,6 +96,15 @@ Branch `feat/seleccion-modelo-ia` from `main` (d32f130).
   real `run_inference(model_id='rtdetr')` OK, 182 tests OK. Review assess: medium, under_budget (291 lines,
   mostly uv.lock) — no review due; rides with slice 2.
 
+- Library alignment (user-approved, point 1 of the nautic_core usage audit): 520042f
+  `refactor(vision): take photo severity from the core_engine taxonomy` — `tasks._SEVERITY_MAP` removed;
+  `inference.severidad_por_clase()` wraps `core_engine.vision.domain.severity_map()`, ordering via
+  `NivelSeveridad`. Review (b26050c..520042f, 409 lines incl. the extras commit): medium,
+  slice_budget_reached, granted, APPROVED + acknowledged. Both advisories applied in 62b611b
+  `fix(vision): log severity levels the backend does not recognize` (warning log + compatibility test).
+  189 tests OK.
+  Deferred (user): public availability API in nautic_core; store model version per photo.
+
 ## Next step
 Open the two slices as stacked PRs (user decision): slice 1 ends at eda0212, slice 2 at HEAD
 (`size:exception`, ~half tests). Then frontend model selector handoff.
