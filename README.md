@@ -19,7 +19,6 @@ El proyecto se organiza en tres secciones y avanza **backend primero**: cada sec
 - **Búsqueda de inspecciones** combinable (buque, fechas, severidad, nombre) en la API y en la interfaz.
 - **Interfaz de Buques** sobre la API existente.
 - **Búsqueda en lenguaje natural** que traduzca la consulta a esos mismos filtros.
-- **Preparación para despliegue**: fotos en un almacenamiento de objetos (bucket) en lugar del disco del servidor.
 
 El detalle de cada feature (alcance, decisiones, estado y traspasos pendientes) está en [`odd/tasks/`](odd/tasks/); el trabajo en curso, en las pull requests.
 
@@ -140,7 +139,7 @@ Con el servidor corriendo:
 
 - **Sin autenticación** en esta versión. Los campos de autoría (p. ej. `tomado_por`) son texto libre.
 - El idioma del dominio es español (modelos, rutas, variables de negocio).
-- Las fotos se guardan hoy en el disco del servidor (`backend/media/`): válido para desarrollo, no para un despliegue en contenedores (ver "Hoja de ruta").
+- **Fotos de inspección:** se guardan en disco local en desarrollo y en un bucket S3-compatible (URL firmadas que expiran) en producción; se elige con `STORAGE_BACKEND` (ver [`backend/.env.example`](backend/.env.example)).
 
 ## Licencia
 
