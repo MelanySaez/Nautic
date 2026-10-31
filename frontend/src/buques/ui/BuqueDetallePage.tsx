@@ -4,6 +4,7 @@ import { useDependencias } from '../../app/useDependencias'
 import { useRecurso } from '../../shared/hooks/useRecurso'
 import { Cargando, MensajeError } from '../../shared/ui/Estados'
 import { Icon } from '../../shared/ui/Icon'
+import { Tarjeta } from '../../shared/ui/Tarjeta'
 import { formatearFecha } from '../../shared/ui/formato'
 import type { BuqueDetalle } from '../domain/buque'
 import { etiquetaDeCampo, GRUPOS_TECNICOS } from '../domain/fichaTecnica'
@@ -92,7 +93,32 @@ function FichaTecnica({ buque }: { buque: BuqueDetalle }) {
             })}
           />
         ))}
+        <SeccionesDelCasco secciones={buque.secciones} />
       </div>
+    </div>
+  )
+}
+
+/** Hull sections the vessel declared, in display order (the API already sorts them). */
+function SeccionesDelCasco({ secciones }: { secciones: BuqueDetalle['secciones'] }) {
+  return (
+    <div role="region" aria-label="Secciones del casco" className="lg:col-span-2">
+      <Tarjeta titulo="Secciones del casco" accion={<span className="label-caps text-accent-ink">{secciones.length} zonas</span>}>
+        {secciones.length === 0 ? (
+          <p className="text-sm text-ink-muted">Este buque no tiene secciones declaradas.</p>
+        ) : (
+          <ul className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+            {secciones.map((seccion) => (
+              <li key={seccion.id} className="flex flex-col gap-0.5">
+                <span className="text-sm">
+                  <span className="font-mono text-ink-dim">{seccion.codigo}</span> · {seccion.nombre}
+                </span>
+                {seccion.descripcion && <span className="text-sm text-ink-muted">{seccion.descripcion}</span>}
+              </li>
+            ))}
+          </ul>
+        )}
+      </Tarjeta>
     </div>
   )
 }

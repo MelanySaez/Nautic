@@ -46,6 +46,56 @@ describe('NuevoBuquePage', () => {
     expect(router.state.location.pathname).toBe('/buques/9')
   })
 
+  it('sends the custom sections in the order shown, after reordering and removing rows', async () => {
+    const { dependencias } = crearDependenciasFalsas()
+    renderizar(dependencias)
+    await rellenarRequeridos()
+
+    await userEvent.click(screen.getByRole('radio', { name: 'Declarar secciones propias' }))
+    await userEvent.type(screen.getByLabelText('Nombre de la sección 1'), 'Popa')
+    await userEvent.click(screen.getByRole('button', { name: 'Agregar sección' }))
+    await userEvent.type(screen.getByLabelText('Nombre de la sección 2'), 'Proa')
+    await userEvent.type(screen.getByLabelText('Código de la sección 2'), 'PRW')
+    await userEvent.type(screen.getByLabelText('Descripción de la sección 2'), 'Parte delantera')
+    await userEvent.click(screen.getByRole('button', { name: 'Agregar sección' }))
+    await userEvent.type(screen.getByLabelText('Nombre de la sección 3'), 'Descartada')
+    await userEvent.click(screen.getByRole('button', { name: 'Subir sección 2' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Quitar sección 3' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Crear buque' }))
+
+    expect(dependencias.buques.crear).toHaveBeenCalledWith({
+      nombre: 'ARC Caribe',
+      tipo: 'Fragata',
+      secciones: [{ nombre: 'Proa', codigo: 'PRW', descripcion: 'Parte delantera' }, { nombre: 'Popa' }],
+    })
+  })
+
+  it('requires a name in every custom section before calling the port', async () => {
+    const { dependencias } = renderizar()
+    await rellenarRequeridos()
+
+    await userEvent.click(screen.getByRole('radio', { name: 'Declarar secciones propias' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Crear buque' }))
+
+    expect(screen.getByLabelText('Nombre de la sección 1')).toHaveAttribute('aria-invalid', 'true')
+    expect(dependencias.buques.crear).not.toHaveBeenCalled()
+  })
+
+  it('shows the server error of the sections inside the sections block', async () => {
+    const { dependencias } = crearDependenciasFalsas()
+    dependencias.buques.crear.mockRejectedValue(
+      new ApiError(400, 'Datos inválidos.', { secciones: ['El código «PRW» está repetido.'] }),
+    )
+    renderizar(dependencias)
+    await rellenarRequeridos()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Crear buque' }))
+
+    const bloque = await screen.findByRole('group', { name: 'Secciones del casco' })
+    expect(bloque).toHaveTextContent('El código «PRW» está repetido.')
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
   it('requires name and type before calling the port', async () => {
     const { dependencias } = renderizar()
 

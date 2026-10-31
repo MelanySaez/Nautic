@@ -142,7 +142,7 @@ function CargaPorZona({ datos, aplicar }: { datos: DatosInspeccion; aplicar: (ev
         <Tarjeta titulo="Mapa del casco" accion={<span className="label-caps text-accent-ink">{secciones.length} zonas</span>}>
           {secciones.length === 0 ? (
             <p className="text-sm text-ink-muted">
-              No hay zonas cargadas. Ejecuta <code className="font-mono">seed_secciones_casco</code> en el backend.
+              Este buque no tiene secciones del casco declaradas.
             </p>
           ) : (
             <MapaZonas

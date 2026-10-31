@@ -11,7 +11,17 @@ import { Tarjeta } from '../../shared/ui/Tarjeta'
 import { mensajeDe } from '../../shared/ui/formato'
 import type { NuevoBuque } from '../domain/buque'
 import { GRUPOS_TECNICOS } from '../domain/fichaTecnica'
+import {
+  aNuevasSecciones,
+  CLAVE_ERROR_SECCIONES,
+  claveErrorFila,
+  filaVacia,
+  validarSecciones,
+  type FilaSeccion,
+  type ModoSecciones,
+} from './filasSeccion'
 import { GrupoNumerico } from './GrupoNumerico'
+import { SeccionesCascoForm } from './SeccionesCascoForm'
 
 const ETAPAS_SUGERIDAS = ['Activo', 'En construcción']
 const REQUERIDO = 'Este campo es requerido.'
@@ -24,6 +34,7 @@ const CLAVE_POR_CAMPO_API: Record<string, string> = {
   etapa: 'etapa',
   descripcion: 'descripcion',
   imagen: 'imagen',
+  secciones: CLAVE_ERROR_SECCIONES,
   ...Object.fromEntries(CAMPOS_TECNICOS.map((c) => [c.claveApi, c.clave])),
 }
 
@@ -51,8 +62,11 @@ function validar(valores: Valores): Errores {
   return errores
 }
 
-/** Builds the creation input: trimmed text, and only the optional fields the user filled. */
-function aNuevoBuque(valores: Valores): NuevoBuque {
+/**
+ * Builds the creation input: trimmed text, and only the optional fields the user filled.
+ * Standard sections are requested by omitting `secciones` (the backend default).
+ */
+function aNuevoBuque(valores: Valores, modo: ModoSecciones, filas: FilaSeccion[]): NuevoBuque {
   const datos: NuevoBuque = { nombre: valores.nombre.trim(), tipo: valores.tipo.trim() }
   if (valores.etapa.trim()) datos.etapa = valores.etapa.trim()
   if (valores.descripcion.trim()) datos.descripcion = valores.descripcion.trim()
@@ -60,6 +74,7 @@ function aNuevoBuque(valores: Valores): NuevoBuque {
   for (const campo of CAMPOS_TECNICOS) {
     if (valores[campo.clave].trim()) datos[campo.clave] = Number(valores[campo.clave])
   }
+  if (modo === 'propias') datos.secciones = aNuevasSecciones(filas)
   return datos
 }
 
@@ -81,6 +96,9 @@ export function NuevoBuquePage() {
 
   const [valores, setValores] = useState<Valores>(VALORES_INICIALES)
   const [errores, setErrores] = useState<Errores>({})
+  const [modoSecciones, setModoSecciones] = useState<ModoSecciones>('estandar')
+  const [filas, setFilas] = useState<FilaSeccion[]>([filaVacia(0)])
+  const [siguienteUid, setSiguienteUid] = useState(1)
   const [errorEnvio, setErrorEnvio] = useState<string | null>(null)
   const [enviando, setEnviando] = useState(false)
 
@@ -89,15 +107,51 @@ export function NuevoBuquePage() {
     setErrores(({ [clave]: _resuelto, ...resto }) => resto)
   }
 
+  function quitarErrores(...claves: string[]) {
+    setErrores((actual) => Object.fromEntries(Object.entries(actual).filter(([clave]) => !claves.includes(clave))))
+  }
+
+  function cambiarFila(uid: number, campo: 'nombre' | 'codigo' | 'descripcion', valor: string) {
+    setFilas((actual) => actual.map((fila) => (fila.uid === uid ? { ...fila, [campo]: valor } : fila)))
+    quitarErrores(claveErrorFila(uid), CLAVE_ERROR_SECCIONES)
+  }
+
+  function agregarFila() {
+    setFilas((actual) => [...actual, filaVacia(siguienteUid)])
+    setSiguienteUid(siguienteUid + 1)
+    quitarErrores(CLAVE_ERROR_SECCIONES)
+  }
+
+  function quitarFila(uid: number) {
+    setFilas((actual) => (actual.length > 1 ? actual.filter((fila) => fila.uid !== uid) : actual))
+    quitarErrores(claveErrorFila(uid), CLAVE_ERROR_SECCIONES)
+  }
+
+  function moverFila(uid: number, delta: -1 | 1) {
+    setFilas((actual) => {
+      const origen = actual.findIndex((fila) => fila.uid === uid)
+      const destino = origen + delta
+      if (origen < 0 || destino < 0 || destino >= actual.length) return actual
+      const copia = [...actual]
+      ;[copia[origen], copia[destino]] = [copia[destino], copia[origen]]
+      return copia
+    })
+  }
+
+  function cambiarModo(modo: ModoSecciones) {
+    setModoSecciones(modo)
+    quitarErrores(CLAVE_ERROR_SECCIONES)
+  }
+
   async function enviar(evento: FormEvent) {
     evento.preventDefault()
-    const invalidos = validar(valores)
+    const invalidos = { ...validar(valores), ...validarSecciones(modoSecciones, filas, REQUERIDO) }
     setErrores(invalidos)
     if (Object.keys(invalidos).length > 0) return
     setErrorEnvio(null)
     setEnviando(true)
     try {
-      const creado = await buques.crear(aNuevoBuque(valores))
+      const creado = await buques.crear(aNuevoBuque(valores, modoSecciones, filas))
       navegar(`/buques/${creado.id}`)
     } catch (error) {
       if (error instanceof ApiError && error.campos) {
@@ -178,6 +232,17 @@ export function NuevoBuquePage() {
             <GrupoNumerico key={grupo.titulo} grupo={grupo} valores={valores} errores={errores} alCambiar={cambiar} />
           ))}
         </div>
+
+        <SeccionesCascoForm
+          modo={modoSecciones}
+          alCambiarModo={cambiarModo}
+          filas={filas}
+          errores={errores}
+          alCambiarFila={cambiarFila}
+          alAgregar={agregarFila}
+          alQuitar={quitarFila}
+          alMover={moverFila}
+        />
 
         {errorEnvio && <MensajeError mensaje={errorEnvio} />}
 
