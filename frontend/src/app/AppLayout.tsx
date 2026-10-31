@@ -2,6 +2,9 @@ import { NavLink, Outlet } from 'react-router'
 import { ThemeToggle } from '../shared/theme/ThemeToggle'
 import { Icon } from '../shared/ui/Icon'
 
+const claseEnlace = ({ isActive }: { isActive: boolean }) =>
+  `label-caps rounded px-3 py-2 ${isActive ? 'bg-info-bg text-info' : 'text-ink-muted hover:text-ink'}`
+
 export function AppLayout() {
   return (
     <div className="min-h-dvh">
@@ -12,14 +15,11 @@ export function AppLayout() {
             Nautic
           </NavLink>
           <nav aria-label="Principal" className="flex flex-1 items-center gap-1">
-            <NavLink
-              to="/"
-              end
-              className={({ isActive }) =>
-                `label-caps rounded px-3 py-2 ${isActive ? 'bg-info-bg text-info' : 'text-ink-muted hover:text-ink'}`
-              }
-            >
+            <NavLink to="/" end className={claseEnlace}>
               Inspecciones
+            </NavLink>
+            <NavLink to="/buques" className={claseEnlace}>
+              Buques
             </NavLink>
           </nav>
           <ThemeToggle />

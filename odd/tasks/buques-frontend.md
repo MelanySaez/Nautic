@@ -302,7 +302,7 @@ Conventional Commit per task, tests and docs alongside the behavior.
       `formatearFecha`; JSON fields rendered read-only or hidden per the open question. Handle 404
       (message from `ApiError`) and a non-numeric id with a friendly message and a back link. Tests:
       renders sheet and nulls, 404, loading, retry.
-- [ ] T8 — Routes and nav. Add `/buques`, `/buques/nuevo`, `/buques/:id` to `router.tsx`; add a
+- [x] T8 — Routes and nav. Add `/buques`, `/buques/nuevo`, `/buques/:id` to `router.tsx`; add a
       "Buques" `NavLink` (`to="/buques"`) to the main nav; keep "Inspecciones" `end` so it does not
       stay active on `/buques`. Update `AppLayout.test.tsx` (both links present, active state). Run the
       checks and do a manual smoke against the real backend.
@@ -394,6 +394,7 @@ Backend evidence: `buques-backend.md` (28 tests OK, `manage.py check` clean).
 - T5 done (commit `feat(frontend): add the vessel list page`), route: delegated direct (single writer). RED: `ListaBuquesPage.test.tsx` failed to load (module `./ListaBuquesPage` did not exist; no tests ran). GREEN: 4 tests in that file passed (`pnpm vitest run src/buques/ui/ListaBuquesPage.test.tsx`). Filter helper `filtrarBuques` is covered through the page test.
 - T6 done (commit `feat(frontend): add the vessel creation form`), route: delegated direct (single writer). RED: `NuevoBuquePage.test.tsx` failed to load (module `./NuevoBuquePage` did not exist; no tests ran). GREEN: 5 tests in that file passed (happy path with exact object + navigation, client-side required, per-field server errors + unmapped keys in the alert, generic error, submit disabled while sending); `tsc -b` and lint clean. Field metadata shared with the detail page in `buques/domain/fichaTecnica.ts`.
 - T7 done (commit `feat(frontend): add the vessel technical sheet page`), route: delegated direct (single writer). RED: `BuqueDetallePage.test.tsx` failed to load (module `./BuqueDetallePage` did not exist; no tests ran). GREEN: 3 tests in that file passed (sheet by group with units and dashes, 404 message + back link, non-numeric id); `tsc -b` and lint clean. JSON fields not shown and `imagen` is a placeholder, per the Decisions section.
+- T8 done (commit `feat(frontend): route the vessel screens and add the nav link`), route: delegated direct (single writer). RED: with the test updated first, `AppLayout.test.tsx` failed 2 tests (no link named "Buques"). GREEN: `pnpm vitest run` on ListaBuquesPage, NuevoBuquePage, BuqueDetallePage and AppLayout tests: 4 files, 15 tests passed; `pnpm lint` clean; `pnpm build` clean. Full suite not run (user rule). Manual smoke against the real backend NOT done. AGENTS.md and frontend/README.md updated.
 
 ## Next step
-Slice 2: T5-T8 (list, create, detail pages, routes and nav). Slice 1 ready for push/PR (user decision).
+Slice 2 (T5-T8) implemented; manual smoke against the real backend pending. Slices 1 and 2 ready for push/PR (user decision).
