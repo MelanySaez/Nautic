@@ -90,6 +90,12 @@ Branch `feat/seleccion-modelo-ia` from `main` (d32f130).
   `modelo`, and both tasks run with the last stored model; the `/api/ai/anomalias/` confidence concern was
   checked and is not an issue (the view applies `DEFAULT_CONFIDENCE` itself, views.py:175).
 
+- Dependency (user-approved): 63126a9 `build(backend): install nautic-core with all model extras`.
+  `nautic-core` declared without extras, so `transformers` (rtdetr extra) was missing. Now
+  `nautic-core[all]`; `uv sync` added transformers 5.22.1. Observed: all 4 models `disponible=true`,
+  real `run_inference(model_id='rtdetr')` OK, 182 tests OK. Review assess: medium, under_budget (291 lines,
+  mostly uv.lock) — no review due; rides with slice 2.
+
 ## Next step
 Open the two slices as stacked PRs (user decision): slice 1 ends at eda0212, slice 2 at HEAD
 (`size:exception`, ~half tests). Then frontend model selector handoff.
