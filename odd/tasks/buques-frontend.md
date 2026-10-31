@@ -403,4 +403,4 @@ Backend evidence: `buques-backend.md` (28 tests OK, `manage.py check` clean).
   minimal-tests rule): client-side numeric checks and the detail page loading/retry are untested.
 
 ## Next step
-Slice 2 (T5-T8) implemented; manual smoke against the real backend pending. Slices 1 and 2 ready for push/PR (user decision).
+DONE — merged to main in PR #16 (data layer) and #17 (screens).
