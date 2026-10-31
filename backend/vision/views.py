@@ -18,7 +18,10 @@ from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExampl
 from drf_spectacular.types import OpenApiTypes
 
 from .almacenamiento import borrar_archivo, guardar_original, url_archivo
-from .busqueda import BusquedaInvalida, LIMIT_MAXIMO, LIMIT_POR_DEFECTO, buscar_inspecciones
+from .busqueda import (
+    BusquedaInvalida, LIMIT_MAXIMO, LIMIT_POR_DEFECTO, ValorInvalido,
+    _parsear_entero_positivo, buscar_inspecciones,
+)
 from .inference import (
     DEFAULT_CONFIDENCE, ids_modelos, listar_modelos, modelo_por_defecto,
     motivo_no_disponible, run_inference,
@@ -29,6 +32,7 @@ from .models import (
 )
 from .pubsub import publicar_evento, suscribirse
 from .ratelimit import check_upload_rate, get_client_ip, track_concurrent_start
+from .secciones import seccion_to_dict
 from .tasks import procesar_foto
 
 logger = logging.getLogger(__name__)
@@ -243,20 +247,10 @@ def api_ai_anomalias(request):
 # Helpers de serialización
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _seccion_to_dict(s):
-    return {
-        'id': s.id,
-        'codigo': s.codigo,
-        'nombre': s.nombre,
-        'descripcion': s.descripcion,
-        'orden': s.orden,
-    }
-
-
 def _foto_to_dict(f, request=None):
     return {
         'id': f.id,
-        'seccion': _seccion_to_dict(f.seccion),
+        'seccion': seccion_to_dict(f.seccion),
         'imagen_original': url_archivo(f.imagen_original, request),
         'imagen_anotada': url_archivo(f.imagen_anotada, request),
         'detecciones': f.detecciones,
@@ -406,17 +400,36 @@ def _resolver_modelo(data, por_defecto=None):
 
 @extend_schema(
     tags=['Inspección IA'],
-    summary='Listar secciones del casco',
-    description='Devuelve el catálogo completo de zonas físicas del casco (FWD-BTM, MID-SS-P, etc.).',
+    summary='Listar las secciones del casco de un buque',
+    description=(
+        'Devuelve las zonas físicas del casco que declaró el buque (FWD-BTM, MID-SS-P, etc.), '
+        'ordenadas por `orden` y `codigo`. El parámetro `buque` es requerido.'
+    ),
+    parameters=[
+        OpenApiParameter('buque', int, OpenApiParameter.QUERY, required=True,
+                         description='ID del buque'),
+    ],
+    responses={200: OpenApiTypes.OBJECT, 400: OpenApiTypes.OBJECT, 404: OpenApiTypes.OBJECT},
 )
 @api_view(['GET'])
 def api_vision_secciones(request):
     """
-    GET /api/vision/secciones/
-    Lista el catálogo completo de secciones del casco.
+    GET /api/vision/secciones/?buque=<id>
+    Lista las secciones del casco del buque indicado.
     """
-    secciones = SeccionCasco.objects.all()
-    return Response([_seccion_to_dict(s) for s in secciones])
+    raw = request.query_params.get('buque')
+    if raw is None:
+        return Response(
+            {'error': 'Datos inválidos.', 'campos': {'buque': ['Este parámetro es requerido.']}},
+            status=400,
+        )
+    try:
+        buque_id = _parsear_entero_positivo(raw)
+    except ValorInvalido as exc:
+        return Response({'error': 'Datos inválidos.', 'campos': {'buque': [str(exc)]}}, status=400)
+
+    buque = get_object_or_404(Buque, pk=buque_id)
+    return Response([seccion_to_dict(s) for s in buque.secciones.all()])
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -650,7 +663,7 @@ def api_vision_inspeccion_detalle(request, inspeccion_id):
             'required': ['imagen', 'seccion_id'],
             'properties': {
                 'imagen': {'type': 'string', 'format': 'binary', 'description': 'Foto del casco (JPG/PNG)'},
-                'seccion_id': {'type': 'integer', 'description': 'ID de la sección del casco'},
+                'seccion_id': {'type': 'integer', 'description': 'ID de una sección del buque de la inspección'},
             },
         }
     },
@@ -683,6 +696,8 @@ def api_vision_subir_foto(request, inspeccion_id):
     if not seccion_id:
         return Response({'error': 'El campo seccion_id es requerido.'}, status=400)
     seccion = get_object_or_404(SeccionCasco, pk=seccion_id)
+    if seccion.buque_id != insp.buque_id:
+        return Response({'error': 'La sección no pertenece al buque de la inspección.'}, status=400)
 
     if 'imagen' not in request.FILES:
         return Response({'error': 'El campo imagen es requerido.'}, status=400)

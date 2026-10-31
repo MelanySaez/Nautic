@@ -49,7 +49,7 @@ touched, never the full suite. Backend TDD off (no configuration); runner
 
 ## Checklist
 - [x] T1 — Model, migration, standard sections constant. Route: delegated direct.
-- [ ] T2 — Backend API + docs. Route: delegated direct.
+- [x] T2 — Backend API + docs. Route: delegated direct.
 - [ ] T3 — Frontend sections block, sheet and upload page. Route: delegated direct.
 
 ## Acceptance criteria
@@ -74,6 +74,14 @@ Branch `feat/secciones-buque-01-backend` from `feat/buques-frontend-02-pantallas
   test_seleccion_modelo test_versiones_foto test_busqueda_inspecciones` -> 140 tests OK; `check` ->
   no issues; `makemigrations --check --dry-run` -> no changes; `migrate` on dev DB -> 0006-0008 OK
   (dev DB had 0 vessels, 23 global sections -> 0 left).
+- T2 done — `feat(vision): declare hull sections when creating a vessel`. Route: delegated direct
+  (single writer). `POST /api/buques/` `secciones` (`"estandar"`/absent or custom list, transactional,
+  errors under `campos.secciones`); `secciones` in the vessel sheet and 201 response;
+  `GET /api/vision/secciones/?buque=<id>`; upload rejects another vessel's section (400); OpenAPI
+  and docs (AGENTS.md, README, VISION_BACKEND.md, INSPECCION_IA.md) updated.
+  Checks: `test vision.tests.test_buques_api test_almacenamiento test_inspecciones_api
+  test_secciones_migracion` -> 90 tests OK; `check` -> no issues; `makemigrations --check --dry-run`
+  -> no changes; `migrate` -> nothing to apply (already at 0008).
 
 ## Next step
-T2.
+T3 (frontend, branch `feat/secciones-buque-02-frontend`).

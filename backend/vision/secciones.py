@@ -182,6 +182,16 @@ _CODIGO_MAX = SeccionCasco._meta.get_field('codigo').max_length
 _NOMBRE_MAX = SeccionCasco._meta.get_field('nombre').max_length
 
 
+def seccion_to_dict(s):
+    return {
+        'id': s.id,
+        'codigo': s.codigo,
+        'nombre': s.nombre,
+        'descripcion': s.descripcion,
+        'orden': s.orden,
+    }
+
+
 def crear_secciones_estandar(buque):
     """Create the standard set for ``buque``. Returns the created sections."""
     return SeccionCasco.objects.bulk_create(

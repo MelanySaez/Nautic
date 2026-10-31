@@ -1,7 +1,7 @@
 import math
 
 from django.core.exceptions import ValidationError
-from django.db import models
+from django.db import models, transaction
 from django.shortcuts import get_object_or_404
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
@@ -9,6 +9,9 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
 from .models import Buque
+from .secciones import (
+    crear_secciones_estandar, crear_secciones_personalizadas, seccion_to_dict, validar_secciones,
+)
 
 # Pagination bounds for the list endpoint.
 _LIMIT_POR_DEFECTO = 50
@@ -58,6 +61,7 @@ def _buque_to_dict(buque):
     data = {'id': buque.id}
     for campo in _CAMPOS_ESCRITURA:
         data[campo] = getattr(buque, campo)
+    data['secciones'] = [seccion_to_dict(s) for s in buque.secciones.all()]
     data['created_at'] = _iso(buque.created_at)
     data['updated_at'] = _iso(buque.updated_at)
     return data
@@ -165,6 +169,18 @@ def _validar_buque(data):
     return instancia, errores
 
 
+def _validar_secciones_buque(data):
+    """
+    Resolve the optional ``secciones`` key of a creation payload.
+    Returns (lista_personalizada|None, errores): ``None`` means the standard set.
+    """
+    valor = data.get('secciones', 'estandar')
+    if valor == 'estandar':
+        return None, []
+    limpias, mensajes = validar_secciones(valor)
+    return limpias, ({'secciones': mensajes} if mensajes else {})
+
+
 @extend_schema(
     methods=['GET'],
     tags=['Buques'],
@@ -188,7 +204,10 @@ def _validar_buque(data):
     description=(
         'Crea un buque. `nombre` y `tipo` son requeridos; el resto de los campos '
         'de la ficha técnica es opcional. Los campos numéricos no admiten valores '
-        'negativos. Los campos desconocidos se rechazan.'
+        'negativos. Los campos desconocidos se rechazan.\n\n'
+        '`secciones` define las zonas del casco del buque: `"estandar"` (por defecto si se omite) '
+        'crea las 20 secciones estándar; una lista de `{nombre, codigo?, descripcion?}` crea '
+        'exactamente esas, en ese orden (`codigo` se genera, p. ej. `SEC-01`, si se omite).'
     ),
     request={
         'application/json': {
@@ -223,6 +242,25 @@ def _validar_buque(data):
                 'documentos': {'type': 'array', 'items': {}},
                 'misiones': {'type': 'array', 'items': {}},
                 'grupos_constructivos': {'type': 'array', 'items': {}},
+                'secciones': {
+                    'oneOf': [
+                        {'type': 'string', 'enum': ['estandar']},
+                        {
+                            'type': 'array',
+                            'minItems': 1,
+                            'items': {
+                                'type': 'object',
+                                'required': ['nombre'],
+                                'properties': {
+                                    'nombre': {'type': 'string', 'maxLength': 100},
+                                    'codigo': {'type': 'string', 'maxLength': 20},
+                                    'descripcion': {'type': 'string'},
+                                },
+                                'additionalProperties': False,
+                            },
+                        },
+                    ],
+                },
             },
             'additionalProperties': False,
         }
@@ -258,18 +296,27 @@ def api_buques(request):
     if not hasattr(data, 'keys'):
         return Response({'error': 'Se esperaba un objeto JSON.'}, status=400)
 
-    buque, errores = _validar_buque(data)
+    # `secciones` is not a Buque column: validate it apart so the unknown-field
+    # check on the rest of the payload keeps working.
+    buque, errores = _validar_buque({k: v for k, v in data.items() if k != 'secciones'})
+    secciones, errores_secciones = _validar_secciones_buque(data)
+    errores.update(errores_secciones)
     if errores:
         return Response({'error': 'Datos inválidos.', 'campos': errores}, status=400)
 
-    buque.save()
+    with transaction.atomic():
+        buque.save()
+        if secciones is None:
+            crear_secciones_estandar(buque)
+        else:
+            crear_secciones_personalizadas(buque, secciones)
     return Response(_buque_to_dict(buque), status=201)
 
 
 @extend_schema(
     tags=['Buques'],
     summary='Detalle de un buque',
-    description='Devuelve la ficha técnica completa del buque.',
+    description='Devuelve la ficha técnica completa del buque, incluidas sus `secciones` del casco.',
     responses={200: OpenApiTypes.OBJECT, 404: OpenApiTypes.OBJECT},
 )
 @api_view(['GET'])

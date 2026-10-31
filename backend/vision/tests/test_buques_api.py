@@ -1,7 +1,8 @@
 from django.test import TestCase
 from rest_framework.test import APIClient
 
-from vision.models import Buque
+from vision.models import Buque, SeccionCasco
+from vision.secciones import SECCIONES_ESTANDAR
 
 URL_LISTA = '/api/buques/'
 
@@ -294,3 +295,65 @@ class DetalleBuqueTests(TestCase):
         res = self.client.get(_url_detalle(999999))
 
         self.assertEqual(res.status_code, 404)
+
+
+class SeccionesDelBuqueTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+
+    def _post(self, **extra):
+        return self.client.post(URL_LISTA, {'nombre': 'Lancha', 'tipo': 'Patrullera', **extra}, format='json')
+
+    def test_sin_secciones_crea_las_estandar(self):
+        res = self._post()
+
+        self.assertEqual(res.status_code, 201)
+        body = res.json()
+        self.assertEqual(len(body['secciones']), len(SECCIONES_ESTANDAR))
+        self.assertEqual(
+            set(body['secciones'][0]), {'id', 'codigo', 'nombre', 'descripcion', 'orden'},
+        )
+        self.assertEqual(
+            self.client.get(_url_detalle(body['id'])).json()['secciones'], body['secciones'],
+        )
+
+    def test_lista_personalizada_crea_exactamente_esas_en_orden(self):
+        res = self._post(secciones=[
+            {'nombre': 'Proa', 'codigo': 'PR', 'descripcion': 'Zona de proa'},
+            {'nombre': 'Popa'},
+        ])
+
+        self.assertEqual(res.status_code, 201)
+        secciones = res.json()['secciones']
+        self.assertEqual([(s['codigo'], s['nombre']) for s in secciones], [('PR', 'Proa'), ('SEC-02', 'Popa')])
+        self.assertEqual([s['orden'] for s in secciones], [1, 2])
+        self.assertEqual(SeccionCasco.objects.count(), 2)
+
+    def test_lista_invalida_devuelve_400_y_no_crea_nada(self):
+        res = self._post(secciones=[{'nombre': 'Proa', 'codigo': 'X'}, {'nombre': ' ', 'codigo': 'X'}])
+
+        self.assertEqual(res.status_code, 400)
+        self.assertIn('secciones', res.json()['campos'])
+        self.assertFalse(Buque.objects.exists())
+        self.assertFalse(SeccionCasco.objects.exists())
+
+    def test_secciones_no_desactiva_el_rechazo_de_campos_desconocidos(self):
+        res = self._post(secciones='estandar', color='rojo')
+
+        self.assertEqual(res.status_code, 400)
+        self.assertIn('color', res.json()['campos'])
+        self.assertFalse(Buque.objects.exists())
+
+    def test_lista_las_secciones_de_un_buque(self):
+        propio = self._post(secciones=[{'nombre': 'Proa'}]).json()
+        self._post()
+
+        res = self.client.get('/api/vision/secciones/', {'buque': propio['id']})
+
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.json(), propio['secciones'])
+
+    def test_listar_secciones_valida_el_parametro_buque(self):
+        self.assertEqual(self.client.get('/api/vision/secciones/').status_code, 400)
+        self.assertEqual(self.client.get('/api/vision/secciones/', {'buque': 'abc'}).status_code, 400)
+        self.assertEqual(self.client.get('/api/vision/secciones/', {'buque': 999999}).status_code, 404)

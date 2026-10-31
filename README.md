@@ -10,7 +10,7 @@ El proyecto se organiza en tres secciones y avanza **backend primero**: cada sec
 
 | Sección | Qué es | Backend | Frontend |
 |---|---|---|---|
-| **Buques** | Entidad buque con ficha técnica (dimensiones, autonomía, capacidades…) | Alta, listado y ficha | Pendiente (hoy usa datos de ejemplo) |
+| **Buques** | Entidad buque con ficha técnica (dimensiones, autonomía, capacidades…) | Alta (con sus secciones del casco: las 20 estándar o una lista propia), listado y ficha | Pendiente (hoy usa datos de ejemplo) |
 | **Inspecciones** | Sesiones de inspección por buque | Alta, listado, detalle y borrado | Alta, listado y detalle |
 | **Visión IA** | Análisis del casco; todo análisis pertenece a una inspección | Fotos → cola Celery → inferencia → resultados en vivo (SSE) | Carga de fotos por zona y resultados en vivo |
 
@@ -63,8 +63,7 @@ uv sync                  # instala dependencias (incluye nautic_core v3.1.0 con 
 
 createdb NauticDB        # o: psql -U postgres -c 'CREATE DATABASE "NauticDB";'
 uv run python manage.py migrate
-uv run python manage.py seed_secciones_casco   # catálogo de secciones del casco
-uv run python manage.py runserver              # :8000
+uv run python manage.py runserver     # :8000
 ```
 
 En otra terminal, para que las fotos se analicen:
