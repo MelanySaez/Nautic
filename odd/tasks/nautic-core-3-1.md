@@ -39,7 +39,7 @@ Backend: off (source: no project/session configuration); runner
 
 ## Checklist
 - [x] T1 — Availability via `model_availability`. Route: delegated direct (writer trigger: 2+ non-trivial files).
-- [ ] T2 — Model and taxonomy version per photo. Route: delegated direct (same trigger).
+- [x] T2 — Model and taxonomy version per photo. Route: delegated direct (same trigger).
 
 ## Acceptance criteria
 - No import of `core_engine.vision.adapters` or `core_engine.vision.weights` remains in `backend/`.
@@ -61,6 +61,7 @@ One PR if it stays near budget; otherwise T1 and T2 as two slices.
 Branch `feat/nautic-core-3-1` from `main` (c9b4f24). Tag bumped to v3.1.0 and `uv sync` run
 (nautic-core 3.0.0 → 3.1.0).
 - T1 done in 4ae0c6b: `inference.py` uses `model_availability` / `models_availability`; private imports and requirements map removed; tests patch `vision.inference.model_availability`; docs updated. Observed: `manage.py test vision` 193 OK, `check` clean, `makemigrations --check` no changes, grep for adapters/weights imports no hits, `listar_modelos()` all 4 available. Route: delegated direct (single writer).
+- T2 done in 28c1128: migration `0005` (nullable `modelo_version`, `taxonomia_version`), `procesar_foto` stores `model_version`/`taxonomy_version` (absent or empty -> null), exposed in `_foto_to_dict` and `foto-updated`; 10 new tests in `test_versiones_foto.py`. Observed: `manage.py test vision` 203 OK, `check` clean, `makemigrations --check` no changes, `migrate` applied 0005 on NauticDB, grep no hits, all 4 models available.
 
 ## Next step
-T2.
+Open the PR (one slice or T1/T2 split) at the user's decision; nothing pushed.
