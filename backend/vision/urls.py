@@ -8,6 +8,9 @@ urlpatterns = [
     # Catálogo de secciones del casco
     path('api/vision/secciones/', views.api_vision_secciones, name='api_vision_secciones'),
 
+    # Catálogo de modelos de IA (con disponibilidad en este servidor)
+    path('api/vision/modelos/', views.api_vision_modelos, name='api_vision_modelos'),
+
     # Inspecciones (lista + creación)
     path('api/vision/inspecciones/', views.api_vision_inspecciones, name='api_vision_inspecciones'),
 
