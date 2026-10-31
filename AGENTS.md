@@ -185,7 +185,7 @@ pnpm add <pkg>     # add a dependency (pnpm add -D <pkg> for dev)
 - **Live updates** come from `EventSource` through the `EventosInspeccion` port and the `aplicarEvento` reducer. Do not add polling.
 - **Styling**: Tailwind with the semantic tokens in `src/index.css` (`bg-surface`, `text-ink`, `border-line`, `text-critical`, …). They swap in dark mode, so `dark:` variants are rarely needed.
 - **Language**: identifiers follow the Spanish domain (`Inspeccion`, `subirFoto`); UI copy is neutral Spanish; code comments in English.
-- **Vessels**: the backend now exposes `GET/POST /api/buques/` and `GET /api/buques/<id>/`, but the frontend still uses `EnMemoriaBuquesRepository` with a seed whose ids must exist in the `buques` table (HTTP adapter pending).
+- **Vessels**: `HttpBuquesRepository` (`buques/infrastructure/`) implements `BuquesRepository` (`listar` walks every page of `GET /api/buques/`, `obtener`, `crear`) and is wired in `composicion.ts`; DTO mapping lives in `buques/infrastructure/dtos.ts`. Field-level 400 errors arrive in `ApiError.campos` (snake_case keys). The Buques screens are not built yet.
 
 ---
 

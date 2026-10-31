@@ -1,6 +1,5 @@
 import type { BuquesRepository } from '../buques/domain/buque'
-import { EnMemoriaBuquesRepository } from '../buques/infrastructure/EnMemoriaBuquesRepository'
-import { BUQUES_SEMILLA } from '../buques/infrastructure/semilla'
+import { HttpBuquesRepository } from '../buques/infrastructure/HttpBuquesRepository'
 import type { EventosInspeccion, InspeccionesRepository } from '../inspecciones/application/puertos'
 import { HttpInspeccionesRepository } from '../inspecciones/infrastructure/HttpInspeccionesRepository'
 import { SseEventosInspeccion } from '../inspecciones/infrastructure/SseEventosInspeccion'
@@ -17,6 +16,6 @@ export function crearDependencias(): Dependencias {
   return {
     inspecciones: new HttpInspeccionesRepository(API_BASE_URL),
     eventos: new SseEventosInspeccion(API_BASE_URL),
-    buques: new EnMemoriaBuquesRepository(BUQUES_SEMILLA),
+    buques: new HttpBuquesRepository(API_BASE_URL),
   }
 }

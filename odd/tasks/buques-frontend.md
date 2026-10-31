@@ -275,7 +275,7 @@ Conventional Commit per task, tests and docs alongside the behavior.
       `/api/buques/${id}/`; `crear(datos)` → POST `/api/buques/`. Tests with injected `fetch`: URLs and
       query, pagination across 2 pages, mapping of nulls and JSON fields, POST body, 201 → detail,
       400 with `campos` → `ApiError.campos`, 404, network error. Acceptance: all green, no UI touched.
-- [ ] T4 — Composition switch. `crearDependencias()` uses `new HttpBuquesRepository(API_BASE_URL)`.
+- [x] T4 — Composition switch. `crearDependencias()` uses `new HttpBuquesRepository(API_BASE_URL)`.
       Delete `EnMemoriaBuquesRepository.ts`, its test and `semilla.ts`. Verify `NuevaInspeccionPage`
       tests are untouched and green (they use the fake). Update the AGENTS.md "Vessels" bullet and
       `frontend/README.md` (tree line and Buques paragraph). Acceptance: no reference to the seed
@@ -382,7 +382,8 @@ remain the user's decisions.
 Backend evidence: `buques-backend.md` (28 tests OK, `manage.py check` clean).
 - T1 done (commit 2885f93 `feat(frontend): expose field errors on ApiError`), route: delegated direct (single writer). RED: `apiClient.test.ts` "keeps the per-field messages of a 400 response..." and "drops entries that are not arrays of strings..." failed (`ApiError.campos` was undefined). GREEN: 7 new tests; full suite 82 passed, lint clean, build clean.
 - T2 done (commit 7acf289 `feat(frontend): model vessel detail and extend the port`), route: delegated direct (single writer). RED: after adding `unBuque`/`unDetalleBuque`/`obtener`/`crear` to `src/test/dobles.tsx`, `tsc -b` failed (TS2305 no exported `BuqueDetalle`/`NuevoBuque`; TS2353 `etapa`/`obtener` unknown on `Buque`/`BuquesRepository`). GREEN: `tsc -b` clean, 82 tests passed, lint clean, build clean. `EnMemoriaBuquesRepository.obtener/crear` throw (removed in T4); seed and its test updated to the new `Buque`.
-- T3 done (commit: see git log `feat(frontend): add HTTP vessel adapter and DTO mappers`), route: delegated direct (single writer). RED: `HttpBuquesRepository.test.ts` failed to load (module `./HttpBuquesRepository` did not exist; no tests ran). GREEN: 12 tests in that file passed; `tsc -b` clean, lint clean, build clean. Per the user's scope change, the full suite is no longer run: only touched/created test files.
+- T3 done (commit c7df226 `feat(frontend): add HTTP vessel adapter and DTO mappers`), route: delegated direct (single writer). RED: `HttpBuquesRepository.test.ts` failed to load (module `./HttpBuquesRepository` did not exist; no tests ran). GREEN: 12 tests in that file passed; `tsc -b` clean, lint clean, build clean. Per the user's scope change, the full suite is no longer run: only touched/created test files.
+- T4 done (commit: see git log `feat(frontend): wire the HTTP vessel adapter`), route: delegated direct (single writer). RED: before the change `grep -rn "BUQUES_SEMILLA\|EnMemoria" src` returned 9 matches (no new test per the scope change; the grep is the check). GREEN: grep empty; touched/related test files passed (NuevaInspeccionPage, HttpBuquesRepository, apiClient, HttpInspeccionesRepository: 41 tests); lint and build clean. Manual smoke against the real backend NOT done (no running backend in this task). AGENTS.md and frontend/README.md updated.
 
 ## Next step
 Create branch from `feat/buques-backend` (or `main` after merge), resolve open question 1 (form
