@@ -86,6 +86,8 @@ Foto individual analizada por YOLO. Máquina de estados asíncrona.
 | `estado` | CharField(20) | Estado actual (ver máquina de estados) |
 | `error_detalle` | TextField null | Mensaje de error si `estado=error` (la tarea trunca a 500 chars al escribir) |
 | `modelo_id` | CharField(50) null | Id del modelo de `core_engine` con el que se pidió analizar la foto (se fija en `/analizar/` o al reintentar; migración `0004`). Se expone como `modelo` |
+| `modelo_version` | CharField(32) null | Versión del modelo (`model_version` de `analyze()`) con la que se completó el último análisis; migración `0005`. Null en fotos anteriores o sin analizar |
+| `taxonomia_version` | CharField(32) null | Versión de la taxonomía de detección (`taxonomy_version`, nautic_core v3.1) del último análisis completado; migración `0005` |
 | `fecha_creacion` | DateTimeField | Auto (auto_now_add) |
 
 **Máquina de estados `FotoInspeccion.Estado`:**
@@ -258,7 +260,7 @@ El modelo se elige al **analizar**, no al subir ni por inspección:
 3. Con el id válido, cada foto encolada guarda `modelo_id` antes de encolarse (las omitidas por el límite de concurrencia no cambian) y el worker llama `run_inference(..., model_id=foto.modelo_id)`; una foto con `modelo_id` nulo (anterior a esta función) usa el modelo por defecto.
 4. El reintento `POST /api/vision/fotos/<id>/` acepta el mismo `modelo` opcional; sin él conserva el `modelo_id` de la foto.
 
-El modelo viaja como `modelo` en el dict de la foto (REST) y en los eventos SSE `foto-created` / `foto-updated`. Fuera de alcance: re-analizar con otro modelo una foto ya `completada`.
+El modelo viaja como `modelo` en el dict de la foto (REST) y en los eventos SSE `foto-created` / `foto-updated`. Al completarse el análisis, `procesar_foto` guarda además `modelo_version` y `taxonomia_version` (claves `model_version` / `taxonomy_version` del resultado de `analyze()`, que `run_inference` conserva) y se exponen con esos nombres en el dict de la foto y en `foto-updated`; si `core_engine` no los reporta quedan en `null`, y un reintento los sobrescribe con los del nuevo análisis. Las fotos anteriores a la migración `0005` no se rellenan. Fuera de alcance: re-analizar con otro modelo una foto ya `completada`.
 ### Validación de configuración
 
 `verificar_configuracion()` comprueba que `VISION_MODEL_ID` exista en el catálogo de `core_engine` y que `NAUTIC_WEIGHTS_DIR` sea un directorio existente. Se aplica en dos puntos:
@@ -370,7 +372,7 @@ El endpoint SSE desempaqueta el envelope y emite `event: foto-updated` al browse
 | Evento | Publicado desde | Payload `data` |
 |--------|----------------|----------------|
 | `foto-created` | `api_vision_subir_foto` | `{"foto": {foto_dict completo}}` |
-| `foto-updated` | `procesar_foto` task (×2: EN_PROCESO + COMPLETADA/ERROR) | `{foto_id, inspeccion_id, estado, severidad, detecciones, tiempo_inferencia_ms, modelo, imagen_anotada, error_detalle}` |
+| `foto-updated` | `procesar_foto` task (×2: EN_PROCESO + COMPLETADA/ERROR) | `{foto_id, inspeccion_id, estado, severidad, detecciones, tiempo_inferencia_ms, modelo, modelo_version, taxonomia_version, imagen_anotada, error_detalle}` |
 | `foto-deleted` | `api_vision_foto_detalle` DELETE | `{foto_id, inspeccion_id}` |
 
 ### Cliente Redis singleton

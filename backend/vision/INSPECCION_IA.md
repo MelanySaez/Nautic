@@ -139,6 +139,8 @@ class FotoInspeccion(models.Model):
     estado               = models.CharField(choices=Estado.choices, default=Estado.PENDIENTE)
     error_detalle        = models.TextField(blank=True, null=True)
     modelo_id            = models.CharField(max_length=50, blank=True, null=True)  # modelo de core_engine elegido al analizar
+    modelo_version       = models.CharField(max_length=32, blank=True, null=True)  # model_version del último análisis completado
+    taxonomia_version    = models.CharField(max_length=32, blank=True, null=True)  # taxonomy_version del último análisis completado
     fecha_creacion       = models.DateTimeField(auto_now_add=True)
 ```
 
@@ -228,7 +230,7 @@ La IP real se extrae respetando `X-Forwarded-For` (primer valor) para funcionar 
 |---|---|---|
 | `ready` | vista SSE | `{inspeccion_id, ts}` |
 | `foto-created` | vista de upload | `{foto: {...}}` |
-| `foto-updated` | worker Celery | `{foto_id, inspeccion_id, estado, severidad, detecciones, tiempo_inferencia_ms, modelo, imagen_anotada, error_detalle}` |
+| `foto-updated` | worker Celery | `{foto_id, inspeccion_id, estado, severidad, detecciones, tiempo_inferencia_ms, modelo, modelo_version, taxonomia_version, imagen_anotada, error_detalle}` |
 | `foto-deleted` | vista de borrado | `{foto_id, inspeccion_id}` |
 
 **Nota sobre URLs de imagen:** el worker Celery no tiene `request`, por lo que `foto-updated` lleva la URL tal como la devuelve el storage: relativa (`/media/...`) en local, absoluta y firmada en un bucket. El `GET` de detalle devuelve URLs absolutas (en local usa `request.build_absolute_uri`). El cliente debe normalizar ambas formas antes de mergear el evento, para no pisar una URL buena con una relativa. Las URL firmadas caducan (`S3_URL_EXPIRE_SECONDS`); un `GET` posterior devuelve URLs nuevas.
@@ -353,7 +355,7 @@ El endpoint `POST /api/vision/inspecciones/<id>/analizar/` itera todas las fotos
 
 El inspector sube las fotos, elige un modelo de `GET /api/vision/modelos/` y presiona "Analizar": `POST .../analizar/` con `{"modelo": "<id>"}` (opcional; por defecto `VISION_MODEL_ID`).
 
-- **Decisión:** el modelo se elige al analizar, no al subir ni por inspección; así se puede subir primero y decidir después, y cada foto registra con qué modelo se analizó (`modelo` en el dict de la foto y en los eventos SSE).
+- **Decisión:** el modelo se elige al analizar, no al subir ni por inspección; así se puede subir primero y decidir después, y cada foto registra con qué modelo se analizó (`modelo` en el dict de la foto y en los eventos SSE) y, al completarse, con qué versión del modelo y de la taxonomía (`modelo_version`, `taxonomia_version`, tomadas de `model_version` / `taxonomy_version` de `analyze()`; `null` si no se reportan o la foto es anterior a la migración `0005`; un reintento los sobrescribe).
 - Un `modelo` desconocido o no disponible (faltan pesos o dependencias en el servidor) responde `400` antes de encolar nada y sin modificar ninguna foto; nunca llega a fallar dentro del worker.
 - Cada modelo usa su umbral de confianza calibrado (`confianza_por_defecto` en el catálogo).
 - Pendiente (fuera de alcance): re-analizar con otro modelo una foto ya `completada`.

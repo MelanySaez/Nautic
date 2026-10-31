@@ -265,6 +265,8 @@ def _foto_to_dict(f, request=None):
         'estado': f.estado,
         'error_detalle': f.error_detalle,
         'modelo': f.modelo_id,
+        'modelo_version': f.modelo_version,
+        'taxonomia_version': f.taxonomia_version,
         'fecha_creacion': f.fecha_creacion.isoformat(),
     }
 
