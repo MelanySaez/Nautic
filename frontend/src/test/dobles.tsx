@@ -3,9 +3,55 @@ import { createMemoryRouter, RouterProvider, type RouteObject } from 'react-rout
 import { vi } from 'vitest'
 import type { Dependencias } from '../app/composicion'
 import { DependenciasProvider } from '../app/DependenciasProvider'
+import type { Buque, BuqueDetalle, NuevoBuque } from '../buques/domain/buque'
 import type { EventoInspeccion, Foto, Inspeccion, InspeccionDetalle, SeccionCasco } from '../inspecciones/domain/inspeccion'
 
 export const SECCION_QUILLA: SeccionCasco = { id: 3, codigo: 'KEEL', nombre: 'Quilla', descripcion: '', orden: 9 }
+
+export function unBuque(overrides: Partial<Buque> = {}): Buque {
+  return {
+    id: 1,
+    nombre: 'ARA Almirante Brown',
+    tipo: 'Destructor',
+    etapa: 'Activo',
+    imagen: null,
+    createdAt: '2026-10-01T10:00:00',
+    updatedAt: '2026-10-01T10:00:00',
+    ...overrides,
+  }
+}
+
+/** Full technical sheet with every optional measure unset. */
+export function unDetalleBuque(overrides: Partial<BuqueDetalle> = {}): BuqueDetalle {
+  return {
+    ...unBuque(),
+    descripcion: '',
+    autonomiaHoras: null,
+    vidaDisenoAnios: null,
+    horasNavegacionAnio: null,
+    autonomiaDias: null,
+    velMaximaNudos: null,
+    alcanceNmA12kn: null,
+    esloraTotalM: null,
+    mangaMoldeadaM: null,
+    puntalM: null,
+    caladoDisenoM: null,
+    desplazamientoTon: null,
+    combustibleDiarioM3: null,
+    combustibleDieselM3: null,
+    combustibleHelicopteroM3: null,
+    gasolinaBotesM3: null,
+    aguaPotableM3: null,
+    aceiteLubricanteM3: null,
+    aceiteHidraulicoM3: null,
+    rondasConfig: {},
+    contextoOperacional: {},
+    documentos: [],
+    misiones: [],
+    gruposConstructivos: [],
+    ...overrides,
+  }
+}
 
 export function unaInspeccion(overrides: Partial<Inspeccion> = {}): Inspeccion {
   return {
@@ -65,9 +111,11 @@ export function crearDependenciasFalsas() {
     },
     buques: {
       listar: vi.fn(async () => [
-        { id: 1, nombre: 'ARA Almirante Brown', tipo: 'Destructor' },
-        { id: 2, nombre: 'ARA Libertad', tipo: 'Fragata' },
+        unBuque(),
+        unBuque({ id: 2, nombre: 'ARA Libertad', tipo: 'Fragata' }),
       ]),
+      obtener: vi.fn(async (_id: number) => unDetalleBuque()),
+      crear: vi.fn(async (_datos: NuevoBuque) => unDetalleBuque()),
     },
   } satisfies Dependencias
   return { dependencias, emitirEvento: (evento: EventoInspeccion) => emitir(evento), cancelarSuscripcion: cancelar }

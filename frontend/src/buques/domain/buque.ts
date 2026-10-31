@@ -1,9 +1,58 @@
+/** Vessel summary, as shown in lists and selectors. */
 export interface Buque {
   id: number
   nombre: string
   tipo: string
+  etapa: string
+  /** Plain name or path stored by the backend; there is no serving contract for it yet. */
+  imagen: string | null
+  createdAt: string
+  updatedAt: string
 }
 
+/** Technical-sheet measures. Every measure is optional on the backend, hence `null`. */
+export interface DatosTecnicosBuque {
+  autonomiaHoras: number | null
+  vidaDisenoAnios: number | null
+  horasNavegacionAnio: number | null
+  autonomiaDias: number | null
+  velMaximaNudos: number | null
+  alcanceNmA12kn: number | null
+  esloraTotalM: number | null
+  mangaMoldeadaM: number | null
+  puntalM: number | null
+  caladoDisenoM: number | null
+  desplazamientoTon: number | null
+  combustibleDiarioM3: number | null
+  combustibleDieselM3: number | null
+  combustibleHelicopteroM3: number | null
+  gasolinaBotesM3: number | null
+  aguaPotableM3: number | null
+  aceiteLubricanteM3: number | null
+  aceiteHidraulicoM3: number | null
+}
+
+/** Free-form JSON fields: the backend defines no schema for them. */
+export interface DocumentosBuque {
+  rondasConfig: Record<string, unknown>
+  contextoOperacional: Record<string, unknown>
+  documentos: unknown[]
+  misiones: unknown[]
+  gruposConstructivos: unknown[]
+}
+
+/** Full technical sheet of a vessel. */
+export interface BuqueDetalle extends Buque, DatosTecnicosBuque, DocumentosBuque {
+  descripcion: string
+}
+
+/** Creation input: only `nombre` and `tipo` are required; omitted fields take the backend default. */
+export type NuevoBuque = Pick<Buque, 'nombre' | 'tipo'> &
+  Partial<Omit<BuqueDetalle, 'id' | 'nombre' | 'tipo' | 'createdAt' | 'updatedAt'>>
+
 export interface BuquesRepository {
+  /** Returns the complete fleet in the order the API provides. */
   listar(): Promise<Buque[]>
+  obtener(id: number): Promise<BuqueDetalle>
+  crear(datos: NuevoBuque): Promise<BuqueDetalle>
 }

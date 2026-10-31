@@ -41,7 +41,7 @@ src/
 │   ├── application/    # puertos: InspeccionesRepository, EventosInspeccion
 │   ├── infrastructure/ # adaptadores: HTTP (fetch) y SSE (EventSource), mapeo snake_case → dominio
 │   └── ui/             # páginas (contenedores) y componentes de presentación
-├── buques/         # puerto BuquesRepository + adaptador en memoria
+├── buques/         # puerto BuquesRepository + adaptador HTTP (/api/buques/)
 ├── shared/         # cliente HTTP, tema, hooks y átomos de UI
 └── test/           # setup de Vitest y dobles de prueba
 ```
@@ -52,7 +52,7 @@ src/
 
 ## Limitaciones conocidas
 
-- **Buques:** el backend ya expone `GET/POST /api/buques/` y `GET /api/buques/<id>/`, pero el selector aún usa `EnMemoriaBuquesRepository` con la semilla de `src/buques/infrastructure/semilla.ts`. Los `id` de la semilla deben existir en la tabla `buques`; si no, crear la inspección devuelve 404. Falta el adaptador HTTP que implemente `BuquesRepository` (plan en `odd/tasks/buques-frontend.md`).
+- **Buques:** el adaptador HTTP (`HttpBuquesRepository`) implementa `listar` (recorre todas las páginas de `GET /api/buques/`), `obtener` y `crear`, y alimenta el selector de «Nueva inspección». Aún no hay pantallas de buques (lista, alta, ficha técnica); el backend no ofrece edición ni borrado (plan en `odd/tasks/buques-frontend.md`).
 - **Exportar resultados:** no implementado (no hay endpoint).
 
 ## Tests
