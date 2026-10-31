@@ -14,13 +14,11 @@ DLQ (Dead Letter Queue):
 """
 import io
 import logging
-import os
-import uuid
 
 from PIL import Image
 from celery import shared_task
-from django.conf import settings
 
+from .almacenamiento import guardar_anotada, leer_archivo, url_archivo
 from .inference import run_inference
 from .models import FotoInspeccion, NivelSeveridad, subir_severidad_max
 from .pubsub import publicar_evento
@@ -85,7 +83,9 @@ def _notificar(foto: FotoInspeccion) -> None:
             "severidad": foto.severidad,
             "detecciones": foto.detecciones,
             "tiempo_inferencia_ms": foto.tiempo_inferencia_ms,
-            "imagen_anotada": foto.imagen_anotada,
+            # URL (not the storage key): the browser uses it as-is. Relative
+            # (``/media/...``) on local storage, absolute and signed on a bucket.
+            "imagen_anotada": url_archivo(foto.imagen_anotada),
             "error_detalle": foto.error_detalle,
         },
     )
@@ -137,7 +137,7 @@ def procesar_foto(self, foto_id: int):
     Pasos:
       1. Marca la foto como ``en_proceso`` (idempotente: si ya está
          ``completada`` la tarea retorna sin reprocesar).
-      2. Lee bytes desde disco y verifica que la imagen es válida.
+      2. Lee bytes desde el storage y verifica que la imagen es válida.
       3. Delega procesado + anotación a ``inference.run_inference`` (nautic_core v3)
       4. Persiste imagen anotada, detecciones agrupadas, severidad y estado.
       5. Ante excepción, marca ``error`` con detalle y reintenta si aplica.
@@ -162,9 +162,7 @@ def procesar_foto(self, foto_id: int):
     _notificar(foto)
 
     try:
-        ruta_original = os.path.join(settings.BASE_DIR, foto.imagen_original)
-        with open(ruta_original, "rb") as fh:
-            imagen_bytes = fh.read()
+        imagen_bytes = leer_archivo(foto.imagen_original)
 
         # Validación de integridad (no es procesamiento — sólo defensa contra
         # archivos corruptos o renombrados con extensión falsa)
@@ -176,18 +174,12 @@ def procesar_foto(self, foto_id: int):
         # Procesado + anotación íntegramente vía nautic_core
         imagen_anotada_bytes, resultados = run_inference(imagen_bytes)
 
-        # Persistir imagen anotada en disco
-        nombre_anotada = (
-            f"media/inspecciones/anotadas/{foto_id}_{uuid.uuid4().hex[:8]}.jpg"
-        )
-        ruta_anotada = os.path.join(settings.BASE_DIR, nombre_anotada)
-        os.makedirs(os.path.dirname(ruta_anotada), exist_ok=True)
-        with open(ruta_anotada, "wb") as fh:
-            fh.write(imagen_anotada_bytes)
+        # Persistir imagen anotada en el storage; se guarda la clave devuelta.
+        clave_anotada = guardar_anotada(foto_id, imagen_anotada_bytes)
 
         raw_detections = resultados.get("detections", [])
 
-        foto.imagen_anotada = nombre_anotada
+        foto.imagen_anotada = clave_anotada
         foto.detecciones = _agrupar_detecciones(raw_detections)
         foto.tiempo_inferencia_ms = round(resultados.get("inference_time_ms", 0), 2)
         foto.severidad = _calcular_severidad(raw_detections)
