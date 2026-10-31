@@ -1,7 +1,7 @@
 import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
-import { crearDependenciasFalsas, renderizarRutas, unaInspeccion } from '../../test/dobles'
+import { crearDependenciasFalsas, renderizarRutas, unaInspeccion, unaPagina } from '../../test/dobles'
 import { ListaInspeccionesPage } from './ListaInspeccionesPage'
 
 function renderizar(dependencias = crearDependenciasFalsas().dependencias) {
@@ -20,9 +20,9 @@ function renderizar(dependencias = crearDependenciasFalsas().dependencias) {
 describe('ListaInspeccionesPage', () => {
   it('lists inspections with vessel, inspector, description and photo count', async () => {
     const { dependencias } = crearDependenciasFalsas()
-    dependencias.inspecciones.listar.mockResolvedValue([
+    dependencias.inspecciones.buscar.mockResolvedValue(unaPagina([
       unaInspeccion({ id: 1, buqueNombre: 'ARA Almirante Brown', tomadoPor: 'María Pérez', totalFotos: 12 }),
-    ])
+    ]))
 
     renderizar(dependencias)
 
@@ -34,7 +34,7 @@ describe('ListaInspeccionesPage', () => {
 
   it('shows "Sin asignar" when the inspector is blank', async () => {
     const { dependencias } = crearDependenciasFalsas()
-    dependencias.inspecciones.listar.mockResolvedValue([unaInspeccion({ tomadoPor: '' })])
+    dependencias.inspecciones.buscar.mockResolvedValue(unaPagina([unaInspeccion({ tomadoPor: '' })]))
 
     renderizar(dependencias)
 
@@ -43,10 +43,10 @@ describe('ListaInspeccionesPage', () => {
 
   it('filters by vessel or inspector as the user types', async () => {
     const { dependencias } = crearDependenciasFalsas()
-    dependencias.inspecciones.listar.mockResolvedValue([
+    dependencias.inspecciones.buscar.mockResolvedValue(unaPagina([
       unaInspeccion({ id: 1, buqueNombre: 'ARA Almirante Brown', tomadoPor: 'María Pérez' }),
       unaInspeccion({ id: 2, buqueNombre: 'ARA Libertad', tomadoPor: 'Juan Gómez' }),
-    ])
+    ]))
     renderizar(dependencias)
     await screen.findByRole('article', { name: 'ARA Libertad' })
 
@@ -57,7 +57,7 @@ describe('ListaInspeccionesPage', () => {
 
   it('tells the user when the search has no matches', async () => {
     const { dependencias } = crearDependenciasFalsas()
-    dependencias.inspecciones.listar.mockResolvedValue([unaInspeccion()])
+    dependencias.inspecciones.buscar.mockResolvedValue(unaPagina([unaInspeccion()]))
     renderizar(dependencias)
     await screen.findByRole('article')
 
@@ -83,7 +83,7 @@ describe('ListaInspeccionesPage', () => {
 
   it('opens the photo upload of an inspection', async () => {
     const { dependencias } = crearDependenciasFalsas()
-    dependencias.inspecciones.listar.mockResolvedValue([unaInspeccion({ id: 42 })])
+    dependencias.inspecciones.buscar.mockResolvedValue(unaPagina([unaInspeccion({ id: 42 })]))
     const { router } = renderizar(dependencias)
 
     await userEvent.click(await screen.findByRole('link', { name: 'Abrir inspección de ARA Almirante Brown' }))
@@ -93,7 +93,7 @@ describe('ListaInspeccionesPage', () => {
 
   it('deletes an inspection after confirmation', async () => {
     const { dependencias } = crearDependenciasFalsas()
-    dependencias.inspecciones.listar.mockResolvedValue([unaInspeccion({ id: 42 })])
+    dependencias.inspecciones.buscar.mockResolvedValue(unaPagina([unaInspeccion({ id: 42 })]))
     vi.spyOn(window, 'confirm').mockReturnValue(true)
     renderizar(dependencias)
     const tarjeta = await screen.findByRole('article')
@@ -109,7 +109,7 @@ describe('ListaInspeccionesPage', () => {
 
   it('keeps the inspection when the deletion is not confirmed', async () => {
     const { dependencias } = crearDependenciasFalsas()
-    dependencias.inspecciones.listar.mockResolvedValue([unaInspeccion()])
+    dependencias.inspecciones.buscar.mockResolvedValue(unaPagina([unaInspeccion()]))
     vi.spyOn(window, 'confirm').mockReturnValue(false)
     renderizar(dependencias)
 
@@ -121,7 +121,7 @@ describe('ListaInspeccionesPage', () => {
 
   it('reports a failed deletion and keeps the inspection', async () => {
     const { dependencias } = crearDependenciasFalsas()
-    dependencias.inspecciones.listar.mockResolvedValue([unaInspeccion()])
+    dependencias.inspecciones.buscar.mockResolvedValue(unaPagina([unaInspeccion()]))
     dependencias.inspecciones.eliminar.mockRejectedValue(new Error('No encontrado.'))
     vi.spyOn(window, 'confirm').mockReturnValue(true)
     renderizar(dependencias)
@@ -134,9 +134,9 @@ describe('ListaInspeccionesPage', () => {
 
   it('shows the loading error and retries on demand', async () => {
     const { dependencias } = crearDependenciasFalsas()
-    dependencias.inspecciones.listar
+    dependencias.inspecciones.buscar
       .mockRejectedValueOnce(new Error('No se pudo conectar con el servidor.'))
-      .mockResolvedValueOnce([unaInspeccion()])
+      .mockResolvedValueOnce(unaPagina([unaInspeccion()]))
     renderizar(dependencias)
 
     expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo conectar con el servidor.')

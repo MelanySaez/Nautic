@@ -1,10 +1,19 @@
 import { ApiClient, type Fetcher } from '../../shared/http/apiClient'
 import type { InspeccionesRepository, ResultadoAnalisis } from '../application/puertos'
-import type { Foto, Inspeccion, InspeccionDetalle, NuevaInspeccion, SeccionCasco } from '../domain/inspeccion'
+import type {
+  FiltroInspecciones,
+  Foto,
+  Inspeccion,
+  InspeccionDetalle,
+  NuevaInspeccion,
+  PaginaInspecciones,
+  SeccionCasco,
+} from '../domain/inspeccion'
 import {
   aFoto,
   aInspeccion,
   aInspeccionDetalle,
+  aPagina,
   aSeccion,
   type FotoDto,
   type InspeccionDetalleDto,
@@ -13,9 +22,8 @@ import {
   type SeccionDto,
 } from './dtos'
 
-const TAMANO_PAGINA = 100
-// Guards against a server that keeps answering hay_mas=true forever.
-const MAX_PAGINAS = 100
+// Divisible by the 2- and 3-column card grids; the backend accepts 1-100.
+const TAMANO_PAGINA = 24
 
 export class HttpInspeccionesRepository implements InspeccionesRepository {
   private readonly api: ApiClient
@@ -24,18 +32,16 @@ export class HttpInspeccionesRepository implements InspeccionesRepository {
     this.api = new ApiClient(baseUrl, fetcher)
   }
 
-  async listar(): Promise<Inspeccion[]> {
-    // Walks every page so callers keep getting the complete list until the search UI does server-side filtering.
-    const inspecciones: Inspeccion[] = []
-    let cursor: string | null = null
-    for (let pagina = 0; pagina < MAX_PAGINAS; pagina++) {
-      const consulta: string = `limit=${TAMANO_PAGINA}` + (cursor ? `&cursor=${encodeURIComponent(cursor)}` : '')
-      const lista: ListaInspeccionesDto = await this.api.get<ListaInspeccionesDto>(`/api/vision/inspecciones/?${consulta}`)
-      inspecciones.push(...lista.resultados.map(aInspeccion))
-      if (!lista.hay_mas || !lista.siguiente) break
-      cursor = lista.siguiente
-    }
-    return inspecciones
+  async buscar(filtro: FiltroInspecciones, cursor?: string): Promise<PaginaInspecciones> {
+    const consulta = new URLSearchParams()
+    if (filtro.buqueId !== undefined) consulta.set('buque', String(filtro.buqueId))
+    if (filtro.desde) consulta.set('desde', filtro.desde)
+    if (filtro.hasta) consulta.set('hasta', filtro.hasta)
+    if (filtro.severidadMin) consulta.set('severidad_min', filtro.severidadMin)
+    if (filtro.q?.trim()) consulta.set('q', filtro.q.trim())
+    consulta.set('limit', String(TAMANO_PAGINA))
+    if (cursor) consulta.set('cursor', cursor)
+    return aPagina(await this.api.get<ListaInspeccionesDto>(`/api/vision/inspecciones/?${consulta}`))
   }
 
   async obtener(id: number): Promise<InspeccionDetalle> {

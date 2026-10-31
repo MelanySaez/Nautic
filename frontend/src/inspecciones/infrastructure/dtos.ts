@@ -5,6 +5,7 @@ import type {
   Foto,
   Inspeccion,
   InspeccionDetalle,
+  PaginaInspecciones,
   SeccionCasco,
   Severidad,
 } from '../domain/inspeccion'
@@ -134,12 +135,18 @@ export function aInspeccion(dto: InspeccionDto): Inspeccion {
     id: dto.id,
     buqueId: dto.buque_id,
     buqueNombre: dto.buque_nombre,
+    nombre: dto.nombre,
+    severidadMax: dto.severidad_max,
     descripcion: dto.descripcion,
     tomadoPor: dto.tomado_por,
     fechaCreacion: dto.fecha_creacion,
     fechaModificacion: dto.fecha_modificacion,
     totalFotos: dto.total_fotos,
   }
+}
+
+export function aPagina(dto: ListaInspeccionesDto): PaginaInspecciones {
+  return { resultados: dto.resultados.map(aInspeccion), siguiente: dto.siguiente, hayMas: dto.hay_mas }
 }
 
 export function aInspeccionDetalle(dto: InspeccionDetalleDto): InspeccionDetalle {

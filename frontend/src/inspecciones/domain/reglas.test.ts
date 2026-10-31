@@ -28,6 +28,8 @@ function inspeccion(overrides: Partial<Inspeccion> = {}): Inspeccion {
     id: 1,
     buqueId: 1,
     buqueNombre: 'ARA Almirante Brown',
+    nombre: 'Inspección #1 — ARA Almirante Brown',
+    severidadMax: null,
     descripcion: '',
     tomadoPor: 'María Pérez',
     fechaCreacion: '2026-10-01T10:00:00Z',

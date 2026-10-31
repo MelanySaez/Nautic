@@ -5,7 +5,15 @@ import type { Dependencias } from '../app/composicion'
 import { DependenciasProvider } from '../app/DependenciasProvider'
 import type { Buque, BuqueDetalle, NuevoBuque } from '../buques/domain/buque'
 import type { ModeloIA } from '../inspecciones/domain/modelo'
-import type { EventoInspeccion, Foto, Inspeccion, InspeccionDetalle, SeccionCasco } from '../inspecciones/domain/inspeccion'
+import type {
+  EventoInspeccion,
+  FiltroInspecciones,
+  Foto,
+  Inspeccion,
+  InspeccionDetalle,
+  PaginaInspecciones,
+  SeccionCasco,
+} from '../inspecciones/domain/inspeccion'
 
 export const SECCION_QUILLA: SeccionCasco = { id: 3, codigo: 'KEEL', nombre: 'Quilla', descripcion: '', orden: 9 }
 
@@ -60,6 +68,8 @@ export function unaInspeccion(overrides: Partial<Inspeccion> = {}): Inspeccion {
     id: 1,
     buqueId: 1,
     buqueNombre: 'ARA Almirante Brown',
+    nombre: 'Inspección #1 — ARA Almirante Brown',
+    severidadMax: null,
     descripcion: 'Control anual de casco',
     tomadoPor: 'María Pérez',
     fechaCreacion: '2026-10-01T10:00:00Z',
@@ -67,6 +77,10 @@ export function unaInspeccion(overrides: Partial<Inspeccion> = {}): Inspeccion {
     totalFotos: 0,
     ...overrides,
   }
+}
+
+export function unaPagina(resultados: Inspeccion[] = [], extra: Partial<PaginaInspecciones> = {}): PaginaInspecciones {
+  return { resultados, siguiente: null, hayMas: false, ...extra }
 }
 
 export function unaFoto(overrides: Partial<Foto> = {}): Foto {
@@ -113,7 +127,7 @@ export function crearDependenciasFalsas() {
   const cancelar = vi.fn()
   const dependencias = {
     inspecciones: {
-      listar: vi.fn(async () => [] as Inspeccion[]),
+      buscar: vi.fn(async (_filtro: FiltroInspecciones, _cursor?: string) => unaPagina()),
       obtener: vi.fn(async () => unDetalle()),
       crear: vi.fn(async () => unaInspeccion()),
       eliminar: vi.fn(async () => {}),
