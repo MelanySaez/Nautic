@@ -55,6 +55,14 @@ class VersionesPorFotoTests(TestCase):
         self.assertEqual(self.foto.modelo_version, '0.1.0')
         self.assertEqual(self.foto.taxonomia_version, '1.0.0')
 
+    def test_una_version_demasiado_larga_se_recorta_y_la_foto_se_completa(self):
+        larga = '1.0.0+' + 'x' * 60
+        self._procesar(model_version=larga, taxonomy_version=larga)
+
+        self.assertEqual(self.foto.estado, FotoInspeccion.Estado.COMPLETADA)
+        self.assertEqual(self.foto.modelo_version, larga[:32])
+        self.assertEqual(self.foto.taxonomia_version, larga[:32])
+
     def test_claves_ausentes_o_vacias_quedan_en_none(self):
         self._procesar()
         self.assertIsNone(self.foto.modelo_version)

@@ -60,6 +60,16 @@ def _calcular_severidad(detections):
     return NivelSeveridad.a_texto(peor)
 
 
+def _version(valor):
+    """Version string from core_engine, cut to the column size (32); None when absent.
+
+    A longer value must never make the completion save fail after a successful inference.
+    """
+    if not valor:
+        return None
+    return str(valor)[:FotoInspeccion._meta.get_field("modelo_version").max_length]
+
+
 def _agrupar_detecciones(detections):
     """Colapsa la lista cruda a una entrada por clase única."""
     grouped = {}
@@ -196,8 +206,8 @@ def procesar_foto(self, foto_id: int):
         foto.severidad = _calcular_severidad(raw_detections)
         # Overwritten on every analysis (retries included); None when the
         # installed core_engine does not report them.
-        foto.modelo_version = resultados.get("model_version") or None
-        foto.taxonomia_version = resultados.get("taxonomy_version") or None
+        foto.modelo_version = _version(resultados.get("model_version"))
+        foto.taxonomia_version = _version(resultados.get("taxonomy_version"))
         foto.estado = FotoInspeccion.Estado.COMPLETADA
         foto.error_detalle = None
         foto.save(update_fields=[
