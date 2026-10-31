@@ -41,7 +41,7 @@ src/
 │   ├── application/    # puertos: InspeccionesRepository, EventosInspeccion
 │   ├── infrastructure/ # adaptadores: HTTP (fetch) y SSE (EventSource), mapeo snake_case → dominio
 │   └── ui/             # páginas (contenedores) y componentes de presentación
-├── buques/         # puerto BuquesRepository + adaptador HTTP (/api/buques/)
+├── buques/         # puerto BuquesRepository, adaptador HTTP (/api/buques/) y pantallas
 ├── shared/         # cliente HTTP, tema, hooks y átomos de UI
 └── test/           # setup de Vitest y dobles de prueba
 ```
@@ -52,7 +52,7 @@ src/
 
 ## Limitaciones conocidas
 
-- **Buques:** el adaptador HTTP (`HttpBuquesRepository`) implementa `listar` (recorre todas las páginas de `GET /api/buques/`), `obtener` y `crear`, y alimenta el selector de «Nueva inspección». Aún no hay pantallas de buques (lista, alta, ficha técnica); el backend no ofrece edición ni borrado (plan en `odd/tasks/buques-frontend.md`).
+- **Buques:** el adaptador HTTP (`HttpBuquesRepository`) implementa `listar` (recorre todas las páginas de `GET /api/buques/`), `obtener` y `crear`, y alimenta el selector de «Nueva inspección». Las pantallas están en `buques/ui/`: lista con búsqueda (`/buques`), alta (`/buques/nuevo`) y ficha técnica (`/buques/:id`), con un enlace «Buques» en la navegación. El backend no ofrece edición ni borrado (plan en `odd/tasks/buques-frontend.md`).
 - **Exportar resultados:** no implementado (no hay endpoint).
 
 ## Tests

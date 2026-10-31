@@ -50,7 +50,7 @@ All endpoints live under `/api/`. The `vision` module needs infrastructure beyon
     └── src/
         ├── app/                 # router, layout, composition root
         ├── inspecciones/        # domain / application / infrastructure / ui
-        ├── buques/              # port + in-memory adapter
+        ├── buques/              # port + HTTP adapter + list/create/detail screens
         ├── shared/              # http client, theme, hooks, UI atoms
         └── test/                # Vitest setup and test doubles
 ```
@@ -185,7 +185,7 @@ pnpm add <pkg>     # add a dependency (pnpm add -D <pkg> for dev)
 - **Live updates** come from `EventSource` through the `EventosInspeccion` port and the `aplicarEvento` reducer. Do not add polling.
 - **Styling**: Tailwind with the semantic tokens in `src/index.css` (`bg-surface`, `text-ink`, `border-line`, `text-critical`, …). They swap in dark mode, so `dark:` variants are rarely needed.
 - **Language**: identifiers follow the Spanish domain (`Inspeccion`, `subirFoto`); UI copy is neutral Spanish; code comments in English.
-- **Vessels**: `HttpBuquesRepository` (`buques/infrastructure/`) implements `BuquesRepository` (`listar` walks every page of `GET /api/buques/`, `obtener`, `crear`) and is wired in `composicion.ts`; DTO mapping lives in `buques/infrastructure/dtos.ts`. Field-level 400 errors arrive in `ApiError.campos` (snake_case keys). The Buques screens are not built yet.
+- **Vessels**: `HttpBuquesRepository` (`buques/infrastructure/`) implements `BuquesRepository` (`listar` walks every page of `GET /api/buques/`, `obtener`, `crear`) and is wired in `composicion.ts`; DTO mapping lives in `buques/infrastructure/dtos.ts`. Field-level 400 errors arrive in `ApiError.campos` (snake_case keys). Screens live in `buques/ui/`: list with client-side search (`/buques`), create form (`/buques/nuevo`, server `campos` errors shown per field) and technical sheet (`/buques/:id`); the main nav has a "Buques" link. There is no edit/delete.
 
 ---
 

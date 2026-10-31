@@ -1,4 +1,7 @@
 import { createBrowserRouter } from 'react-router'
+import { BuqueDetalleRuta } from '../buques/ui/BuqueDetallePage'
+import { ListaBuquesPage } from '../buques/ui/ListaBuquesPage'
+import { NuevoBuquePage } from '../buques/ui/NuevoBuquePage'
 import { CargaPorZonaRuta } from '../inspecciones/ui/CargaPorZonaPage'
 import { ListaInspeccionesPage } from '../inspecciones/ui/ListaInspeccionesPage'
 import { NuevaInspeccionPage } from '../inspecciones/ui/NuevaInspeccionPage'
@@ -13,6 +16,9 @@ export const router = createBrowserRouter([
       { path: '/inspecciones/nueva', element: <NuevaInspeccionPage /> },
       { path: '/inspecciones/:id/carga', element: <CargaPorZonaRuta /> },
       { path: '/inspecciones/:id/resultados', element: <ResultadosRuta /> },
+      { path: '/buques', element: <ListaBuquesPage /> },
+      { path: '/buques/nuevo', element: <NuevoBuquePage /> },
+      { path: '/buques/:id', element: <BuqueDetalleRuta /> },
     ],
   },
 ])
