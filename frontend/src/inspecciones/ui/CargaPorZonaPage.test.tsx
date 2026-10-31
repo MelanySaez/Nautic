@@ -1,4 +1,4 @@
-import { act, screen, within } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import {
@@ -7,8 +7,16 @@ import {
   SECCION_QUILLA,
   unaFoto,
   unDetalle,
+  unModelo,
 } from '../../test/dobles'
+import { ApiError } from '../../shared/http/apiClient'
 import { CargaPorZonaRuta } from './CargaPorZonaPage'
+
+const MODELOS = [
+  unModelo(),
+  unModelo({ id: 'rtdetr', label: 'RT-DETR', descripcion: 'Detector basado en transformers.', porDefecto: false }),
+  unModelo({ id: 'maskrcnn', label: 'Mask R-CNN', porDefecto: false, disponible: false }),
+]
 
 const SECCION_PROA = { id: 1, codigo: 'FWD-BTM', nombre: 'Fondo - Proa', descripcion: '', orden: 1 }
 
@@ -16,18 +24,19 @@ function preparar() {
   const falsas = crearDependenciasFalsas()
   falsas.dependencias.inspecciones.obtener.mockResolvedValue(unDetalle({ id: 7, buqueId: 4, buqueNombre: 'ARA Libertad' }))
   falsas.dependencias.inspecciones.listarSecciones.mockResolvedValue([SECCION_QUILLA, SECCION_PROA])
+  falsas.dependencias.modelos.listar.mockResolvedValue(MODELOS)
   return falsas
 }
 
 function renderizar(dependencias = preparar().dependencias) {
   const router = renderizarRutas(
     [
-      { path: '/inspecciones/:id/carga', element: <CargaPorZonaRuta /> },
-      { path: '/inspecciones/:id/resultados', element: <p>Resultados</p> },
+      { path: '/vision/:id', element: <CargaPorZonaRuta /> },
+      { path: '/vision/:id/resultados', element: <p>Resultados</p> },
       { path: '/', element: <p>Listado</p> },
     ],
     dependencias,
-    '/inspecciones/7/carga',
+    '/vision/7',
   )
   return { router, dependencias }
 }
@@ -155,10 +164,79 @@ describe('CargaPorZonaPage', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: 'Iniciar análisis' }))
 
-    expect(dependencias.inspecciones.analizar).toHaveBeenCalledWith(7)
+    expect(dependencias.inspecciones.analizar).toHaveBeenCalledWith(7, 'yolo-seg')
     expect(await screen.findByRole('status')).toHaveTextContent(
       'Análisis iniciado para 1 foto. 1 en espera por límite de tareas concurrentes.',
     )
+  })
+
+  it('preselects the default model, disables the unavailable one and describes the selection', async () => {
+    renderizar()
+
+    const selector = await screen.findByLabelText('Modelo de IA')
+
+    await waitFor(() => expect(selector).toHaveValue('yolo-seg'))
+    expect(screen.getByRole('option', { name: 'Mask R-CNN (no disponible)' })).toBeDisabled()
+    expect(screen.getByRole('option', { name: 'RT-DETR' })).toBeEnabled()
+    expect(screen.getByText('Detecta y segmenta daños del casco.')).toBeInTheDocument()
+
+    await userEvent.selectOptions(selector, 'rtdetr')
+
+    expect(screen.getByText('Detector basado en transformers.')).toBeInTheDocument()
+  })
+
+  it('analyzes and retries with the model chosen in the selector', async () => {
+    const { dependencias } = preparar()
+    dependencias.inspecciones.obtener.mockResolvedValue(
+      unDetalle({
+        id: 7,
+        buqueNombre: 'ARA Libertad',
+        fotos: [unaFoto({ id: 21 }), unaFoto({ id: 22, estado: 'error', errorDetalle: 'Fallo' })],
+      }),
+    )
+    dependencias.inspecciones.analizar.mockResolvedValue({ iniciadas: 1, omitidasPorLimite: 0 })
+    dependencias.inspecciones.reintentarFoto.mockResolvedValue(unaFoto({ id: 22 }))
+    renderizar(dependencias)
+    await screen.findByRole('option', { name: 'RT-DETR' })
+    await userEvent.selectOptions(screen.getByLabelText('Modelo de IA'), 'rtdetr')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Iniciar análisis' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Reintentar análisis' }))
+
+    expect(dependencias.inspecciones.analizar).toHaveBeenCalledWith(7, 'rtdetr')
+    expect(dependencias.inspecciones.reintentarFoto).toHaveBeenCalledWith(22, 'rtdetr')
+  })
+
+  it('shows the field error when the server rejects the model', async () => {
+    const { dependencias } = preparar()
+    dependencias.inspecciones.obtener.mockResolvedValue(
+      unDetalle({ id: 7, buqueNombre: 'ARA Libertad', fotos: [unaFoto({ id: 21 })] }),
+    )
+    dependencias.inspecciones.analizar.mockRejectedValue(
+      new ApiError(400, 'Datos inválidos.', { modelo: ['Modelo no disponible en este servidor.'] }),
+    )
+    renderizar(dependencias)
+    await screen.findByLabelText('Modelo de IA')
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Iniciar análisis' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Modelo no disponible en este servidor.')
+  })
+
+  it('shows the model and version on the photos that have one', async () => {
+    const { dependencias } = preparar()
+    dependencias.inspecciones.obtener.mockResolvedValue(
+      unDetalle({
+        id: 7,
+        buqueNombre: 'ARA Libertad',
+        fotos: [unaFoto({ id: 21, estado: 'completada', modelo: 'rtdetr', modeloVersion: '2.0.1' })],
+      }),
+    )
+    renderizar(dependencias)
+
+    const cola = await screen.findByRole('list', { name: 'Fotos de la inspección' })
+
+    expect(cola).toHaveTextContent('RT-DETR v2.0.1')
   })
 
   it('disables the analysis when nothing is pending', async () => {
@@ -187,7 +265,7 @@ describe('CargaPorZonaPage', () => {
 
     await userEvent.click(within(cola).getByRole('button', { name: 'Reintentar análisis' }))
 
-    expect(dependencias.inspecciones.reintentarFoto).toHaveBeenCalledWith(21)
+    expect(dependencias.inspecciones.reintentarFoto).toHaveBeenCalledWith(21, 'yolo-seg')
     expect(cola).toHaveTextContent('Pendiente')
   })
 
@@ -211,7 +289,7 @@ describe('CargaPorZonaPage', () => {
 
     await userEvent.click(await screen.findByRole('link', { name: 'Ver resultados' }))
 
-    expect(router.state.location.pathname).toBe('/inspecciones/7/resultados')
+    expect(router.state.location.pathname).toBe('/vision/7/resultados')
   })
 
   it('shows the loading error and retries on demand', async () => {

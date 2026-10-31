@@ -46,7 +46,7 @@ export function ListaInspeccionesPage() {
           <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">Inspecciones</h1>
           <p className="mt-1 text-ink-muted">Sesiones de inspección de casco por buque.</p>
         </div>
-        <EnlaceBoton to="/inspecciones/nueva">
+        <EnlaceBoton to="/vision">
           <Icon name="plus" className="size-4" />
           Nueva inspección
         </EnlaceBoton>
@@ -71,7 +71,7 @@ export function ListaInspeccionesPage() {
       {estado.tipo === 'listo' && estado.datos.length === 0 && (
         <Vacio>
           <p>Todavía no hay inspecciones.</p>
-          <EnlaceBoton to="/inspecciones/nueva" variante="accion">
+          <EnlaceBoton to="/vision" variante="accion">
             Nueva inspección
           </EnlaceBoton>
         </Vacio>

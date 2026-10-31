@@ -15,6 +15,9 @@ export function AppLayout() {
             Nautic
           </NavLink>
           <nav aria-label="Principal" className="flex flex-1 items-center gap-1">
+            <NavLink to="/vision" className={claseEnlace}>
+              Visión IA
+            </NavLink>
             <NavLink to="/" end className={claseEnlace}>
               Inspecciones
             </NavLink>

@@ -8,8 +8,8 @@ function renderizar(dependencias = crearDependenciasFalsas().dependencias) {
   const router = renderizarRutas(
     [
       { path: '/', element: <ListaInspeccionesPage /> },
-      { path: '/inspecciones/nueva', element: <p>Formulario nuevo</p> },
-      { path: '/inspecciones/:id/carga', element: <p>Carga de fotos</p> },
+      { path: '/vision', element: <p>Formulario nuevo</p> },
+      { path: '/vision/:id', element: <p>Carga de fotos</p> },
     ],
     dependencias,
     '/',
@@ -78,7 +78,7 @@ describe('ListaInspeccionesPage', () => {
 
     await userEvent.click(screen.getAllByRole('link', { name: /Nueva inspección/ })[0])
 
-    expect(router.state.location.pathname).toBe('/inspecciones/nueva')
+    expect(router.state.location.pathname).toBe('/vision')
   })
 
   it('opens the photo upload of an inspection', async () => {
@@ -88,7 +88,7 @@ describe('ListaInspeccionesPage', () => {
 
     await userEvent.click(await screen.findByRole('link', { name: 'Abrir inspección de ARA Almirante Brown' }))
 
-    expect(router.state.location.pathname).toBe('/inspecciones/42/carga')
+    expect(router.state.location.pathname).toBe('/vision/42')
   })
 
   it('deletes an inspection after confirmation', async () => {

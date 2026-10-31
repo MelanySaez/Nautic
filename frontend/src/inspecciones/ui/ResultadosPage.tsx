@@ -6,6 +6,7 @@ import { clasesControlCompacto } from '../../shared/ui/clasesControl'
 import { resumirProgreso, severidadMaxima } from '../domain/reglas'
 import { InsigniaSeveridad } from './Insignias'
 import { TarjetaResultado } from './TarjetaResultado'
+import { useModelos } from './useModelos'
 import { useInspeccionEnVivo, type DatosInspeccion } from './useInspeccionEnVivo'
 
 /** Route entry: keys the page by id so switching inspections starts from a clean state. */
@@ -25,6 +26,9 @@ export function ResultadosPage({ inspeccionId }: { inspeccionId: number }) {
 function Resultados({ datos }: { datos: DatosInspeccion }) {
   const { detalle, secciones } = datos
   const [zonaId, setZonaId] = useState('')
+  const catalogo = useModelos()
+  // A failed catalog only costs the friendly label: photos fall back to the raw model id.
+  const modelos = catalogo.tipo === 'listo' ? catalogo.datos : []
 
   const analizadas = detalle.fotos.filter((f) => f.estado === 'completada')
   const visibles = zonaId ? analizadas.filter((f) => String(f.seccion.id) === zonaId) : analizadas
@@ -39,7 +43,7 @@ function Resultados({ datos }: { datos: DatosInspeccion }) {
     <div className="flex flex-col gap-6">
       <header className="flex flex-wrap items-center gap-3">
         <Link
-          to={`/inspecciones/${detalle.id}/carga`}
+          to={`/vision/${detalle.id}`}
           aria-label="Volver a la carga"
           className="rounded p-1 text-ink-muted hover:text-ink"
         >
@@ -64,7 +68,7 @@ function Resultados({ datos }: { datos: DatosInspeccion }) {
 
       {sinAnalizar > 0 && (
         <Link
-          to={`/inspecciones/${detalle.id}/carga`}
+          to={`/vision/${detalle.id}`}
           className="label-caps self-start rounded border border-info/30 bg-info-bg px-3 py-2 text-info hover:border-accent"
         >
           {sinAnalizar} {sinAnalizar === 1 ? 'foto' : 'fotos'} sin analizar · ir a la carga
@@ -90,7 +94,7 @@ function Resultados({ datos }: { datos: DatosInspeccion }) {
           </label>
           <div className="grid gap-6 lg:grid-cols-2">
             {visibles.map((foto) => (
-              <TarjetaResultado key={foto.id} foto={foto} />
+              <TarjetaResultado key={foto.id} foto={foto} modelos={modelos} />
             ))}
           </div>
         </>

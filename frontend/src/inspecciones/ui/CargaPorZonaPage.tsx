@@ -1,5 +1,6 @@
 import { useMemo, useState, type DragEvent } from 'react'
 import { Link, useParams } from 'react-router'
+import { ApiError } from '../../shared/http/apiClient'
 import { useDependencias } from '../../app/useDependencias'
 import { Boton, EnlaceBoton } from '../../shared/ui/Boton'
 import { Cargando, MensajeError, Vacio } from '../../shared/ui/Estados'
@@ -7,10 +8,13 @@ import { Icon } from '../../shared/ui/Icon'
 import { Tarjeta } from '../../shared/ui/Tarjeta'
 import { mensajeDe } from '../../shared/ui/formato'
 import type { EventoInspeccion, Foto, SeccionCasco } from '../domain/inspeccion'
+import { modeloInicial } from '../domain/modelo'
 import { resumirProgreso } from '../domain/reglas'
 import { ColaFotos } from './ColaFotos'
 import { MapaZonas } from './MapaZonas'
+import { SelectorModelo } from './SelectorModelo'
 import { useInspeccionEnVivo, type DatosInspeccion } from './useInspeccionEnVivo'
+import { useModelos } from './useModelos'
 
 /** Route entry: keys the page by id so switching inspections starts from a clean state. */
 export function CargaPorZonaRuta() {
@@ -31,6 +35,12 @@ function textoAnalisis(iniciadas: number, omitidas: number): string {
   return omitidas > 0 ? `${base} ${omitidas} en espera por límite de tareas concurrentes.` : base
 }
 
+/** A rejected model comes back as a field error; everything else keeps its own message. */
+function mensajeAnalisis(error: unknown): string {
+  if (error instanceof ApiError && error.campos?.modelo) return `Modelo: ${error.campos.modelo.join(' ')}`
+  return mensajeDe(error)
+}
+
 function CargaPorZona({ datos, aplicar }: { datos: DatosInspeccion; aplicar: (evento: EventoInspeccion) => void }) {
   const { inspecciones } = useDependencias()
   const { detalle, secciones } = datos
@@ -41,6 +51,13 @@ function CargaPorZona({ datos, aplicar }: { datos: DatosInspeccion; aplicar: (ev
   const [analizando, setAnalizando] = useState(false)
   const [ocupadas, setOcupadas] = useState<Set<number>>(new Set())
   const [arrastrando, setArrastrando] = useState(false)
+  const [eleccionModelo, setEleccionModelo] = useState<string | null>(null)
+  const catalogo = useModelos()
+
+  const modelos = catalogo.tipo === 'listo' ? catalogo.datos : []
+  // Without a catalog the request carries no model and the server applies its default.
+  const modeloId = eleccionModelo ?? modeloInicial(modelos)?.id ?? undefined
+  const sinModeloUsable = catalogo.tipo === 'listo' && modeloId === undefined
 
   const progreso = resumirProgreso(detalle.fotos)
   const fotosPorSeccion = useMemo(() => {
@@ -76,10 +93,10 @@ function CargaPorZona({ datos, aplicar }: { datos: DatosInspeccion; aplicar: (ev
     setAviso(null)
     setAnalizando(true)
     try {
-      const { iniciadas, omitidasPorLimite } = await inspecciones.analizar(detalle.id)
+      const { iniciadas, omitidasPorLimite } = await inspecciones.analizar(detalle.id, modeloId)
       setAviso(textoAnalisis(iniciadas, omitidasPorLimite))
     } catch (error) {
-      setErrores([mensajeDe(error)])
+      setErrores([mensajeAnalisis(error)])
     } finally {
       setAnalizando(false)
     }
@@ -91,7 +108,7 @@ function CargaPorZona({ datos, aplicar }: { datos: DatosInspeccion; aplicar: (ev
     try {
       await accion()
     } catch (error) {
-      setErrores([mensajeDe(error)])
+      setErrores([mensajeAnalisis(error)])
     } finally {
       setOcupadas((s) => {
         const copia = new Set(s)
@@ -103,7 +120,7 @@ function CargaPorZona({ datos, aplicar }: { datos: DatosInspeccion; aplicar: (ev
 
   const reintentarFoto = (foto: Foto) =>
     conFotoOcupada(foto, async () => {
-      const f = await inspecciones.reintentarFoto(foto.id)
+      const f = await inspecciones.reintentarFoto(foto.id, modeloId)
       aplicar({
         tipo: 'foto-actualizada',
         actualizacion: {
@@ -257,18 +274,37 @@ function CargaPorZona({ datos, aplicar }: { datos: DatosInspeccion; aplicar: (ev
             <p>Esta inspección todavía no tiene fotos.</p>
           </Vacio>
         ) : (
-          <ColaFotos fotos={detalle.fotos} ocupadas={ocupadas} alReintentar={reintentarFoto} alEliminar={eliminarFoto} />
+          <ColaFotos fotos={detalle.fotos} modelos={modelos} ocupadas={ocupadas} alReintentar={reintentarFoto} alEliminar={eliminarFoto} />
         )}
       </Tarjeta>
 
-      <div className="sticky bottom-0 -mx-4 flex gap-3 border-t border-line bg-canvas/95 px-4 py-4 backdrop-blur sm:justify-end">
-        <EnlaceBoton to={`/inspecciones/${detalle.id}/resultados`} variante="secundario" className="flex-1 sm:flex-none">
-          Ver resultados
-        </EnlaceBoton>
-        <Boton onClick={analizar} disabled={analizando || progreso.pendientes === 0} className="flex-1 sm:flex-none">
-          <Icon name="search" className="size-4" />
-          Iniciar análisis
-        </Boton>
+      <div className="sticky bottom-0 -mx-4 flex flex-col gap-3 border-t border-line bg-canvas/95 px-4 py-4 backdrop-blur sm:flex-row sm:items-start sm:justify-end">
+        <SelectorModelo
+          modelos={modelos}
+          seleccionadoId={modeloId ?? null}
+          cargando={catalogo.tipo === 'cargando'}
+          error={
+            catalogo.tipo === 'error'
+              ? `No se pudo cargar el catálogo de modelos (${catalogo.mensaje}). Se usará el modelo por defecto del servidor.`
+              : sinModeloUsable
+                ? 'Ningún modelo está disponible en el servidor.'
+                : null
+          }
+          alCambiar={setEleccionModelo}
+        />
+        <div className="flex gap-3">
+          <EnlaceBoton to={`/vision/${detalle.id}/resultados`} variante="secundario" className="flex-1 sm:flex-none">
+            Ver resultados
+          </EnlaceBoton>
+          <Boton
+            onClick={analizar}
+            disabled={analizando || progreso.pendientes === 0 || catalogo.tipo === 'cargando' || sinModeloUsable}
+            className="flex-1 sm:flex-none"
+          >
+            <Icon name="search" className="size-4" />
+            Iniciar análisis
+          </Boton>
+        </div>
       </div>
     </div>
   )

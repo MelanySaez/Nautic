@@ -1,5 +1,6 @@
 import { Icon } from '../../shared/ui/Icon'
 import type { Foto } from '../domain/inspeccion'
+import { etiquetaModelo, type ModeloIA } from '../domain/modelo'
 import { InsigniaEstado } from './Insignias'
 
 function nombreArchivo(url: string | null): string {
@@ -9,11 +10,13 @@ function nombreArchivo(url: string | null): string {
 
 export function ColaFotos({
   fotos,
+  modelos,
   ocupadas,
   alReintentar,
   alEliminar,
 }: {
   fotos: Foto[]
+  modelos: ModeloIA[]
   ocupadas: Set<number>
   alReintentar: (foto: Foto) => void
   alEliminar: (foto: Foto) => void
@@ -23,6 +26,7 @@ export function ColaFotos({
       {fotos.map((foto) => {
         const ocupada = ocupadas.has(foto.id)
         const imagen = foto.imagenAnotada ?? foto.imagenOriginal
+        const modelo = etiquetaModelo(foto.modelo, foto.modeloVersion, modelos)
         return (
           <li key={foto.id} className="flex flex-col overflow-hidden rounded border border-line bg-surface">
             <div className="relative aspect-[4/3] bg-surface-2">
@@ -45,6 +49,7 @@ export function ColaFotos({
                 </span>
                 <InsigniaEstado estado={foto.estado} />
               </div>
+              {modelo && <p className="truncate font-mono text-[11px] text-ink-dim">{modelo}</p>}
               {foto.estado === 'error' && foto.errorDetalle && (
                 <p className="line-clamp-2 text-xs text-critical">{foto.errorDetalle}</p>
               )}
