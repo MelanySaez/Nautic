@@ -81,6 +81,16 @@ describe('ListaInspeccionesPage', () => {
     expect(router.state.location.search).toBe('?q=casco')
   })
 
+  it('clears the search box when the URL drops the text, e.g. from the nav link', async () => {
+    const { router } = renderizar(crearDependenciasFalsas().dependencias, '/?q=casco')
+    const caja = await screen.findByRole('searchbox', { name: 'Buscar por nombre' })
+    expect(caja).toHaveValue('casco')
+
+    await router.navigate('/')
+
+    await waitFor(() => expect(caja).toHaveValue(''))
+  })
+
   it('appends the next page with "Cargar más" until the server has no more', async () => {
     const { dependencias } = crearDependenciasFalsas()
     dependencias.inspecciones.buscar

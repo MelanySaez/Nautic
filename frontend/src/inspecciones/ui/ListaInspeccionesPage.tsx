@@ -23,6 +23,13 @@ export function ListaInspeccionesPage() {
   const cargarBuques = useCallback(() => buques.listar(), [buques])
   const catalogo = useRecurso(cargarBuques).estado
   const [texto, setTexto] = useState(parametros.get('q') ?? '')
+  // Follow URL changes made elsewhere (nav link, history); our own debounced writes already match.
+  const qUrl = parametros.get('q') ?? ''
+  const [qVisto, setQVisto] = useState(qUrl)
+  if (qUrl !== qVisto) {
+    setQVisto(qUrl)
+    if (qUrl !== texto.trim()) setTexto(qUrl)
+  }
   const [eliminandoId, setEliminandoId] = useState<number | null>(null)
   const [errorAccion, setErrorAccion] = useState<string | null>(null)
 

@@ -152,5 +152,13 @@ do it once and share it).
 ## Checks
 From `frontend/`: touched test files only (`pnpm vitest run <files>`), `pnpm lint`, `pnpm build`; manual smoke against the backend.
 
+- Reviews (user pre-authorized): slice 1 (main..c7f7a2b) and slice 2 (..ee2da39) medium,
+  slice_budget_reached, APPROVED + acknowledged. Applied: the search box follows URL changes made
+  elsewhere (nav link, history) instead of keeping stale text; RED then GREEN in
+  `ListaInspeccionesPage.test.tsx` (14 passed), lint and build clean. Open advisories: slice 1 alone
+  shows only the first page (merge both slices together); the stale-response guard has no test; an
+  empty state and "Cargar más" can show together after deleting every loaded card. Product question
+  for the user: cards open `/vision/:id` (upload) rather than the results page where rename lives.
+
 ## Next step
 Manual smoke against the backend (filters, Cargar más, rename), then open the stacked PRs (slice 1 = T1+T2, slice 2 = T3-T5).
