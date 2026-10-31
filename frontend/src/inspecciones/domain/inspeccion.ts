@@ -27,6 +27,10 @@ export interface Foto {
   severidad: Severidad | null
   estado: EstadoFoto
   errorDetalle: string | null
+  /** Catalog id of the model that analyzed (or will analyze) the photo; null when none was chosen yet. */
+  modelo: string | null
+  modeloVersion: string | null
+  taxonomiaVersion: string | null
   fechaCreacion: string
 }
 
@@ -47,6 +51,8 @@ export interface InspeccionDetalle extends Inspeccion {
 
 export interface NuevaInspeccion {
   buqueId: number
+  /** Optional: when blank the backend generates one. */
+  nombre?: string
   tomadoPor: string
   descripcion: string
 }
@@ -60,6 +66,9 @@ export interface ActualizacionFoto {
   tiempoInferenciaMs: number | null
   imagenAnotada: string | null
   errorDetalle: string | null
+  modelo: string | null
+  modeloVersion: string | null
+  taxonomiaVersion: string | null
 }
 
 export type EventoInspeccion =

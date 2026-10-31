@@ -111,6 +111,9 @@ describe('ResultadosPage', () => {
           tiempoInferenciaMs: 500,
           imagenAnotada: 'http://api.test/media/anotadas/25.jpg',
           errorDetalle: null,
+          modelo: null,
+          modeloVersion: null,
+          taxonomiaVersion: null,
         },
       }),
     )

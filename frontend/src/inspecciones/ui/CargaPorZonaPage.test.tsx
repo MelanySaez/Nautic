@@ -116,6 +116,9 @@ describe('CargaPorZonaPage', () => {
           tiempoInferenciaMs: 800,
           imagenAnotada: null,
           errorDetalle: null,
+          modelo: null,
+          modeloVersion: null,
+          taxonomiaVersion: null,
         },
       }),
     )

@@ -15,6 +15,9 @@ function foto(overrides: Partial<Foto> = {}): Foto {
     severidad: null,
     estado: 'pendiente',
     errorDetalle: null,
+    modelo: null,
+    modeloVersion: null,
+    taxonomiaVersion: null,
     fechaCreacion: '2026-10-01T10:00:00Z',
     ...overrides,
   }
@@ -95,6 +98,9 @@ describe('aplicarEvento', () => {
         tiempoInferenciaMs: 1200,
         imagenAnotada: 'http://api/media/a-anotada.jpg',
         errorDetalle: null,
+        modelo: null,
+        modeloVersion: null,
+        taxonomiaVersion: null,
       },
     })
 

@@ -114,6 +114,9 @@ function CargaPorZona({ datos, aplicar }: { datos: DatosInspeccion; aplicar: (ev
           tiempoInferenciaMs: f.tiempoInferenciaMs,
           imagenAnotada: f.imagenAnotada,
           errorDetalle: f.errorDetalle,
+          modelo: f.modelo,
+          modeloVersion: f.modeloVersion,
+          taxonomiaVersion: f.taxonomiaVersion,
         },
       })
     })
