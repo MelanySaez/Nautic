@@ -1,8 +1,8 @@
-import os
-import tempfile
-from pathlib import Path
+import subprocess
+import sys
 from unittest import mock
 
+from core_engine.vision import ModelAvailability
 from django.test import SimpleTestCase, override_settings
 from rest_framework.test import APIClient
 
@@ -17,85 +17,133 @@ CAMPOS = {
 IDS_CATALOGO = ['yolo-seg', 'yolo-tiled', 'maskrcnn', 'rtdetr']
 
 
-class _PesosTemporales(SimpleTestCase):
-    """Points the weights resolver at an empty temp dir (no real weights needed)."""
-
-    def setUp(self):
-        self._tmp = tempfile.TemporaryDirectory()
-        self.addCleanup(self._tmp.cleanup)
-        self.pesos = Path(self._tmp.name)
-        # Also redirect the development fallback so the real repo cannot leak in.
-        parches = [
-            mock.patch.dict(os.environ, {'NAUTIC_WEIGHTS_DIR': str(self.pesos)}),
-            mock.patch('core_engine.vision.weights.REPO_ROOT', self.pesos / 'sin-repo'),
-        ]
-        for parche in parches:
-            parche.start()
-            self.addCleanup(parche.stop)
-
-    def _crear_pesos(self, *nombres):
-        for nombre in nombres:
-            (self.pesos / nombre).mkdir(exist_ok=True)
+def _estado(model_id, missing_weights=(), missing_modules=(), install_hint=None):
+    """Availability report as ``core_engine`` returns it."""
+    return ModelAvailability(
+        model_id=model_id,
+        available=not missing_weights and not missing_modules,
+        missing_weights=tuple(missing_weights),
+        missing_modules=tuple(missing_modules),
+        install_hint=install_hint,
+    )
 
 
-class DisponibilidadModeloTests(_PesosTemporales):
-    def test_sin_pesos_no_esta_disponible(self):
-        self.assertFalse(inference.modelo_disponible('yolo-seg'))
-        self.assertEqual(
-            inference.motivo_no_disponible('yolo-seg'),
-            'Faltan los pesos del modelo en el servidor.',
+def _todos_disponibles():
+    return [_estado(model_id) for model_id in IDS_CATALOGO]
+
+
+def _parchear_disponibilidad(test, estados):
+    """Patch ``model_availability`` / ``models_availability`` at the import site."""
+    por_id = {e.model_id: e for e in estados}
+
+    def por_modelo(model_id):
+        if model_id not in por_id:
+            raise ValueError(f'Unknown model: {model_id}')
+        return por_id[model_id]
+
+    parches = [
+        mock.patch('vision.inference.model_availability', side_effect=por_modelo),
+        mock.patch('vision.inference.models_availability', return_value=list(estados)),
+    ]
+    for parche in parches:
+        parche.start()
+        test.addCleanup(parche.stop)
+
+
+class DisponibilidadModeloTests(SimpleTestCase):
+    def test_disponible_cuando_core_engine_lo_reporta_disponible(self):
+        _parchear_disponibilidad(self, [_estado('yolo-seg')])
+
+        self.assertTrue(inference.modelo_disponible('yolo-seg'))
+        self.assertIsNone(inference.motivo_no_disponible('yolo-seg'))
+
+    def test_sin_pesos_el_motivo_nombra_los_pesos_faltantes(self):
+        _parchear_disponibilidad(
+            self, [_estado('maskrcnn', missing_weights=['maskrcnn-0.2.0.pt'])]
         )
 
-    def test_con_pesos_y_dependencias_esta_disponible(self):
-        from core_engine.vision.adapters import yolo_seg
+        self.assertFalse(inference.modelo_disponible('maskrcnn'))
+        self.assertEqual(
+            inference.motivo_no_disponible('maskrcnn'),
+            'Faltan los pesos del modelo en el servidor: maskrcnn-0.2.0.pt.',
+        )
 
-        self._crear_pesos(yolo_seg.WEIGHTS_NAME)
+    def test_peso_de_directorio_se_reporta_como_directorio_barra_archivo(self):
+        _parchear_disponibilidad(
+            self, [_estado('rtdetr', missing_weights=['rtdetr-0.1.0/config.json'])]
+        )
 
-        with mock.patch('importlib.util.find_spec', return_value=object()):
-            self.assertTrue(inference.modelo_disponible('yolo-seg'))
-            self.assertIsNone(inference.motivo_no_disponible('yolo-seg'))
+        self.assertIn('rtdetr-0.1.0/config.json', inference.motivo_no_disponible('rtdetr'))
 
-    def test_yolo_tiled_reutiliza_los_pesos_de_yolo_seg(self):
-        from core_engine.vision.adapters import yolo_seg
+    def test_sin_dependencias_el_motivo_nombra_modulos_e_instalacion(self):
+        _parchear_disponibilidad(self, [_estado(
+            'rtdetr', missing_modules=['torch', 'transformers'],
+            install_hint="pip install 'nautic-core[rtdetr]'",
+        )])
 
-        self._crear_pesos(yolo_seg.WEIGHTS_NAME)
+        self.assertEqual(
+            inference.motivo_no_disponible('rtdetr'),
+            'Faltan dependencias del modelo en el servidor: torch, transformers. '
+            "Instalación: pip install 'nautic-core[rtdetr]'.",
+        )
 
-        with mock.patch('importlib.util.find_spec', return_value=object()):
-            self.assertTrue(inference.modelo_disponible('yolo-tiled'))
-            self.assertFalse(inference.modelo_disponible('maskrcnn'))
+    def test_dependencias_sin_install_hint_omiten_la_instalacion(self):
+        _parchear_disponibilidad(self, [_estado('rtdetr', missing_modules=['torch'])])
 
-    def test_dependencia_faltante_no_esta_disponible_aunque_haya_pesos(self):
-        from core_engine.vision.adapters import rtdetr
+        self.assertEqual(
+            inference.motivo_no_disponible('rtdetr'),
+            'Faltan dependencias del modelo en el servidor: torch.',
+        )
 
-        self._crear_pesos(rtdetr.WEIGHTS_NAME)
-        instalados = {'torch'}
+    def test_pesos_y_dependencias_faltantes_se_informan_juntos(self):
+        _parchear_disponibilidad(self, [_estado(
+            'maskrcnn', missing_weights=['maskrcnn-0.2.0.pt'],
+            missing_modules=['torchvision'], install_hint='pip install nautic-core',
+        )])
 
-        def find_spec(nombre):
-            return object() if nombre in instalados else None
-
-        with mock.patch('importlib.util.find_spec', side_effect=find_spec):
-            self.assertEqual(
-                inference.motivo_no_disponible('rtdetr'),
-                'Faltan dependencias del modelo en el servidor.',
-            )
-
-    def test_el_motivo_no_expone_rutas_del_servidor(self):
         motivo = inference.motivo_no_disponible('maskrcnn')
 
-        self.assertNotIn(str(self.pesos), motivo)
+        self.assertIn('Faltan los pesos del modelo en el servidor: maskrcnn-0.2.0.pt.', motivo)
+        self.assertIn('Faltan dependencias del modelo en el servidor: torchvision.', motivo)
 
-    def test_modelo_fuera_del_mapa_de_requisitos_se_considera_disponible(self):
+    def test_el_motivo_no_expone_rutas_del_servidor(self):
+        # core_engine reports names only; the message must never add a path.
+        _parchear_disponibilidad(
+            self, [_estado('maskrcnn', missing_weights=['maskrcnn-0.2.0.pt'])]
+        )
+
+        self.assertNotIn('/', inference.motivo_no_disponible('maskrcnn'))
+
+    def test_modelo_fuera_del_catalogo_se_considera_disponible(self):
+        # Same behaviour as before 3.1: unknown ids are validated by ids_modelos().
+        _parchear_disponibilidad(self, _todos_disponibles())
+
         self.assertIsNone(inference.motivo_no_disponible('modelo-futuro'))
+        self.assertTrue(inference.modelo_disponible('modelo-futuro'))
 
     def test_comprobar_disponibilidad_no_importa_frameworks_pesados(self):
-        with mock.patch('builtins.__import__', wraps=__import__) as importar:
-            inference.modelo_disponible('rtdetr')
+        # Fresh interpreter: other tests may already have imported torch & co.
+        codigo = (
+            'import sys, django, os\n'
+            'os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")\n'
+            'django.setup()\n'
+            'from vision import inference\n'
+            'inference.listar_modelos(); inference.modelo_disponible("rtdetr")\n'
+            'cargados = {"torch", "torchvision", "ultralytics", "transformers"} '
+            '& set(sys.modules)\n'
+            'print(sorted(cargados))\n'
+        )
+        res = subprocess.run(
+            [sys.executable, '-c', codigo], capture_output=True, text=True, check=True,
+        )
 
-        importados = {c.args[0].split('.')[0] for c in importar.call_args_list}
-        self.assertFalse(importados & {'torch', 'ultralytics', 'transformers'})
+        self.assertEqual(res.stdout.strip().splitlines()[-1], '[]')
 
 
-class ListarModelosTests(_PesosTemporales):
+class ListarModelosTests(SimpleTestCase):
+    def setUp(self):
+        _parchear_disponibilidad(self, _todos_disponibles())
+
     def test_sigue_el_orden_y_los_campos_del_catalogo(self):
         modelos = inference.listar_modelos()
 
@@ -111,6 +159,21 @@ class ListarModelosTests(_PesosTemporales):
         self.assertEqual(por_defecto, ['maskrcnn'])
         self.assertEqual(inference.modelo_por_defecto(), 'maskrcnn')
 
+    def test_disponible_viene_de_models_availability(self):
+        _parchear_disponibilidad(self, [
+            _estado('yolo-seg'),
+            _estado('yolo-tiled'),
+            _estado('maskrcnn', missing_weights=['maskrcnn-0.2.0.pt']),
+            _estado('rtdetr', missing_modules=['transformers']),
+        ])
+
+        disponibles = {m['id']: m['disponible'] for m in inference.listar_modelos()}
+
+        self.assertEqual(
+            disponibles,
+            {'yolo-seg': True, 'yolo-tiled': True, 'maskrcnn': False, 'rtdetr': False},
+        )
+
     def test_confianza_y_mascaras_vienen_de_core_engine(self):
         por_id = {m['id']: m for m in inference.listar_modelos()}
 
@@ -120,9 +183,9 @@ class ListarModelosTests(_PesosTemporales):
         self.assertEqual(por_id['maskrcnn']['confianza_por_defecto'], 0.5)
 
 
-class ApiModelosTests(_PesosTemporales):
+class ApiModelosTests(SimpleTestCase):
     def setUp(self):
-        super().setUp()
+        _parchear_disponibilidad(self, _todos_disponibles())
         self.client = APIClient()
 
     def test_lista_los_cuatro_modelos_del_catalogo(self):
@@ -140,13 +203,15 @@ class ApiModelosTests(_PesosTemporales):
 
         self.assertEqual([m['id'] for m in modelos if m['por_defecto']], ['yolo-seg'])
 
-    def test_disponible_refleja_los_pesos_presentes(self):
-        from core_engine.vision.adapters import maskrcnn
+    def test_disponible_refleja_la_disponibilidad_de_core_engine(self):
+        _parchear_disponibilidad(self, [
+            _estado('yolo-seg', missing_weights=['yolo-seg-0.1.0.pt']),
+            _estado('yolo-tiled', missing_weights=['yolo-seg-0.1.0.pt']),
+            _estado('maskrcnn'),
+            _estado('rtdetr', missing_modules=['transformers']),
+        ])
 
-        self._crear_pesos(maskrcnn.WEIGHTS_NAME)
-
-        with mock.patch('importlib.util.find_spec', return_value=object()):
-            modelos = self.client.get(URL_MODELOS).json()['modelos']
+        modelos = self.client.get(URL_MODELOS).json()['modelos']
 
         disponibles = {m['id']: m['disponible'] for m in modelos}
         self.assertEqual(

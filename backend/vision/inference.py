@@ -11,14 +11,18 @@ de inicialización.
 
 Los pesos se resuelven con ``$NAUTIC_WEIGHTS_DIR/<archivo>`` (ver
 ``backend/.env.example``). Si no existen, ``FileNotFoundError`` lista las
-rutas probadas.
+rutas probadas. La disponibilidad de cada modelo (pesos y dependencias) se
+consulta con la API pública ``model_availability`` / ``models_availability``
+de ``core_engine`` (nautic_core v3.1), que no carga ningún framework de ML.
 """
-import importlib.util
 import logging
 import os
 from typing import Any, Dict, List, Optional, Tuple
 
 from celery.signals import worker_init, worker_process_init
+from core_engine.vision import (
+    ModelAvailability, model_availability, models_availability,
+)
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
@@ -39,58 +43,63 @@ def modelo_por_defecto() -> str:
     return _modelo_id()
 
 
-def _requisitos_modelos() -> Dict[str, Tuple[str, Tuple[str, ...]]]:
-    """Requisitos de ejecución por modelo: ``(pesos, módulos Python)``.
+def _disponibilidad(model_id: str) -> Optional[ModelAvailability]:
+    """Disponibilidad de un modelo según ``core_engine``.
 
-    Los nombres de pesos son las constantes ``WEIGHTS_NAME`` de los adaptadores
-    de ``core_engine`` (importarlos no carga torch ni ultralytics). Los módulos
-    son los que el adaptador importa al construir el detector. ``yolo-tiled``
-    reutiliza los pesos de ``yolo-seg``. Un modelo que no figura aquí (catálogo
-    más nuevo que este mapa) no se puede verificar y se trata como disponible.
+    ``model_availability`` no importa torch ni ultralytics ni carga pesos.
+
+    Returns:
+        ``None`` si el id no existe en el catálogo: no hay nada que verificar y
+        se trata como disponible (``ids_modelos()`` es quien valida los ids).
     """
-    from core_engine.vision.adapters import maskrcnn, rtdetr, yolo_seg
+    try:
+        return model_availability(model_id)
+    except ValueError:
+        return None
 
-    return {
-        "yolo-seg": (yolo_seg.WEIGHTS_NAME, ("ultralytics",)),
-        "yolo-tiled": (yolo_seg.WEIGHTS_NAME, ("ultralytics",)),
-        "maskrcnn": (maskrcnn.WEIGHTS_NAME, ("torch", "torchvision")),
-        "rtdetr": (rtdetr.WEIGHTS_NAME, ("torch", "transformers")),
-    }
+
+def _mensaje_no_disponible(estado: ModelAvailability) -> str:
+    """Mensaje en español, apto para el cliente, de lo que le falta a un modelo.
+
+    Sólo usa nombres (pesos y módulos) y el ``install_hint`` de ``core_engine``;
+    nunca rutas del servidor.
+    """
+    partes = []
+    if estado.missing_weights:
+        partes.append(
+            "Faltan los pesos del modelo en el servidor: "
+            + ", ".join(estado.missing_weights) + "."
+        )
+    if estado.missing_modules:
+        parte = (
+            "Faltan dependencias del modelo en el servidor: "
+            + ", ".join(estado.missing_modules) + "."
+        )
+        if estado.install_hint:
+            parte += f" Instalación: {estado.install_hint}."
+        partes.append(parte)
+    return " ".join(partes) or "El modelo no está disponible en el servidor."
 
 
 def motivo_no_disponible(model_id: str) -> Optional[str]:
     """Por qué un modelo no puede ejecutarse en este servidor.
 
-    No importa torch ni ultralytics: sólo comprueba que los pesos se resuelvan
-    con el resolvedor de ``core_engine`` y que los módulos requeridos sean
-    importables (``find_spec``).
+    Delega en ``core_engine.vision.model_availability`` (pesos y módulos
+    requeridos), que no carga ningún framework de ML.
 
     Returns:
-        ``None`` si el modelo está disponible; si no, un mensaje corto en
-        español, apto para el cliente (sin rutas del servidor; el detalle va
-        al log).
+        ``None`` si el modelo está disponible (o el id no existe en el
+        catálogo); si no, un mensaje corto en español, apto para el cliente
+        (nombres de pesos y módulos, sin rutas del servidor).
     """
-    from core_engine.vision.weights import resolve_weights
-
-    requisitos = _requisitos_modelos().get(model_id)
-    if requisitos is None:
+    estado = _disponibilidad(model_id)
+    if estado is None or estado.available:
         return None
-    pesos, modulos = requisitos
-
-    try:
-        resolve_weights(pesos)
-    except FileNotFoundError:
-        logger.debug("Pesos del modelo '%s' no encontrados (%s)", model_id, pesos)
-        return "Faltan los pesos del modelo en el servidor."
-
-    faltantes = [m for m in modulos if importlib.util.find_spec(m) is None]
-    if faltantes:
-        logger.debug(
-            "Dependencias del modelo '%s' no instaladas: %s",
-            model_id, ", ".join(faltantes),
-        )
-        return "Faltan dependencias del modelo en el servidor."
-    return None
+    logger.debug(
+        "Modelo '%s' no disponible: pesos=%s módulos=%s",
+        model_id, estado.missing_weights, estado.missing_modules,
+    )
+    return _mensaje_no_disponible(estado)
 
 
 def modelo_disponible(model_id: str) -> bool:
@@ -125,6 +134,7 @@ def listar_modelos() -> List[Dict[str, Any]]:
     from core_engine.vision import available_models
 
     por_defecto = modelo_por_defecto()
+    disponibles = {a.model_id: a.available for a in models_availability()}
     return [
         {
             "id": m.id,
@@ -135,7 +145,7 @@ def listar_modelos() -> List[Dict[str, Any]]:
             "produce_mascaras": m.produces_masks,
             "confianza_por_defecto": m.default_confidence,
             "por_defecto": m.id == por_defecto,
-            "disponible": modelo_disponible(m.id),
+            "disponible": disponibles.get(m.id, True),
         }
         for m in available_models()
     ]

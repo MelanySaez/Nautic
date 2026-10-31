@@ -67,7 +67,7 @@ Django view (stream)  → SUBSCRIBE Redis → StreamingHttpResponse (SSE) → br
 ```
 
 **Dependencias clave:**
-- `core_engine.vision` — modelos de visión (paquete externo `nautic_core`, tag `v3.0.0`); se consume solo a través de `vision.inference.run_inference`
+- `core_engine.vision` — modelos de visión (paquete externo `nautic_core`, tag `v3.1.0`); se consume solo a través de `vision.inference.run_inference`
 - `celery` + RabbitMQ — cola de tareas para la inferencia
 - `redis` — pub/sub de eventos SSE y contadores de rate limiting
 - `PIL` (Pillow) — validación de imágenes antes de guardarlas o procesarlas
@@ -291,7 +291,7 @@ Si `NAUTIC_WEIGHTS_DIR` o `VISION_MODEL_ID` son inválidos el worker no arranca 
 
 `run_inference(image_bytes, confidence=None, incluir_mascaras=False, model_id=None)` es el único punto de entrada hacia `core_engine`: llama a `core_engine.vision.analyze(...)` con `model_id` (si es `None`, el definido en `VISION_MODEL_ID`: `yolo-seg` por defecto; también `yolo-tiled`, `maskrcnn`, `rtdetr`) y devuelve `(jpeg_anotado, resultado)`. Es síncrono y no recibe `iou`. Con `confidence=None` cada modelo usa su propio umbral calibrado (ya no se fuerza 0.25).
 
-El mismo módulo expone el catálogo: `listar_modelos()`, `modelo_disponible()` / `motivo_no_disponible()` (pesos resolubles con el resolvedor de `core_engine` y dependencias importables vía `find_spec`, sin cargar torch) e `ids_modelos()`.
+El mismo módulo expone el catálogo: `listar_modelos()`, `modelo_disponible()` / `motivo_no_disponible()` (construidos sobre `core_engine.vision.model_availability()` / `models_availability()` de nautic_core v3.1: pesos y módulos requeridos, sin cargar torch; el motivo para el cliente nombra los pesos y módulos faltantes y el `install_hint`, nunca rutas del servidor) e `ids_modelos()`.
 
 `core_engine` cachea el detector por modelo dentro de cada proceso, así que los pesos se cargan una sola vez sin necesidad de un singleton propio. Los pesos se buscan en el directorio de la variable de entorno **`NAUTIC_WEIGHTS_DIR`**. En workers prefork, la señal `worker_process_init` precarga el modelo por defecto al arrancar cada subproceso, de modo que la primera tarea no paga la latencia de inicialización; los demás modelos se cargan la primera vez que una foto los pide.
 

@@ -2,7 +2,7 @@
 
 Stack: Django 5.1 · Celery 5.4 · RabbitMQ (AMQP) · Redis · PostgreSQL · nautic_core v3 (YOLO)
 
-> El paquete se instala como `nautic_core` (desde git, tag `v3.0.0`, por SSH) pero se importa como `core_engine`.
+> El paquete se instala como `nautic_core` (desde git, tag `v3.1.0`, por SSH) pero se importa como `core_engine`.
 > Todo el código vive en `backend/`; los comandos de este documento se ejecutan desde ese directorio.
 > Los pesos del modelo se resuelven desde `NAUTIC_WEIGHTS_DIR` (ver [Adaptador de inferencia](#adaptador-de-inferencia-visioninferencepy)).
 
@@ -253,7 +253,7 @@ def run_inference(image_bytes, confidence=None, incluir_mascaras=False, model_id
 
 El modelo se elige al **analizar**, no al subir ni por inspección:
 
-1. `GET /api/vision/modelos/` lista el catálogo de `core_engine` (`available_models()`) en su orden. `por_defecto` marca `VISION_MODEL_ID`; `disponible` es `true` sólo si los pesos se resuelven con el resolvedor de `core_engine` (`NAUTIC_WEIGHTS_DIR`) y los módulos Python que exige el modelo son importables (`ultralytics` para `yolo-seg`/`yolo-tiled`; `torch`+`torchvision` para `maskrcnn`; `torch`+`transformers` para `rtdetr`). La comprobación usa `importlib.util.find_spec` y no carga ningún framework.
+1. `GET /api/vision/modelos/` lista el catálogo de `core_engine` (`available_models()`) en su orden. `por_defecto` marca `VISION_MODEL_ID`; `disponible` viene de la API pública `core_engine.vision.models_availability()` (nautic_core v3.1): es `true` sólo si los pesos del modelo existen en `NAUTIC_WEIGHTS_DIR` y los módulos Python que declara el modelo son importables. La comprobación no carga ningún framework ni pesos, y los requisitos los define `core_engine` (este repositorio ya no mantiene su propio mapa). Si falta algo, `motivo_no_disponible()` arma un mensaje en español con los nombres de los pesos y módulos faltantes y el `install_hint` de `core_engine` (por ejemplo `Faltan los pesos del modelo en el servidor: maskrcnn-0.2.0.pt.`); nunca incluye rutas del servidor.
 2. `POST /api/vision/inspecciones/<id>/analizar/` con `{"modelo": "<id>"}` (JSON o formulario) valida el id **antes de tocar nada**: desconocido → `400 {"error": "Datos inválidos.", "campos": {"modelo": [...]}}`; no disponible → `400 {"error": "Modelo no disponible.", "campos": {"modelo": [...]}}` (mensaje sin rutas del servidor; el detalle va al log). Sin `modelo` se usa `VISION_MODEL_ID`, que también se valida.
 3. Con el id válido, cada foto encolada guarda `modelo_id` antes de encolarse (las omitidas por el límite de concurrencia no cambian) y el worker llama `run_inference(..., model_id=foto.modelo_id)`; una foto con `modelo_id` nulo (anterior a esta función) usa el modelo por defecto.
 4. El reintento `POST /api/vision/fotos/<id>/` acepta el mismo `modelo` opcional; sin él conserva el `modelo_id` de la foto.

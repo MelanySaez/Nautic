@@ -164,6 +164,26 @@ class AnalizarConModeloTests(_Base):
             foto.refresh_from_db()
             self.assertIsNone(foto.modelo_id)
 
+    def test_motivo_de_core_engine_llega_al_cliente_sin_rutas(self):
+        from core_engine.vision import ModelAvailability
+
+        self._foto()
+        # Real reason builder over a core_engine availability report.
+        self.motivo.side_effect = inference.motivo_no_disponible
+        faltante = ModelAvailability(
+            model_id='maskrcnn', available=False, missing_weights=('maskrcnn-0.2.0.pt',),
+        )
+        with mock.patch('vision.inference.model_availability', return_value=faltante):
+            res = self._analizar({'modelo': 'maskrcnn'})
+
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(
+            res.json()['campos']['modelo'],
+            ['El modelo "maskrcnn" no está disponible. '
+             'Faltan los pesos del modelo en el servidor: maskrcnn-0.2.0.pt.'],
+        )
+        self.disparar.assert_not_called()
+
     def test_el_modelo_por_defecto_tambien_se_valida(self):
         self._foto()
         self.motivo.return_value = 'Faltan dependencias del modelo en el servidor.'

@@ -74,7 +74,7 @@ uv run python manage.py check                  # system checks (includes vision.
 ```
 
 - Database: PostgreSQL, default name `NauticDB` (`DB_NAME` in `.env`).
-- `nautic_core` (v3.0.0) is installed from `ssh://git@github.com/AaronDLF/nautic_core.git`; it needs an SSH key with access. It is installed as `nautic_core` but imported as `core_engine`.
+- `nautic_core` (v3.1.0) is installed from `ssh://git@github.com/AaronDLF/nautic_core.git`; it needs an SSH key with access. It is installed as `nautic_core` but imported as `core_engine`.
 - Docker: `DOCKER_BUILDKIT=1 docker build --ssh default backend/` (build context is `backend/`).
 - API docs (drf-spectacular): `/api/docs/` (Swagger), `/api/docs/redoc/`, `/api/schema/`.
 
@@ -94,7 +94,7 @@ uv run celery -A config flower --port=5555 \
   --broker_api=http://guest:guest@localhost:15672/api/
 ```
 
-Required environment: `NAUTIC_WEIGHTS_DIR` (directory with the model weights). Optional: `VISION_MODEL_ID` (default model, used when a request does not choose one; default `yolo-seg`; valid ids come from the `core_engine` catalog: `yolo-seg`, `yolo-tiled`, `maskrcnn`, `rtdetr`). A model is only usable if its weights are in `NAUTIC_WEIGHTS_DIR` and its Python dependencies are installed (`GET /api/vision/modelos/` reports it as `disponible`).
+Required environment: `NAUTIC_WEIGHTS_DIR` (directory with the model weights). Optional: `VISION_MODEL_ID` (default model, used when a request does not choose one; default `yolo-seg`; valid ids come from the `core_engine` catalog: `yolo-seg`, `yolo-tiled`, `maskrcnn`, `rtdetr`). A model is only usable if its weights are in `NAUTIC_WEIGHTS_DIR` and its Python dependencies are installed (`GET /api/vision/modelos/` reports it as `disponible`). Availability comes from the public `core_engine.vision.model_availability()` / `models_availability()` (nautic_core v3.1); never import `core_engine.vision.adapters` or `core_engine.vision.weights`.
 
 `vision.inference.verificar_configuracion()` validates both settings. It is enforced by the Django system check `vision.E001` and by Celery `worker_init`: a misconfigured worker **refuses to start**.
 

@@ -22,4 +22,4 @@ dependencies = [
 package = false
 
 [tool.uv.sources]
-nautic-core = { git = "ssh://git@github.com/AaronDLF/nautic_core.git", tag = "v3.0.0" }
+nautic-core = { git = "ssh://git@github.com/AaronDLF/nautic_core.git", tag = "v3.1.0" }
