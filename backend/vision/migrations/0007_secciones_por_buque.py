@@ -15,12 +15,19 @@ def copiar_secciones_por_buque(apps, schema_editor):
 
     globales = list(Seccion.objects.filter(buque__isnull=True).order_by('orden', 'codigo'))
     if not globales:
+        # Only the fields this historical model has: later keys in the constant must not break replays.
         from vision.secciones import SECCIONES_ESTANDAR
 
         Seccion.objects.bulk_create(
-            Seccion(buque=buque, **datos)
+            Seccion(
+                buque=buque,
+                codigo=d['codigo'],
+                nombre=d['nombre'],
+                descripcion=d['descripcion'],
+                orden=d['orden'],
+            )
             for buque in Buque.objects.all()
-            for datos in SECCIONES_ESTANDAR
+            for d in SECCIONES_ESTANDAR
         )
         return
 

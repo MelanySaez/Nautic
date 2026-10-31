@@ -83,5 +83,15 @@ Branch `feat/secciones-buque-01-backend` from `feat/buques-frontend-02-pantallas
   test_secciones_migracion` -> 90 tests OK; `check` -> no issues; `makemigrations --check --dry-run`
   -> no changes; `migrate` -> nothing to apply (already at 0008).
 
+- Gap closed (orchestrator, inline): with no global sections (never-seeded DB) the data migration now
+  gives every existing vessel the standard set (6afed1d); new test in `test_secciones_migracion`
+  (2 tests OK).
+- Review slice 1 (feat/buques-frontend-02-pantallas..6afed1d): medium, slice_budget_reached, granted
+  (user pre-authorized), APPROVED + acknowledged. Applied: the migration builds rows only from the
+  fields the historical model has. Open advisories: the standard-set content in 0007 follows the live
+  constant (not frozen); `GET /api/vision/secciones/` now requires `buque`, so the current upload page
+  breaks until T3 lands (merge both slices together); duplicate-code and empty-list rejections have no
+  dedicated test (minimal-tests rule).
+
 ## Next step
 T3 (frontend, branch `feat/secciones-buque-02-frontend`).
