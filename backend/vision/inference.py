@@ -105,6 +105,17 @@ def ids_modelos() -> List[str]:
     return [m.id for m in available_models()]
 
 
+def severidad_por_clase() -> Dict[str, str]:
+    """Severidad de cada clase de anomalía según la taxonomía de ``core_engine``.
+
+    Las clases de componente (casco, hélice, ánodo...) no tienen severidad y no
+    aparecen. Importar la taxonomía no carga torch ni ultralytics.
+    """
+    from core_engine.vision.domain import severity_map
+
+    return severity_map()
+
+
 def listar_modelos() -> List[Dict[str, Any]]:
     """Catálogo de modelos para el cliente, en el orden de ``core_engine``.
 

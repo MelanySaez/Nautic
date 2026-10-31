@@ -341,7 +341,7 @@ procesar_foto.apply_async([foto_id])
 La tarea aplica dos transformaciones sobre la salida cruda del modelo antes de guardar:
 
 - **`_agrupar_detecciones(raw_detections)`** — colapsa la lista de detecciones individuales en una entrada por clase única, conservando el conteo de apariciones y la confianza máxima.
-- **`_calcular_severidad(raw_detections)`** — evalúa todas las clases detectadas contra `_SEVERITY_MAP` y retorna el nivel más alto encontrado (`critical` > `high` > `medium` > `low`). Si no hay anomalías reales entre las detecciones, retorna `None`.
+- **`_calcular_severidad(raw_detections)`** — evalúa todas las clases detectadas contra la taxonomía de `core_engine` (`inference.severidad_por_clase()`, que envuelve `severity_map()`) y retorna el nivel más alto encontrado (`critical` > `high` > `medium` > `low`). Si no hay anomalías reales entre las detecciones, retorna `None`.
 
 ### Por qué NO se inicia automáticamente al subir
 
@@ -490,15 +490,15 @@ Sin severidad (componentes, no fallas): `ship_hull`, `bilge_keel`, `propeller`, 
 
 ### Severidad global de la foto
 
-La severidad se calcula en el worker Celery durante el procesamiento YOLO y se persiste en el campo `FotoInspeccion.severidad`. `_calcular_severidad()` evalúa todas las detecciones contra `_SEVERITY_MAP` y retorna la peor encontrada. 
+La severidad se calcula en el worker Celery durante el procesamiento y se persiste en el campo `FotoInspeccion.severidad`. `_calcular_severidad()` evalúa todas las detecciones contra la severidad por clase que define la taxonomía de `core_engine` y retorna la peor encontrada. El backend no mantiene una copia de esa tabla: si `nautic_core` cambia una severidad o añade una clase, el backend la sigue sin cambios.
+
 ```python
-# Backend: vision/tasks.py
-_SEVERITY_MAP = {
-    'corrosion':     'critical',
-    'defect':        'high',
-    'marine_growth': 'medium',
-    'paint_peel':    'low',
-}
+# Backend: vision/inference.py
+def severidad_por_clase():
+    from core_engine.vision.domain import severity_map
+    return severity_map()
+# nautic_core 3.0.0: {'corrosion': 'critical', 'defect': 'high',
+#                     'marine_growth': 'medium', 'paint_peel': 'low'}
 ```
 
 El cliente lee `foto.severidad` directamente; no la calcula.

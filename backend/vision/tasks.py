@@ -19,7 +19,7 @@ from PIL import Image
 from celery import shared_task
 
 from .almacenamiento import guardar_anotada, leer_archivo, url_archivo
-from .inference import modelo_por_defecto, run_inference
+from .inference import modelo_por_defecto, run_inference, severidad_por_clase
 from .models import FotoInspeccion, NivelSeveridad, subir_severidad_max
 from .pubsub import publicar_evento
 from .ratelimit import track_concurrent_end
@@ -35,25 +35,19 @@ _MAX_RETRIES = 3
 # categorización de las detecciones que devuelve nautic_core)
 # ─────────────────────────────────────────────────────────────────────────────
 
-_SEVERITY_MAP = {
-    "corrosion":     "critical",
-    "defect":        "high",
-    "marine_growth": "medium",
-    "paint_peel":    "low",
-}
-_SEVERITY_ORDER = ["critical", "high", "medium", "low"]
-
-
 def _calcular_severidad(detections):
-    """Nivel de severidad más alto entre las detecciones."""
-    worst = None
+    """Nivel de severidad más alto entre las detecciones.
+
+    La severidad de cada clase viene de la taxonomía de ``core_engine``
+    (``severidad_por_clase``); las clases sin severidad se ignoran.
+    """
+    severidades = severidad_por_clase()
+    peor = None
     for det in detections:
-        sev = _SEVERITY_MAP.get(det.get("class_name"))
-        if not sev:
-            continue
-        if worst is None or _SEVERITY_ORDER.index(sev) < _SEVERITY_ORDER.index(worst):
-            worst = sev
-    return worst
+        nivel = NivelSeveridad.desde_texto(severidades.get(det.get("class_name")))
+        if nivel is not None and (peor is None or nivel > peor):
+            peor = nivel
+    return NivelSeveridad.a_texto(peor)
 
 
 def _agrupar_detecciones(detections):
