@@ -60,6 +60,16 @@ def _calcular_severidad(detections):
     return NivelSeveridad.a_texto(peor)
 
 
+def _version(valor):
+    """Version string from core_engine, cut to the column size (32); None when absent.
+
+    A longer value must never make the completion save fail after a successful inference.
+    """
+    if not valor:
+        return None
+    return str(valor)[:FotoInspeccion._meta.get_field("modelo_version").max_length]
+
+
 def _agrupar_detecciones(detections):
     """Colapsa la lista cruda a una entrada por clase única."""
     grouped = {}
@@ -88,6 +98,8 @@ def _notificar(foto: FotoInspeccion) -> None:
             "detecciones": foto.detecciones,
             "tiempo_inferencia_ms": foto.tiempo_inferencia_ms,
             "modelo": foto.modelo_id,
+            "modelo_version": foto.modelo_version,
+            "taxonomia_version": foto.taxonomia_version,
             # URL (not the storage key): the browser uses it as-is. Relative
             # (``/media/...``) on local storage, absolute and signed on a bucket.
             "imagen_anotada": url_archivo(foto.imagen_anotada),
@@ -192,11 +204,16 @@ def procesar_foto(self, foto_id: int):
         foto.detecciones = _agrupar_detecciones(raw_detections)
         foto.tiempo_inferencia_ms = round(resultados.get("inference_time_ms", 0), 2)
         foto.severidad = _calcular_severidad(raw_detections)
+        # Overwritten on every analysis (retries included); None when the
+        # installed core_engine does not report them.
+        foto.modelo_version = _version(resultados.get("model_version"))
+        foto.taxonomia_version = _version(resultados.get("taxonomy_version"))
         foto.estado = FotoInspeccion.Estado.COMPLETADA
         foto.error_detalle = None
         foto.save(update_fields=[
             "imagen_anotada", "detecciones", "tiempo_inferencia_ms",
-            "severidad", "estado", "error_detalle",
+            "severidad", "modelo_version", "taxonomia_version", "estado",
+            "error_detalle",
         ])
         # Mantener la peor severidad de la inspección (UPDATE condicional atómico).
         subir_severidad_max(

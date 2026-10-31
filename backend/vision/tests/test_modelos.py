@@ -3,6 +3,7 @@ import sys
 from unittest import mock
 
 from core_engine.vision import ModelAvailability
+from django.conf import settings
 from django.test import SimpleTestCase, override_settings
 from rest_framework.test import APIClient
 
@@ -135,6 +136,7 @@ class DisponibilidadModeloTests(SimpleTestCase):
         )
         res = subprocess.run(
             [sys.executable, '-c', codigo], capture_output=True, text=True, check=True,
+            cwd=settings.BASE_DIR,  # so `config` and `vision` import from any runner cwd
         )
 
         self.assertEqual(res.stdout.strip().splitlines()[-1], '[]')

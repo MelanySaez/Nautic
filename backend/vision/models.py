@@ -224,6 +224,12 @@ class FotoInspeccion(models.Model):
     # Id del modelo de core_engine con el que se analizó (o se va a analizar)
     # la foto. Se fija al disparar el análisis; null mientras nunca se pidió.
     modelo_id = models.CharField(max_length=50, blank=True, null=True)
+    # Versions reported by core_engine's analyze() for the last completed
+    # analysis: weights/model version and detection-taxonomy version. They let
+    # a weights or taxonomy update be traced per photo. Null for photos analyzed
+    # before they were recorded, or not analyzed yet.
+    modelo_version = models.CharField(max_length=32, blank=True, null=True)
+    taxonomia_version = models.CharField(max_length=32, blank=True, null=True)
     fecha_creacion = models.DateTimeField(auto_now_add=True)
 
     class Meta:
