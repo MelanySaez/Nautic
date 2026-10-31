@@ -64,6 +64,8 @@ describe('HttpInspeccionesRepository', () => {
         id: 7,
         buqueId: 2,
         buqueNombre: 'ARA Libertad',
+        nombre: 'Inspección #7 — ARA Libertad',
+        severidadMax: 'high',
         descripcion: 'Control anual',
         tomadoPor: 'Juan Gómez',
         fechaCreacion: '2026-10-01T10:00:00Z',

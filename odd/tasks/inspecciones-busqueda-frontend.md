@@ -19,6 +19,21 @@ and it is exactly the cost the backend search was built to avoid. Inspections gr
 (each one adds photos), so this must be replaced before real data accumulates.
 
 ## Status
+IN PROGRESS (2026-10-31), branch `feat/inspecciones-historial-01-datos` from `main` (b415dd2). Third
+frontend section: Inspecciones is the history of inspections already created (creation and analysis
+live in Visión IA, `odd/tasks/vision-ia-frontend.md`).
+
+Updates since the handoff:
+- `ApiError.campos` exists (buques-frontend T1).
+- Optional `nombre` on create is done in Visión IA (`/vision`); T4 keeps only the rename.
+- The inspection detail for the history is the results page `/inspecciones/:id/resultados`; the
+  rename (PATCH `nombre`) lives there.
+- Tests: user rule — minimal tests only (happy path + key error case); run only the touched test
+  files, never the full suite (`pnpm vitest run <files>`, `pnpm lint`, `pnpm build`).
+- Delivery: stacked PRs to main; slice 1 = T1+T2 (`feat/inspecciones-historial-01-datos`), slice 2 =
+  T3-T5 (`feat/inspecciones-historial-02-pantallas`). Route: delegated direct (single writer).
+
+Previously:
 NOT STARTED (handoff). Backend done on branch `feat/inspecciones-busqueda`.
 
 ## API contract (verified against `backend/vision/busqueda.py`, `views.py`)
@@ -112,13 +127,16 @@ Per-field errors need `ApiError` to keep `campos` (see task T1 of `odd/tasks/buq
 do it once and share it).
 
 ## Checklist
-- [ ] T1 — Domain + DTO mapping for `nombre`, `severidadMax`; filter and page types.
+- [x] T1 — Domain + DTO mapping for `nombre`, `severidadMax`; filter and page types.
 - [ ] T2 — Port `buscar(filtro, cursor?)` + HTTP adapter (query building, cursor passthrough, 400
       `campos`), remove the walk-all `listar()`; adapter tests.
 - [ ] T3 — `ListaInspeccionesPage` with server filters in the URL, debounce, "Cargar más", stale
       response guard, empty/error states; remove `filtrarInspecciones`.
-- [ ] T4 — Name on create (`NuevaInspeccionPage`) and rename on detail (PATCH).
+- [ ] T4 — Rename on the detail/results page (PATCH). (Name on create: done in Visión IA.)
 - [ ] T5 — Cards show `nombre` and the severity badge; docs (AGENTS.md, frontend README).
+
+## Progress / Evidence
+- T1 `feat(inspecciones): map nombre and severidadMax, add search filter and page types` — route: delegated direct (single writer). RED: the adapter test expecting `nombre`/`severidadMax` in the mapped inspection failed (fields missing). GREEN: `pnpm vitest run src/inspecciones/infrastructure/HttpInspeccionesRepository.test.ts src/inspecciones/domain/reglas.test.ts` 30/30; `pnpm lint` exit 0; `pnpm build` ok.
 
 ## Acceptance criteria
 - The list never downloads more than one page per user action.
@@ -128,7 +146,7 @@ do it once and share it).
 - A created inspection without a name shows the generated one; renaming updates list and detail.
 
 ## Checks
-From `frontend/`: `pnpm test`, `pnpm lint`, `pnpm build`; manual smoke against the backend.
+From `frontend/`: touched test files only (`pnpm vitest run <files>`), `pnpm lint`, `pnpm build`; manual smoke against the backend.
 
 ## Next step
-T1.
+T2.
