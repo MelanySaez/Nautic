@@ -19,7 +19,10 @@ from drf_spectacular.types import OpenApiTypes
 
 from .almacenamiento import borrar_archivo, guardar_original, url_archivo
 from .busqueda import BusquedaInvalida, LIMIT_MAXIMO, LIMIT_POR_DEFECTO, buscar_inspecciones
-from .inference import DEFAULT_CONFIDENCE, listar_modelos, run_inference
+from .inference import (
+    DEFAULT_CONFIDENCE, ids_modelos, listar_modelos, modelo_por_defecto,
+    motivo_no_disponible, run_inference,
+)
 from .models import (
     Buque, SeccionCasco, InspeccionCasco, FotoInspeccion, NivelSeveridad,
     nombre_por_defecto, recalcular_severidad_max,
@@ -261,6 +264,7 @@ def _foto_to_dict(f, request=None):
         'severidad': f.severidad,
         'estado': f.estado,
         'error_detalle': f.error_detalle,
+        'modelo': f.modelo_id,
         'fecha_creacion': f.fecha_creacion.isoformat(),
     }
 
@@ -332,6 +336,66 @@ def _validar_edicion_inspeccion(data):
 def _disparar_procesamiento(foto_id):
     """Encola la tarea Celery ``vision.procesar_foto`` para la foto dada."""
     procesar_foto.apply_async(kwargs={"foto_id": foto_id})
+
+
+_SCHEMA_MODELO = {
+    'application/json': {
+        'type': 'object',
+        'properties': {
+            'modelo': {
+                'type': 'string',
+                'description': 'Id del modelo (GET /api/vision/modelos/). Opcional.',
+            },
+        },
+    }
+}
+
+
+def _resolver_modelo(data, por_defecto=None):
+    """
+    Resolve and validate the optional ``modelo`` field of an analyze request.
+
+    Returns ``(modelo_id, respuesta_error)``; exactly one of them is ``None``.
+    ``por_defecto`` is used when the field is absent (``None`` → the configured
+    default model). The model must exist in the catalog and be available on this
+    server (weights + dependencies), so the worker never fails on a bad choice.
+    """
+    if not hasattr(data, 'get'):
+        return None, Response({'error': 'Se esperaba un objeto JSON.'}, status=400)
+
+    modelo = data.get('modelo')
+    if modelo is None:
+        modelo = por_defecto or modelo_por_defecto()
+    elif not isinstance(modelo, str):
+        return None, Response(
+            {'error': 'Datos inválidos.', 'campos': {'modelo': ['Debe ser texto.']}},
+            status=400,
+        )
+    else:
+        modelo = modelo.strip()
+
+    validos = ids_modelos()
+    if modelo not in validos:
+        return None, Response(
+            {
+                'error': 'Datos inválidos.',
+                'campos': {'modelo': [
+                    f'Modelo desconocido. Valores válidos: {", ".join(validos)}.'
+                ]},
+            },
+            status=400,
+        )
+
+    motivo = motivo_no_disponible(modelo)
+    if motivo:
+        return None, Response(
+            {
+                'error': 'Modelo no disponible.',
+                'campos': {'modelo': [f'El modelo "{modelo}" no está disponible. {motivo}']},
+            },
+            status=400,
+        )
+    return modelo, None
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -661,8 +725,15 @@ def api_vision_subir_foto(request, inspeccion_id):
     methods=['POST'],
     tags=['Inspección IA'],
     summary='Reintentar análisis de foto',
-    description='Reintenta el procesamiento YOLO si la foto está en estado "error".',
-    responses={202: OpenApiTypes.OBJECT, 400: OpenApiTypes.OBJECT},
+    description=(
+        'Reintenta el procesamiento si la foto está en estado "pendiente" o "error". '
+        'Cuerpo opcional: `{"modelo": "<id>"}` (ver GET /api/vision/modelos/); sin él se '
+        'reutiliza el modelo con el que se pidió el análisis de la foto y, si nunca se '
+        'pidió, el modelo por defecto. Un modelo desconocido o no disponible devuelve 400 '
+        'y no cambia la foto.'
+    ),
+    request=_SCHEMA_MODELO,
+    responses={202: OpenApiTypes.OBJECT, 400: OpenApiTypes.OBJECT, 429: OpenApiTypes.OBJECT},
 )
 @api_view(['GET', 'POST', 'DELETE'])
 def api_vision_foto_detalle(request, foto_id):
@@ -696,24 +767,45 @@ def api_vision_foto_detalle(request, foto_id):
             {'error': f'Solo se puede analizar una foto en estado "pendiente" o "error". Estado actual: {foto.estado}.'},
             status=400,
         )
+    modelo, error = _resolver_modelo(request.data, por_defecto=foto.modelo_id)
+    if error:
+        return error
     ip = get_client_ip(request)
     ok, err = track_concurrent_start(ip, foto.id)
     if not ok:
         return Response({'error': err}, status=429)
     foto.estado = FotoInspeccion.Estado.PENDIENTE
     foto.error_detalle = None
-    foto.save(update_fields=['estado', 'error_detalle'])
+    foto.modelo_id = modelo
+    foto.save(update_fields=['estado', 'error_detalle', 'modelo_id'])
     _disparar_procesamiento(foto.id)
     return Response(_foto_to_dict(foto, request), status=202)
 
 
+@extend_schema(
+    tags=['Inspección IA'],
+    summary='Analizar las fotos pendientes de una inspección',
+    description=(
+        'Encola el análisis de todas las fotos en estado "pendiente" con el modelo elegido. '
+        'Cuerpo opcional: `{"modelo": "<id>"}` (ids en GET /api/vision/modelos/); sin él se '
+        'usa el modelo por defecto del servidor (`VISION_MODEL_ID`). El modelo se guarda en '
+        'cada foto (`modelo`). Un modelo desconocido o no disponible devuelve 400 y no se '
+        'encola ni cambia nada.'
+    ),
+    request=_SCHEMA_MODELO,
+    responses={202: OpenApiTypes.OBJECT, 400: OpenApiTypes.OBJECT, 429: OpenApiTypes.OBJECT},
+)
 @api_view(['POST'])
 def api_vision_analizar_inspeccion(request, inspeccion_id):
     """
     POST /api/vision/inspecciones/<id>/analizar/
-    Dispara el análisis YOLO para todas las fotos en estado 'pendiente' de la inspección.
+    Dispara el análisis para todas las fotos en estado 'pendiente' de la inspección,
+    con el modelo indicado en `modelo` (opcional; por defecto VISION_MODEL_ID).
     """
     insp = get_object_or_404(InspeccionCasco, pk=inspeccion_id)
+    modelo, error = _resolver_modelo(request.data)
+    if error:
+        return error
     fotos = FotoInspeccion.objects.filter(
         inspeccion=insp,
         estado=FotoInspeccion.Estado.PENDIENTE,
@@ -729,6 +821,9 @@ def api_vision_analizar_inspeccion(request, inspeccion_id):
         if not ok:
             skipped += 1
             continue
+        # The worker reads the model from the photo: persist it before enqueueing.
+        foto.modelo_id = modelo
+        foto.save(update_fields=['modelo_id'])
         _disparar_procesamiento(foto.id)
         dispatched += 1
 

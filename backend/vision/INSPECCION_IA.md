@@ -138,6 +138,7 @@ class FotoInspeccion(models.Model):
     severidad            = models.CharField(max_length=20, null=True, blank=True)
     estado               = models.CharField(choices=Estado.choices, default=Estado.PENDIENTE)
     error_detalle        = models.TextField(blank=True, null=True)
+    modelo_id            = models.CharField(max_length=50, blank=True, null=True)  # modelo de core_engine elegido al analizar
     fecha_creacion       = models.DateTimeField(auto_now_add=True)
 ```
 
@@ -180,6 +181,7 @@ Todos registrados en `vision/urls.py` (montado en la raíz por `backend/config/u
 | Método | URL | Descripción |
 |---|---|---|
 | `GET` | `/api/vision/secciones/` | Catálogo completo de secciones del casco |
+| `GET` | `/api/vision/modelos/` | Catálogo de modelos de IA con `por_defecto` y `disponible` |
 | `GET` | `/api/vision/inspecciones/` | Busca inspecciones (`buque`, `desde`, `hasta`, `severidad_min`, `q`, `limit`, `cursor`) → `{resultados, siguiente, hay_mas}` |
 | `POST` | `/api/vision/inspecciones/` | Crear nueva inspección (`nombre` opcional) |
 | `GET` | `/api/vision/inspecciones/<id>/` | Detalle de inspección con todas sus fotos |
@@ -187,9 +189,9 @@ Todos registrados en `vision/urls.py` (montado en la raíz por `backend/config/u
 | `DELETE` | `/api/vision/inspecciones/<id>/` | Eliminar inspección + archivos físicos |
 | `POST` | `/api/vision/inspecciones/<id>/fotos/` | Subir foto (multipart) |
 | `GET` | `/api/vision/fotos/<id>/` | Estado de una foto (consulta puntual / fallback) |
-| `POST` | `/api/vision/fotos/<id>/` | Disparar análisis de foto en estado `pendiente` o `error` |
+| `POST` | `/api/vision/fotos/<id>/` | Reintentar análisis de foto en estado `pendiente` o `error` (`modelo` opcional) |
 | `DELETE` | `/api/vision/fotos/<id>/` | Eliminar foto + archivos físicos |
-| `POST` | `/api/vision/inspecciones/<id>/analizar/` | Iniciar análisis de todas las fotos pendientes |
+| `POST` | `/api/vision/inspecciones/<id>/analizar/` | Iniciar análisis de todas las fotos pendientes (`modelo` opcional) |
 | `GET` | `/api/vision/inspecciones/<id>/stream/` | Stream SSE de eventos de la inspección |
 
 ### Búsqueda de inspecciones (`vision/busqueda.py`)
@@ -226,7 +228,7 @@ La IP real se extrae respetando `X-Forwarded-For` (primer valor) para funcionar 
 |---|---|---|
 | `ready` | vista SSE | `{inspeccion_id, ts}` |
 | `foto-created` | vista de upload | `{foto: {...}}` |
-| `foto-updated` | worker Celery | `{foto_id, inspeccion_id, estado, severidad, detecciones, tiempo_inferencia_ms, imagen_anotada, error_detalle}` |
+| `foto-updated` | worker Celery | `{foto_id, inspeccion_id, estado, severidad, detecciones, tiempo_inferencia_ms, modelo, imagen_anotada, error_detalle}` |
 | `foto-deleted` | vista de borrado | `{foto_id, inspeccion_id}` |
 
 **Nota sobre URLs de imagen:** el worker Celery no tiene `request`, por lo que `foto-updated` lleva la URL tal como la devuelve el storage: relativa (`/media/...`) en local, absoluta y firmada en un bucket. El `GET` de detalle devuelve URLs absolutas (en local usa `request.build_absolute_uri`). El cliente debe normalizar ambas formas antes de mergear el evento, para no pisar una URL buena con una relativa. Las URL firmadas caducan (`S3_URL_EXPIRE_SECONDS`); un `GET` posterior devuelve URLs nuevas.
@@ -287,9 +289,11 @@ Si `NAUTIC_WEIGHTS_DIR` o `VISION_MODEL_ID` son inválidos el worker no arranca 
 
 ### Adaptador de inferencia (`vision/inference.py`)
 
-`run_inference(image_bytes, confidence=None)` es el único punto de entrada hacia `core_engine`: llama a `core_engine.vision.analyze(...)` con el modelo definido en `VISION_MODEL_ID` (`yolo-seg` por defecto; también `yolo-tiled`, `maskrcnn`, `rtdetr`) y devuelve `(jpeg_anotado, resultado)`. Es síncrono y no recibe `iou`.
+`run_inference(image_bytes, confidence=None, incluir_mascaras=False, model_id=None)` es el único punto de entrada hacia `core_engine`: llama a `core_engine.vision.analyze(...)` con `model_id` (si es `None`, el definido en `VISION_MODEL_ID`: `yolo-seg` por defecto; también `yolo-tiled`, `maskrcnn`, `rtdetr`) y devuelve `(jpeg_anotado, resultado)`. Es síncrono y no recibe `iou`. Con `confidence=None` cada modelo usa su propio umbral calibrado (ya no se fuerza 0.25).
 
-`core_engine` cachea el detector por modelo dentro de cada proceso, así que los pesos se cargan una sola vez sin necesidad de un singleton propio. Los pesos se buscan en el directorio de la variable de entorno **`NAUTIC_WEIGHTS_DIR`**. En workers prefork, la señal `worker_process_init` precarga el modelo al arrancar cada subproceso, de modo que la primera tarea no paga la latencia de inicialización.
+El mismo módulo expone el catálogo: `listar_modelos()`, `modelo_disponible()` / `motivo_no_disponible()` (pesos resolubles con el resolvedor de `core_engine` y dependencias importables vía `find_spec`, sin cargar torch) e `ids_modelos()`.
+
+`core_engine` cachea el detector por modelo dentro de cada proceso, así que los pesos se cargan una sola vez sin necesidad de un singleton propio. Los pesos se buscan en el directorio de la variable de entorno **`NAUTIC_WEIGHTS_DIR`**. En workers prefork, la señal `worker_process_init` precarga el modelo por defecto al arrancar cada subproceso, de modo que la primera tarea no paga la latencia de inicialización; los demás modelos se cargan la primera vez que una foto los pide.
 
 **Validación de configuración:** `verificar_configuracion()` comprueba que `VISION_MODEL_ID` exista en el catálogo de `core_engine` y que `NAUTIC_WEIGHTS_DIR` sea un directorio existente. Se ejecuta como system check de Django (`vision.E001`) y en la señal Celery `worker_init`: un worker mal configurado se detiene con un mensaje claro en lugar de reiniciar subprocesos en bucle.
 
@@ -343,11 +347,20 @@ La tarea aplica dos transformaciones sobre la salida cruda del modelo antes de g
 
 **Decisión deliberada:** el análisis no se dispara al subir la foto. El inspector puede subir múltiples fotos a distintas secciones, revisarlas, eliminar errores, y solo cuando considera que el lote está completo presiona **"Iniciar análisis"**. Esto evita consumir recursos de GPU/CPU en fotos que se iban a eliminar de todas formas.
 
-El endpoint `POST /api/vision/inspecciones/<id>/analizar/` itera todas las fotos en estado `pendiente`, reserva slot de concurrencia para cada una y llama `_disparar_procesamiento`.
+El endpoint `POST /api/vision/inspecciones/<id>/analizar/` itera todas las fotos en estado `pendiente`, reserva slot de concurrencia para cada una, guarda en ella el modelo elegido (`modelo_id`) y llama `_disparar_procesamiento`.
+
+### Elección del modelo de IA
+
+El inspector sube las fotos, elige un modelo de `GET /api/vision/modelos/` y presiona "Analizar": `POST .../analizar/` con `{"modelo": "<id>"}` (opcional; por defecto `VISION_MODEL_ID`).
+
+- **Decisión:** el modelo se elige al analizar, no al subir ni por inspección; así se puede subir primero y decidir después, y cada foto registra con qué modelo se analizó (`modelo` en el dict de la foto y en los eventos SSE).
+- Un `modelo` desconocido o no disponible (faltan pesos o dependencias en el servidor) responde `400` antes de encolar nada y sin modificar ninguna foto; nunca llega a fallar dentro del worker.
+- Cada modelo usa su umbral de confianza calibrado (`confianza_por_defecto` en el catálogo).
+- Pendiente (fuera de alcance): re-analizar con otro modelo una foto ya `completada`.
 
 ### Reintentar fotos en error
 
-`POST /api/vision/fotos/<id>/` permite reintentar el análisis de una foto en estado `error` **o** `pendiente`. Restablece el estado a `pendiente`, limpia `error_detalle` y re-encola la tarea. Útil cuando el fallo fue terminal (sin reintento automático) o cuando ya se agotaron los 3 reintentos de Celery.
+`POST /api/vision/fotos/<id>/` permite reintentar el análisis de una foto en estado `error` **o** `pendiente`. Restablece el estado a `pendiente`, limpia `error_detalle` y re-encola la tarea. Acepta el mismo `modelo` opcional que `/analizar/`; sin él conserva el `modelo_id` de la foto (y si nunca tuvo, usa `VISION_MODEL_ID`). Útil cuando el fallo fue terminal (sin reintento automático) o cuando ya se agotaron los 3 reintentos de Celery.
 
 ---
 
@@ -509,10 +522,11 @@ Se usa azul (no verde) para "Bajo" porque verde implicaría que no hay problema,
 1. Crear (o elegir) un Buque                     ← hoy: shell/DB; sin endpoint
 2. POST /api/vision/inspecciones/                ← buque_id, nombre (opcional), descripcion, tomado_por → InspeccionCasco
 3. GET  /api/vision/secciones/                   ← catálogo de secciones del casco
+   GET  /api/vision/modelos/                     ← catálogo de modelos de IA (para elegir uno antes de analizar)
 4. POST /api/vision/inspecciones/<id>/fotos/     ← multipart (imagen, seccion_id) → 202, foto en estado=pendiente
    └── Se publica foto-created en Redis
 5. (Opcional) DELETE /api/vision/fotos/<id>/     ← descartar fotos erróneas antes de analizar
-6. POST /api/vision/inspecciones/<id>/analizar/  ← encola una tarea Celery por foto pendiente (cola "vision")
+6. POST /api/vision/inspecciones/<id>/analizar/  ← {"modelo": "<id>"} opcional; encola una tarea Celery por foto pendiente (cola "vision")
    └── El worker publica foto-updated en Redis en cada cambio de estado
 7. GET  /api/vision/inspecciones/<id>/stream/    ← SSE: ready, foto-created, foto-updated, foto-deleted
 8. GET  /api/vision/inspecciones/<id>/           ← resultados: fotos con detecciones, severidad y estado

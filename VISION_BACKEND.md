@@ -85,6 +85,7 @@ Foto individual analizada por YOLO. Máquina de estados asíncrona.
 | `severidad` | CharField(20) null | `critical` / `high` / `medium` / `low` |
 | `estado` | CharField(20) | Estado actual (ver máquina de estados) |
 | `error_detalle` | TextField null | Mensaje de error si `estado=error` (la tarea trunca a 500 chars al escribir) |
+| `modelo_id` | CharField(50) null | Id del modelo de `core_engine` con el que se pidió analizar la foto (se fija en `/analizar/` o al reintentar; migración `0004`). Se expone como `modelo` |
 | `fecha_creacion` | DateTimeField | Auto (auto_now_add) |
 
 **Máquina de estados `FotoInspeccion.Estado`:**
@@ -111,6 +112,7 @@ Registrados en `vision/urls.py` y montados en la raíz por `backend/config/urls.
 |--------|-----|-------|-------------|
 | POST | `/api/ai/anomalias/` | `api_ai_anomalias` | Inferencia directa sin persistencia (retorna imagen JPEG o JSON con base64). Acepta `confidence`; ya no acepta ni devuelve `iou` |
 | GET | `/api/vision/secciones/` | `api_vision_secciones` | Catálogo completo de secciones del casco |
+| GET | `/api/vision/modelos/` | `api_vision_modelos` | Catálogo de modelos de IA: `{modelos: [{id, label, descripcion, arquitectura, version, produce_mascaras, confianza_por_defecto, por_defecto, disponible}]}`. Ver [Selección de modelo](#selección-de-modelo) |
 | GET | `/api/vision/inspecciones/` | `api_vision_inspecciones` | Busca inspecciones: `{resultados, siguiente, hay_mas}`. Ver [Búsqueda de inspecciones](#búsqueda-de-inspecciones) |
 | POST | `/api/vision/inspecciones/` | `api_vision_inspecciones` | Crear inspección (`buque_id`, `nombre` opcional, `descripcion`, `tomado_por`) |
 | GET | `/api/vision/inspecciones/<id>/` | `api_vision_inspeccion_detalle` | Detalle con fotos anidadas |
@@ -118,9 +120,9 @@ Registrados en `vision/urls.py` y montados en la raíz por `backend/config/urls.
 | DELETE | `/api/vision/inspecciones/<id>/` | `api_vision_inspeccion_detalle` | Elimina inspección y archivos físicos |
 | POST | `/api/vision/inspecciones/<id>/fotos/` | `api_vision_subir_foto` | Sube foto (multipart: `imagen`, `seccion_id`) → HTTP 202 |
 | GET | `/api/vision/fotos/<id>/` | `api_vision_foto_detalle` | Estado y resultado de una foto |
-| POST | `/api/vision/fotos/<id>/` | `api_vision_foto_detalle` | Disparar análisis (estado `pendiente` o `error`) |
+| POST | `/api/vision/fotos/<id>/` | `api_vision_foto_detalle` | Reintentar análisis (estado `pendiente` o `error`); cuerpo opcional `{"modelo": "<id>"}` (por defecto el `modelo_id` de la foto, si no el de `VISION_MODEL_ID`) |
 | DELETE | `/api/vision/fotos/<id>/` | `api_vision_foto_detalle` | Elimina foto y archivos físicos |
-| POST | `/api/vision/inspecciones/<id>/analizar/` | `api_vision_analizar_inspeccion` | Disparar YOLO para todas las fotos `pendiente` |
+| POST | `/api/vision/inspecciones/<id>/analizar/` | `api_vision_analizar_inspeccion` | Encola el análisis de todas las fotos `pendiente`; cuerpo opcional `{"modelo": "<id>"}` (por defecto `VISION_MODEL_ID`). Modelo desconocido o no disponible → 400 sin encolar nada |
 | GET | `/api/vision/inspecciones/<id>/stream/` | `api_vision_inspeccion_stream` | Stream SSE (text/event-stream) |
 
 ### Búsqueda de inspecciones
@@ -212,7 +214,7 @@ cd backend
 uv run celery -A config worker -Q vision -l info --concurrency=2 --pool=prefork
 ```
 
-`--concurrency=2` = 2 procesos, cada uno con el modelo YOLO cargado una vez.
+`--concurrency=2` = 2 procesos. Cada uno precarga al arrancar el modelo por defecto (`VISION_MODEL_ID`); los demás modelos se cargan la primera vez que una foto los pide (más lenta) y quedan cacheados en ese proceso.
 
 Si `NAUTIC_WEIGHTS_DIR` o `VISION_MODEL_ID` son inválidos, el worker **no arranca** (ver validación de configuración abajo).
 
@@ -223,12 +225,12 @@ Si `NAUTIC_WEIGHTS_DIR` o `VISION_MODEL_ID` son inválidos, el worker **no arran
 Punto de entrada único hacia `core_engine`. Ni las vistas ni las tareas llaman a `core_engine` directamente.
 
 ```python
-def run_inference(image_bytes, confidence=None, incluir_mascaras=False) -> (jpeg_anotado, resultado):
+def run_inference(image_bytes, confidence=None, incluir_mascaras=False, model_id=None) -> (jpeg_anotado, resultado):
     from core_engine.vision import analyze
     anotada, resultado = analyze(
         image_bytes,
-        model_id=settings.VISION_MODEL_ID,
-        confidence=confidence or DEFAULT_CONFIDENCE,
+        model_id=model_id or settings.VISION_MODEL_ID,
+        confidence=confidence,   # None → umbral calibrado del modelo
         annotate=True,
     )
     # sin incluir_mascaras se elimina "mask" (RLE) de cada detección
@@ -237,7 +239,7 @@ def run_inference(image_bytes, confidence=None, incluir_mascaras=False) -> (jpeg
 
 - Es **síncrono**: la tarea Celery y la vista lo llaman directamente, sin `asyncio.run`.
 - `core_engine` cachea el detector por modelo dentro de cada proceso: los pesos se cargan una sola vez por proceso. Ya no existe `ImageProcessor`, singleton propio ni `iou` (v3 fija su NMS).
-- Umbral por defecto: `DEFAULT_CONFIDENCE = 0.25`.
+- `model_id=None` usa `VISION_MODEL_ID`. Con `confidence=None` cada modelo aplica su umbral calibrado (`ModelInfo.default_confidence`: yolo-seg 0.15, yolo-tiled 0.25, maskrcnn 0.5, rtdetr 0.15); el pipeline de inspecciones ya no fuerza 0.25. `DEFAULT_CONFIDENCE = 0.25` sólo lo usa `/api/ai/anomalias/` cuando el cliente no envía `confidence`.
 - `resultado` es `InferenceResult.to_dict()` más la clave `"model"`; el código usa `detections`, `detection_count`, `inference_time_ms` e `image_size`.
 
 ### Configuración
@@ -245,8 +247,18 @@ def run_inference(image_bytes, confidence=None, incluir_mascaras=False) -> (jpeg
 | Variable / setting | Descripción |
 |---|---|
 | `NAUTIC_WEIGHTS_DIR` | **Obligatoria.** Directorio con los pesos (p. ej. `yolo11s-seg-0.1.0.pt` para `yolo-seg`). La lee `core_engine` directamente |
-| `VISION_MODEL_ID` | Id del modelo: `yolo-seg` (default), `yolo-tiled`, `maskrcnn`, `rtdetr` |
+| `VISION_MODEL_ID` | Modelo por defecto: `yolo-seg` (default), `yolo-tiled`, `maskrcnn`, `rtdetr`. Se usa cuando la petición no elige modelo |
 
+### Selección de modelo
+
+El modelo se elige al **analizar**, no al subir ni por inspección:
+
+1. `GET /api/vision/modelos/` lista el catálogo de `core_engine` (`available_models()`) en su orden. `por_defecto` marca `VISION_MODEL_ID`; `disponible` es `true` sólo si los pesos se resuelven con el resolvedor de `core_engine` (`NAUTIC_WEIGHTS_DIR`) y los módulos Python que exige el modelo son importables (`ultralytics` para `yolo-seg`/`yolo-tiled`; `torch`+`torchvision` para `maskrcnn`; `torch`+`transformers` para `rtdetr`). La comprobación usa `importlib.util.find_spec` y no carga ningún framework.
+2. `POST /api/vision/inspecciones/<id>/analizar/` con `{"modelo": "<id>"}` (JSON o formulario) valida el id **antes de tocar nada**: desconocido → `400 {"error": "Datos inválidos.", "campos": {"modelo": [...]}}`; no disponible → `400 {"error": "Modelo no disponible.", "campos": {"modelo": [...]}}` (mensaje sin rutas del servidor; el detalle va al log). Sin `modelo` se usa `VISION_MODEL_ID`, que también se valida.
+3. Con el id válido, cada foto encolada guarda `modelo_id` antes de encolarse (las omitidas por el límite de concurrencia no cambian) y el worker llama `run_inference(..., model_id=foto.modelo_id)`; una foto con `modelo_id` nulo (anterior a esta función) usa el modelo por defecto.
+4. El reintento `POST /api/vision/fotos/<id>/` acepta el mismo `modelo` opcional; sin él conserva el `modelo_id` de la foto.
+
+El modelo viaja como `modelo` en el dict de la foto (REST) y en los eventos SSE `foto-created` / `foto-updated`. Fuera de alcance: re-analizar con otro modelo una foto ya `completada`.
 ### Validación de configuración
 
 `verificar_configuracion()` comprueba que `VISION_MODEL_ID` exista en el catálogo de `core_engine` y que `NAUTIC_WEIGHTS_DIR` sea un directorio existente. Se aplica en dos puntos:
@@ -358,7 +370,7 @@ El endpoint SSE desempaqueta el envelope y emite `event: foto-updated` al browse
 | Evento | Publicado desde | Payload `data` |
 |--------|----------------|----------------|
 | `foto-created` | `api_vision_subir_foto` | `{"foto": {foto_dict completo}}` |
-| `foto-updated` | `procesar_foto` task (×2: EN_PROCESO + COMPLETADA/ERROR) | `{foto_id, inspeccion_id, estado, severidad, detecciones, tiempo_inferencia_ms, imagen_anotada, error_detalle}` |
+| `foto-updated` | `procesar_foto` task (×2: EN_PROCESO + COMPLETADA/ERROR) | `{foto_id, inspeccion_id, estado, severidad, detecciones, tiempo_inferencia_ms, modelo, imagen_anotada, error_detalle}` |
 | `foto-deleted` | `api_vision_foto_detalle` DELETE | `{foto_id, inspeccion_id}` |
 
 ### Cliente Redis singleton

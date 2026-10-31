@@ -19,7 +19,7 @@ from PIL import Image
 from celery import shared_task
 
 from .almacenamiento import guardar_anotada, leer_archivo, url_archivo
-from .inference import run_inference
+from .inference import modelo_por_defecto, run_inference
 from .models import FotoInspeccion, NivelSeveridad, subir_severidad_max
 from .pubsub import publicar_evento
 from .ratelimit import track_concurrent_end
@@ -83,6 +83,7 @@ def _notificar(foto: FotoInspeccion) -> None:
             "severidad": foto.severidad,
             "detecciones": foto.detecciones,
             "tiempo_inferencia_ms": foto.tiempo_inferencia_ms,
+            "modelo": foto.modelo_id,
             # URL (not the storage key): the browser uses it as-is. Relative
             # (``/media/...``) on local storage, absolute and signed on a bucket.
             "imagen_anotada": url_archivo(foto.imagen_anotada),
@@ -172,7 +173,11 @@ def procesar_foto(self, foto_id: int):
             raise ValueError("El archivo almacenado no es una imagen válida.")
 
         # Procesado + anotación íntegramente vía nautic_core
-        imagen_anotada_bytes, resultados = run_inference(imagen_bytes)
+        # Modelo elegido al disparar el análisis; fotos anteriores a esa
+        # elección (modelo_id nulo) usan el modelo por defecto.
+        imagen_anotada_bytes, resultados = run_inference(
+            imagen_bytes, model_id=foto.modelo_id or modelo_por_defecto()
+        )
 
         # Persistir imagen anotada en el storage; se guarda la clave devuelta.
         clave_anotada = guardar_anotada(foto_id, imagen_anotada_bytes)
