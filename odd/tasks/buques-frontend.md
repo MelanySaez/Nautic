@@ -268,7 +268,7 @@ Conventional Commit per task, tests and docs alongside the behavior.
       `obtener`/`crear` and a `unBuque()`/`unDetalleBuque()` factory. Keep `tsc -b` green:
       `EnMemoriaBuquesRepository` gets a minimal implementation (it is deleted in T4). Acceptance:
       `pnpm build` and `pnpm test` green, no behavior change.
-- [ ] T3 — DTOs + `HttpBuquesRepository`. `BuqueResumenDto`, `BuqueDetalleDto`, `ListaBuquesDto
+- [x] T3 — DTOs + `HttpBuquesRepository`. `BuqueResumenDto`, `BuqueDetalleDto`, `ListaBuquesDto
       {total, offset, limit, resultados}`, mappers `aBuque`/`aBuqueDetalle`, and the inverse
       `aNuevoBuqueDto` (camelCase → snake_case, omit undefined/empty optionals). Adapter:
       `listar()` requests `/api/buques/?offset=N&limit=200` until `offset >= total`; `obtener(id)` →
@@ -381,7 +381,8 @@ remain the user's decisions.
 ## Progress / Evidence
 Backend evidence: `buques-backend.md` (28 tests OK, `manage.py check` clean).
 - T1 done (commit 2885f93 `feat(frontend): expose field errors on ApiError`), route: delegated direct (single writer). RED: `apiClient.test.ts` "keeps the per-field messages of a 400 response..." and "drops entries that are not arrays of strings..." failed (`ApiError.campos` was undefined). GREEN: 7 new tests; full suite 82 passed, lint clean, build clean.
-- T2 done (commit: see git log `feat(frontend): model vessel detail and extend the port`), route: delegated direct (single writer). RED: after adding `unBuque`/`unDetalleBuque`/`obtener`/`crear` to `src/test/dobles.tsx`, `tsc -b` failed (TS2305 no exported `BuqueDetalle`/`NuevoBuque`; TS2353 `etapa`/`obtener` unknown on `Buque`/`BuquesRepository`). GREEN: `tsc -b` clean, 82 tests passed, lint clean, build clean. `EnMemoriaBuquesRepository.obtener/crear` throw (removed in T4); seed and its test updated to the new `Buque`.
+- T2 done (commit 7acf289 `feat(frontend): model vessel detail and extend the port`), route: delegated direct (single writer). RED: after adding `unBuque`/`unDetalleBuque`/`obtener`/`crear` to `src/test/dobles.tsx`, `tsc -b` failed (TS2305 no exported `BuqueDetalle`/`NuevoBuque`; TS2353 `etapa`/`obtener` unknown on `Buque`/`BuquesRepository`). GREEN: `tsc -b` clean, 82 tests passed, lint clean, build clean. `EnMemoriaBuquesRepository.obtener/crear` throw (removed in T4); seed and its test updated to the new `Buque`.
+- T3 done (commit: see git log `feat(frontend): add HTTP vessel adapter and DTO mappers`), route: delegated direct (single writer). RED: `HttpBuquesRepository.test.ts` failed to load (module `./HttpBuquesRepository` did not exist; no tests ran). GREEN: 12 tests in that file passed; `tsc -b` clean, lint clean, build clean. Per the user's scope change, the full suite is no longer run: only touched/created test files.
 
 ## Next step
 Create branch from `feat/buques-backend` (or `main` after merge), resolve open question 1 (form
