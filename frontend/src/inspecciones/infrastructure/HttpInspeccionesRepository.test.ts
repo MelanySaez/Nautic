@@ -53,13 +53,23 @@ describe('HttpInspeccionesRepository', () => {
     return { url: String(url), init: init ?? {} }
   }
 
-  it('lists inspections from the paginated response, mapped to the domain model', async () => {
-    fetchMock.mockResolvedValue(respuesta(200, { resultados: [inspeccionDto], siguiente: null, hay_mas: false }))
+  it('searches sending the filters as query parameters and maps the page', async () => {
+    fetchMock.mockResolvedValue(respuesta(200, { resultados: [inspeccionDto], siguiente: 'abc', hay_mas: true }))
 
-    const inspecciones = await repo.listar()
+    const pagina = await repo.buscar({
+      buqueId: 2,
+      desde: '2026-10-01',
+      hasta: '2026-10-31',
+      severidadMin: 'high',
+      q: 'casco',
+    })
 
-    expect(ultimaLlamada().url).toBe('http://api.test/api/vision/inspecciones/?limit=100')
-    expect(inspecciones).toEqual([
+    expect(ultimaLlamada().url).toBe(
+      'http://api.test/api/vision/inspecciones/?buque=2&desde=2026-10-01&hasta=2026-10-31&severidad_min=high&q=casco&limit=24',
+    )
+    expect(pagina.siguiente).toBe('abc')
+    expect(pagina.hayMas).toBe(true)
+    expect(pagina.resultados).toEqual([
       {
         id: 7,
         buqueId: 2,
@@ -75,37 +85,24 @@ describe('HttpInspeccionesRepository', () => {
     ])
   })
 
-  it('follows the cursor until the server has no more pages, keeping the order', async () => {
-    const otro = { ...inspeccionDto, id: 6 }
-    fetchMock
-      .mockResolvedValueOnce(respuesta(200, { resultados: [inspeccionDto], siguiente: 'abc+/=&x', hay_mas: true }))
-      .mockResolvedValueOnce(respuesta(200, { resultados: [otro], siguiente: null, hay_mas: false }))
-
-    const inspecciones = await repo.listar()
-
-    expect(fetchMock).toHaveBeenCalledTimes(2)
-    expect(String(fetchMock.mock.calls[0][0])).toBe('http://api.test/api/vision/inspecciones/?limit=100')
-    expect(String(fetchMock.mock.calls[1][0])).toBe(
-      'http://api.test/api/vision/inspecciones/?limit=100&cursor=abc%2B%2F%3D%26x',
-    )
-    expect(inspecciones.map((i) => i.id)).toEqual([7, 6])
-  })
-
-  it('stops after a safety cap of pages if the server never ends the pagination', async () => {
-    fetchMock.mockImplementation(async () =>
-      respuesta(200, { resultados: [inspeccionDto], siguiente: 'siempre', hay_mas: true }),
-    )
-
-    const inspecciones = await repo.listar()
-
-    expect(fetchMock).toHaveBeenCalledTimes(100)
-    expect(inspecciones).toHaveLength(100)
-  })
-
-  it('returns an empty list when the server has no inspections', async () => {
+  it('passes the cursor untouched to get the next page and omits blank filters', async () => {
     fetchMock.mockResolvedValue(respuesta(200, { resultados: [], siguiente: null, hay_mas: false }))
 
-    await expect(repo.listar()).resolves.toEqual([])
+    const pagina = await repo.buscar({ q: '  ' }, 'abc+/=&x')
+
+    expect(ultimaLlamada().url).toBe('http://api.test/api/vision/inspecciones/?limit=24&cursor=abc%2B%2F%3D%26x')
+    expect(pagina).toEqual({ resultados: [], siguiente: null, hayMas: false })
+  })
+
+  it('surfaces the field errors of a rejected search', async () => {
+    fetchMock.mockResolvedValue(
+      respuesta(400, { error: 'Datos inválidos.', campos: { q: ['Debe tener entre 2 y 100 caracteres.'] } }),
+    )
+
+    await expect(repo.buscar({ q: 'a' })).rejects.toMatchObject({
+      status: 400,
+      campos: { q: ['Debe tener entre 2 y 100 caracteres.'] },
+    })
   })
 
   it('gets the inspection detail with its photos, treating missing detections as empty', async () => {
@@ -263,7 +260,7 @@ describe('HttpInspeccionesRepository', () => {
   it('uses a generic message when the response has no readable error', async () => {
     fetchMock.mockResolvedValue(new Response('<html>Server Error</html>', { status: 500 }))
 
-    await expect(repo.listar()).rejects.toMatchObject({
+    await expect(repo.buscar({})).rejects.toMatchObject({
       status: 500,
       message: 'El servidor respondió con un error (500).',
     })
@@ -272,7 +269,7 @@ describe('HttpInspeccionesRepository', () => {
   it('reports a network failure without leaking the raw error', async () => {
     fetchMock.mockRejectedValue(new TypeError('Failed to fetch'))
 
-    await expect(repo.listar()).rejects.toMatchObject({
+    await expect(repo.buscar({})).rejects.toMatchObject({
       status: 0,
       message: 'No se pudo conectar con el servidor.',
     })

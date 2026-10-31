@@ -1,9 +1,11 @@
 import type {
   EventoInspeccion,
+  FiltroInspecciones,
   Foto,
   Inspeccion,
   InspeccionDetalle,
   NuevaInspeccion,
+  PaginaInspecciones,
   SeccionCasco,
 } from '../domain/inspeccion'
 import type { ModeloIA } from '../domain/modelo'
@@ -14,7 +16,8 @@ export interface ResultadoAnalisis {
 }
 
 export interface InspeccionesRepository {
-  listar(): Promise<Inspeccion[]>
+  /** One page of the server-side search, newest first; pass the previous page's `siguiente` as `cursor` for the next one. */
+  buscar(filtro: FiltroInspecciones, cursor?: string): Promise<PaginaInspecciones>
   obtener(id: number): Promise<InspeccionDetalle>
   crear(datos: NuevaInspeccion): Promise<Inspeccion>
   eliminar(id: number): Promise<void>

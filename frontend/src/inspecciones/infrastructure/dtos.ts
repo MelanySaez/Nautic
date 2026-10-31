@@ -5,6 +5,7 @@ import type {
   Foto,
   Inspeccion,
   InspeccionDetalle,
+  PaginaInspecciones,
   SeccionCasco,
   Severidad,
 } from '../domain/inspeccion'
@@ -142,6 +143,10 @@ export function aInspeccion(dto: InspeccionDto): Inspeccion {
     fechaModificacion: dto.fecha_modificacion,
     totalFotos: dto.total_fotos,
   }
+}
+
+export function aPagina(dto: ListaInspeccionesDto): PaginaInspecciones {
+  return { resultados: dto.resultados.map(aInspeccion), siguiente: dto.siguiente, hayMas: dto.hay_mas }
 }
 
 export function aInspeccionDetalle(dto: InspeccionDetalleDto): InspeccionDetalle {

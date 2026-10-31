@@ -128,7 +128,7 @@ do it once and share it).
 
 ## Checklist
 - [x] T1 — Domain + DTO mapping for `nombre`, `severidadMax`; filter and page types.
-- [ ] T2 — Port `buscar(filtro, cursor?)` + HTTP adapter (query building, cursor passthrough, 400
+- [x] T2 — Port `buscar(filtro, cursor?)` + HTTP adapter (query building, cursor passthrough, 400
       `campos`), remove the walk-all `listar()`; adapter tests.
 - [ ] T3 — `ListaInspeccionesPage` with server filters in the URL, debounce, "Cargar más", stale
       response guard, empty/error states; remove `filtrarInspecciones`.
@@ -137,6 +137,7 @@ do it once and share it).
 
 ## Progress / Evidence
 - T1 `feat(inspecciones): map nombre and severidadMax, add search filter and page types` — route: delegated direct (single writer). RED: the adapter test expecting `nombre`/`severidadMax` in the mapped inspection failed (fields missing). GREEN: `pnpm vitest run src/inspecciones/infrastructure/HttpInspeccionesRepository.test.ts src/inspecciones/domain/reglas.test.ts` 30/30; `pnpm lint` exit 0; `pnpm build` ok.
+- T2 `feat(inspecciones): replace the walk-all listar with a paginated buscar port` — route: delegated direct (single writer). RED: 3 new adapter tests (query building + cursor passthrough, blank filters omitted, `campos` surfaced) and the 2 error tests failed with `repo.buscar is not a function`. GREEN: `pnpm vitest run src/inspecciones/infrastructure/HttpInspeccionesRepository.test.ts src/inspecciones/ui/ListaInspeccionesPage.test.tsx` 29/29; `pnpm lint` exit 0; `pnpm build` ok. Page size sent: `limit=24`. `ListaInspeccionesPage` is transitional (first page only, still `filtrarInspecciones`) until T3.
 
 ## Acceptance criteria
 - The list never downloads more than one page per user action.
@@ -149,4 +150,4 @@ do it once and share it).
 From `frontend/`: touched test files only (`pnpm vitest run <files>`), `pnpm lint`, `pnpm build`; manual smoke against the backend.
 
 ## Next step
-T2.
+T3 (branch `feat/inspecciones-historial-02-pantallas`).

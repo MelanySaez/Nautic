@@ -11,7 +11,8 @@ import { TarjetaInspeccion } from './TarjetaInspeccion'
 
 export function ListaInspeccionesPage() {
   const { inspecciones: repo } = useDependencias()
-  const cargar = useCallback(() => repo.listar(), [repo])
+  // Transitional: first page only; the server-side filter bar and "Cargar más" replace this.
+  const cargar = useCallback(async () => (await repo.buscar({})).resultados, [repo])
   const { estado, reintentar, actualizar } = useRecurso(cargar)
   const [consulta, setConsulta] = useState('')
   const [eliminandoId, setEliminandoId] = useState<number | null>(null)
