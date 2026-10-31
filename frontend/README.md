@@ -52,7 +52,7 @@ src/
 
 ## Limitaciones conocidas
 
-- **Buques:** el adaptador HTTP (`HttpBuquesRepository`) implementa `listar` (recorre todas las páginas de `GET /api/buques/`), `obtener` y `crear`, y alimenta el selector de «Nueva inspección». Las pantallas están en `buques/ui/`: lista con búsqueda (`/buques`), alta (`/buques/nuevo`) y ficha técnica (`/buques/:id`), con un enlace «Buques» en la navegación. El backend no ofrece edición ni borrado (plan en `odd/tasks/buques-frontend.md`).
+- **Buques:** el adaptador HTTP (`HttpBuquesRepository`) implementa `listar` (recorre todas las páginas de `GET /api/buques/`), `obtener` y `crear`, y alimenta el selector de «Nueva inspección». Las pantallas están en `buques/ui/`: lista con búsqueda (`/buques`), alta (`/buques/nuevo`) y ficha técnica (`/buques/:id`), con un enlace «Buques» en la navegación. El alta incluye el bloque «Secciones del casco» (estándar o propias; el modo estándar omite `secciones` en el POST) y la ficha las lista; la carga de fotos pide las secciones del buque de la inspección (`GET /api/vision/secciones/?buque=<id>`). El backend no ofrece edición ni borrado (plan en `odd/tasks/buques-frontend.md`).
 - **Exportar resultados:** no implementado (no hay endpoint).
 
 ## Tests

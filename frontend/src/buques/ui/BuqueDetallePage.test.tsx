@@ -48,6 +48,28 @@ describe('BuqueDetallePage', () => {
     expect(screen.getByRole('region', { name: 'Capacidades' })).toBeInTheDocument()
   })
 
+  it('lists the hull sections of the vessel in order', async () => {
+    const { dependencias } = crearDependenciasFalsas()
+    dependencias.buques.obtener.mockResolvedValue(
+      unDetalleBuque({
+        secciones: [
+          { id: 1, codigo: 'PRW', nombre: 'Proa', descripcion: 'Parte delantera', orden: 0 },
+          { id: 2, codigo: 'SEC-02', nombre: 'Popa', descripcion: '', orden: 1 },
+        ],
+      }),
+    )
+
+    renderizar('/buques/1', dependencias)
+
+    const secciones = await screen.findByRole('region', { name: 'Secciones del casco' })
+    const items = within(secciones).getAllByRole('listitem')
+    expect(items).toHaveLength(2)
+    expect(items[0]).toHaveTextContent('PRW')
+    expect(items[0]).toHaveTextContent('Proa')
+    expect(items[0]).toHaveTextContent('Parte delantera')
+    expect(items[1]).toHaveTextContent('Popa')
+  })
+
   it('shows the backend message when the vessel does not exist and links back to the list', async () => {
     const { dependencias } = crearDependenciasFalsas()
     dependencias.buques.obtener.mockRejectedValue(new ApiError(404, 'No encontrado.'))

@@ -14,7 +14,7 @@ const SECCION_PROA = { id: 1, codigo: 'FWD-BTM', nombre: 'Fondo - Proa', descrip
 
 function preparar() {
   const falsas = crearDependenciasFalsas()
-  falsas.dependencias.inspecciones.obtener.mockResolvedValue(unDetalle({ id: 7, buqueNombre: 'ARA Libertad' }))
+  falsas.dependencias.inspecciones.obtener.mockResolvedValue(unDetalle({ id: 7, buqueId: 4, buqueNombre: 'ARA Libertad' }))
   falsas.dependencias.inspecciones.listarSecciones.mockResolvedValue([SECCION_QUILLA, SECCION_PROA])
   return falsas
 }
@@ -42,7 +42,8 @@ async function elegirZona(codigo: string) {
 
 describe('CargaPorZonaPage', () => {
   it('shows the vessel and the hull zones sorted by their order', async () => {
-    renderizar()
+    const { dependencias } = preparar()
+    renderizar(dependencias)
 
     expect(await screen.findByRole('heading', { name: 'ARA Libertad' })).toBeInTheDocument()
     const mapa = screen.getByRole('group', { name: 'Zonas del casco' })
@@ -50,6 +51,7 @@ describe('CargaPorZonaPage', () => {
       expect.stringContaining('FWD-BTM'),
       expect.stringContaining('KEEL'),
     ])
+    expect(dependencias.inspecciones.listarSecciones).toHaveBeenCalledWith(4)
   })
 
   it('keeps the upload disabled until a zone is selected', async () => {
@@ -213,7 +215,7 @@ describe('CargaPorZonaPage', () => {
     const { dependencias } = preparar()
     dependencias.inspecciones.obtener
       .mockRejectedValueOnce(new Error('No encontrado.'))
-      .mockResolvedValueOnce(unDetalle({ id: 7, buqueNombre: 'ARA Libertad' }))
+      .mockResolvedValueOnce(unDetalle({ id: 7, buqueId: 4, buqueNombre: 'ARA Libertad' }))
     renderizar(dependencias)
 
     expect(await screen.findByRole('alert')).toHaveTextContent('No encontrado.')

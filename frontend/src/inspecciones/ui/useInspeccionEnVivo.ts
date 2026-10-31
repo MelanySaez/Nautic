@@ -10,7 +10,7 @@ export interface DatosInspeccion {
 }
 
 /**
- * Loads an inspection with the hull-section catalog and keeps its photos in sync with
+ * Loads an inspection with the hull sections of its vessel and keeps its photos in sync with
  * the server-sent events of that inspection while mounted.
  */
 export function useInspeccionEnVivo(inspeccionId: number) {
@@ -18,10 +18,9 @@ export function useInspeccionEnVivo(inspeccionId: number) {
 
   const cargar = useCallback(
     async (): Promise<DatosInspeccion> => {
-      const [detalle, secciones] = await Promise.all([
-        inspecciones.obtener(inspeccionId),
-        inspecciones.listarSecciones(),
-      ])
+      // The sections belong to the inspection's vessel, which is only known once it is loaded.
+      const detalle = await inspecciones.obtener(inspeccionId)
+      const secciones = await inspecciones.listarSecciones(detalle.buqueId)
       return { detalle, secciones }
     },
     [inspecciones, inspeccionId],

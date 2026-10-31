@@ -163,11 +163,11 @@ describe('HttpInspeccionesRepository', () => {
     })
   })
 
-  it('lists hull sections', async () => {
+  it('lists the hull sections of one vessel', async () => {
     fetchMock.mockResolvedValue(respuesta(200, [seccionDto]))
 
-    expect(await repo.listarSecciones()).toEqual([seccionDto])
-    expect(ultimaLlamada().url).toBe('http://api.test/api/vision/secciones/')
+    expect(await repo.listarSecciones(2)).toEqual([seccionDto])
+    expect(ultimaLlamada().url).toBe('http://api.test/api/vision/secciones/?buque=2')
   })
 
   it('uploads a photo as multipart form data', async () => {

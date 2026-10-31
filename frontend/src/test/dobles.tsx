@@ -49,6 +49,7 @@ export function unDetalleBuque(overrides: Partial<BuqueDetalle> = {}): BuqueDeta
     documentos: [],
     misiones: [],
     gruposConstructivos: [],
+    secciones: [],
     ...overrides,
   }
 }
@@ -97,7 +98,7 @@ export function crearDependenciasFalsas() {
       obtener: vi.fn(async () => unDetalle()),
       crear: vi.fn(async () => unaInspeccion()),
       eliminar: vi.fn(async () => {}),
-      listarSecciones: vi.fn(async () => [SECCION_QUILLA]),
+      listarSecciones: vi.fn(async (_buqueId: number) => [SECCION_QUILLA]),
       subirFoto: vi.fn(async () => unaFoto()),
       analizar: vi.fn(async () => ({ iniciadas: 0, omitidasPorLimite: 0 })),
       reintentarFoto: vi.fn(async () => unaFoto()),

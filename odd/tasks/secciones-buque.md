@@ -50,7 +50,7 @@ touched, never the full suite. Backend TDD off (no configuration); runner
 ## Checklist
 - [x] T1 — Model, migration, standard sections constant. Route: delegated direct.
 - [x] T2 — Backend API + docs. Route: delegated direct.
-- [ ] T3 — Frontend sections block, sheet and upload page. Route: delegated direct.
+- [x] T3 — Frontend sections block, sheet and upload page. Route: delegated direct.
 
 ## Acceptance criteria
 - A vessel created without a section mode gets the 20 standard sections; one created with a custom
@@ -93,5 +93,17 @@ Branch `feat/secciones-buque-01-backend` from `feat/buques-frontend-02-pantallas
   breaks until T3 lands (merge both slices together); duplicate-code and empty-list rejections have no
   dedicated test (minimal-tests rule).
 
+- T3 done — `feat(frontend): declare and list hull sections per vessel`. Route: delegated direct
+  (single writer). Create form block "Secciones del casco" (radio standard/custom; custom rows with
+  add/remove/move, client check: non-empty and every nombre filled; server `campos.secciones` shown in
+  the block); standard mode omits `secciones` from the POST. Vessel sheet lists the sections;
+  `listarSecciones(buqueId)` requests `?buque=<id>` and `useInspeccionEnVivo` loads the inspection
+  first to get its `buqueId`; empty-zones copy no longer mentions the removed seed command.
+  RED observed first: 8 new/changed tests failed (HttpBuquesRepository obtener+crear, HttpInspecciones
+  listarSecciones, BuqueDetallePage sections, NuevoBuquePage x3, CargaPorZonaPage call site).
+  Checks: `pnpm vitest run` on HttpBuquesRepository, HttpInspeccionesRepository, BuqueDetallePage,
+  NuevoBuquePage, CargaPorZonaPage -> 53 passed; ResultadosPage (shares the hook) -> 6 passed;
+  `pnpm lint` -> clean; `pnpm build` -> OK.
+
 ## Next step
-T3 (frontend, branch `feat/secciones-buque-02-frontend`).
+Push/PR at the user's decision (slice 2 = T3; merge with slice 1 together).

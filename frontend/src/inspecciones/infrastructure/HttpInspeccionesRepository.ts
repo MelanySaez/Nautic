@@ -55,8 +55,8 @@ export class HttpInspeccionesRepository implements InspeccionesRepository {
     return this.api.delete(`/api/vision/inspecciones/${id}/`)
   }
 
-  async listarSecciones(): Promise<SeccionCasco[]> {
-    const dtos = await this.api.get<SeccionDto[]>('/api/vision/secciones/')
+  async listarSecciones(buqueId: number): Promise<SeccionCasco[]> {
+    const dtos = await this.api.get<SeccionDto[]>(`/api/vision/secciones/?buque=${buqueId}`)
     return dtos.map(aSeccion)
   }
 

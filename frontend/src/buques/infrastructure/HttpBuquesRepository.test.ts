@@ -43,6 +43,7 @@ const detalleDto = {
   contexto_operacional: { zona: 'Caribe' },
   misiones: ['patrulla'],
   grupos_constructivos: [{ codigo: '100' }],
+  secciones: [{ id: 3, codigo: 'KEEL', nombre: 'Quilla', descripcion: '', orden: 0 }],
   created_at: '2026-10-28T22:41:07.512903',
   updated_at: '2026-10-28T22:41:08.000000',
 }
@@ -167,6 +168,7 @@ describe('HttpBuquesRepository', () => {
         documentos: [{ nombre: 'plano.pdf' }],
         misiones: ['patrulla'],
         gruposConstructivos: [{ codigo: '100' }],
+        secciones: [{ id: 3, codigo: 'KEEL', nombre: 'Quilla', descripcion: '', orden: 0 }],
         createdAt: '2026-10-28T22:41:07.512903',
         updatedAt: '2026-10-28T22:41:08.000000',
       })
@@ -234,6 +236,25 @@ describe('HttpBuquesRepository', () => {
         tipo: 'Patrullera',
         misiones: [],
         rondas_config: { intervalo: 4 },
+      })
+    })
+
+    it('sends a custom section list in order and drops blank codes and descriptions', async () => {
+      fetchMock.mockResolvedValue(respuesta(201, detalleDto))
+
+      await repo.crear({
+        nombre: 'Lancha',
+        tipo: 'Patrullera',
+        secciones: [
+          { nombre: 'Proa', codigo: 'PRW', descripcion: 'Parte delantera' },
+          { nombre: 'Popa', codigo: '', descripcion: '' },
+        ],
+      })
+
+      expect(JSON.parse(String(llamada(0).init.body))).toEqual({
+        nombre: 'Lancha',
+        tipo: 'Patrullera',
+        secciones: [{ nombre: 'Proa', codigo: 'PRW', descripcion: 'Parte delantera' }, { nombre: 'Popa' }],
       })
     })
 

@@ -17,7 +17,8 @@ export interface InspeccionesRepository {
   obtener(id: number): Promise<InspeccionDetalle>
   crear(datos: NuevaInspeccion): Promise<Inspeccion>
   eliminar(id: number): Promise<void>
-  listarSecciones(): Promise<SeccionCasco[]>
+  /** Hull sections declared by one vessel, in display order. */
+  listarSecciones(buqueId: number): Promise<SeccionCasco[]>
   subirFoto(inspeccionId: number, seccionId: number, imagen: File): Promise<Foto>
   analizar(inspeccionId: number): Promise<ResultadoAnalisis>
   reintentarFoto(fotoId: number): Promise<Foto>

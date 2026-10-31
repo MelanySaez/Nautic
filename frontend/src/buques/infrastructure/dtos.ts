@@ -1,4 +1,5 @@
-import type { Buque, BuqueDetalle, NuevoBuque } from '../domain/buque'
+import { aSeccion, type SeccionDto } from '../../inspecciones/infrastructure/dtos'
+import type { Buque, BuqueDetalle, NuevaSeccion, NuevoBuque } from '../domain/buque'
 
 export interface BuqueResumenDto {
   id: number
@@ -35,6 +36,7 @@ export interface BuqueDetalleDto extends BuqueResumenDto {
   documentos: unknown[]
   misiones: unknown[]
   grupos_constructivos: unknown[]
+  secciones: SeccionDto[]
 }
 
 export interface ListaBuquesDto {
@@ -83,6 +85,7 @@ export function aBuqueDetalle(dto: BuqueDetalleDto): BuqueDetalle {
     documentos: dto.documentos,
     misiones: dto.misiones,
     gruposConstructivos: dto.grupos_constructivos,
+    secciones: dto.secciones.map(aSeccion),
   }
 }
 
@@ -114,7 +117,15 @@ const CAMPOS_OPCIONALES = {
   documentos: 'documentos',
   misiones: 'misiones',
   gruposConstructivos: 'grupos_constructivos',
-} as const satisfies Record<keyof Omit<NuevoBuque, 'nombre' | 'tipo'>, string>
+} as const satisfies Record<keyof Omit<NuevoBuque, 'nombre' | 'tipo' | 'secciones'>, string>
+
+/** Blank code and description are omitted: the backend generates the code and defaults the description. */
+function aNuevaSeccionDto({ nombre, codigo, descripcion }: NuevaSeccion): Record<string, string> {
+  const dto: Record<string, string> = { nombre }
+  if (codigo) dto.codigo = codigo
+  if (descripcion) dto.descripcion = descripcion
+  return dto
+}
 
 /**
  * Builds the POST body. Undefined optionals are omitted so the backend applies its defaults;
@@ -127,6 +138,9 @@ export function aNuevoBuqueDto(datos: NuevoBuque): Record<string, unknown> {
     const valor = datos[clave as keyof typeof CAMPOS_OPCIONALES]
     if (valor === undefined || valor === '') continue
     dto[campo] = valor
+  }
+  if (datos.secciones !== undefined) {
+    dto.secciones = datos.secciones === 'estandar' ? datos.secciones : datos.secciones.map(aNuevaSeccionDto)
   }
   return dto
 }
