@@ -75,14 +75,21 @@ Branch `feat/seleccion-modelo-ia` from `main` (d32f130).
 - T1 done: commit c56d5c5 `feat(vision): list available AI models`. Route: delegated direct (single writer).
   Checks observed: `manage.py test vision --noinput` 150 tests OK (15 new in `test_modelos.py`);
   `check` no issues; `makemigrations --check --dry-run` no changes; `migrate` nothing to apply.
-  Native review: not run (RDD not enabled by the user). Review tier: not assessed here.
+  Native review (slice 1 = c56d5c5 + eda0212, 392 lines): medium, granted (user pre-authorized), APPROVED +
+  acknowledged. Advisories: catalog models missing from the requirements map are reported available; the
+  "no heavy imports" test does not reach the `find_spec` path; resolver errors other than
+  FileNotFoundError are not caught.
 - T2 done: commit c07a24a `feat(vision): choose the AI model when analyzing an inspection`. Route: delegated direct.
   Checks observed: `manage.py test vision --noinput` 182 tests OK (32 new in `test_seleccion_modelo.py`, 1 existing
   assertion updated for `model_id=`); `check` no issues; `makemigrations --check --dry-run` no changes;
   `migrate` applied `0004_foto_modelo_id` on the dev DB. Dev catalog: rtdetr reports `disponible=false`
   (`transformers` not installed), the other three true.
   Docs updated: AGENTS.md, VISION_BACKEND.md, backend/vision/INSPECCION_IA.md.
-  Native review: not run (RDD not enabled by the user).
+  Native review (slice 2 = c07a24a + 33af6c3, 640 lines): medium, slice_budget_reached, granted, APPROVED +
+  acknowledged. Advisories: a photo still `pendiente` and already enqueued can be re-dispatched with another
+  `modelo`, and both tasks run with the last stored model; the `/api/ai/anomalias/` confidence concern was
+  checked and is not an issue (the view applies `DEFAULT_CONFIDENCE` itself, views.py:175).
 
 ## Next step
-Open the two slices as stacked PRs (user decision); frontend model selector handoff.
+Open the two slices as stacked PRs (user decision): slice 1 ends at eda0212, slice 2 at HEAD
+(`size:exception`, ~half tests). Then frontend model selector handoff.
