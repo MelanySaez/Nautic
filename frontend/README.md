@@ -52,7 +52,7 @@ src/
 
 ## Limitaciones conocidas
 
-- **Buques:** el backend no expone endpoints de buques. El selector usa `EnMemoriaBuquesRepository` con la semilla de `src/buques/infrastructure/semilla.ts`. Los `id` de la semilla deben existir en la tabla `buques`; si no, crear la inspección devuelve 404. Cuando exista `/api/buques/`, basta con un adaptador HTTP que implemente `BuquesRepository` y cambiarlo en `composicion.ts`.
+- **Buques:** el backend ya expone `GET/POST /api/buques/` y `GET /api/buques/<id>/`, pero el selector aún usa `EnMemoriaBuquesRepository` con la semilla de `src/buques/infrastructure/semilla.ts`. Los `id` de la semilla deben existir en la tabla `buques`; si no, crear la inspección devuelve 404. Falta el adaptador HTTP que implemente `BuquesRepository` (plan en `odd/tasks/buques-frontend.md`).
 - **Exportar resultados:** no implementado (no hay endpoint).
 
 ## Tests
