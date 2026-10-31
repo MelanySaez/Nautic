@@ -22,7 +22,9 @@ class _Base(TestCase):
         self.insp = InspeccionCasco.objects.create(
             buque=Buque.objects.create(nombre='ARC Caribe', tipo='Fragata')
         )
-        self.seccion = SeccionCasco.objects.create(codigo='FWD-BTM', nombre='Fondo - Proa')
+        self.seccion = SeccionCasco.objects.create(
+            buque=self.insp.buque, codigo='FWD-BTM', nombre='Fondo - Proa'
+        )
         self.disparar = self._parchear('vision.views._disparar_procesamiento')
         self.concurrencia = self._parchear(
             'vision.views.track_concurrent_start', return_value=(True, None)
@@ -348,7 +350,7 @@ class TareaConModeloTests(TestCase):
         insp = InspeccionCasco.objects.create(
             buque=Buque.objects.create(nombre='ARC Caribe', tipo='Fragata')
         )
-        seccion = SeccionCasco.objects.create(codigo='FWD-BTM', nombre='Fondo - Proa')
+        seccion = SeccionCasco.objects.create(buque=insp.buque, codigo='FWD-BTM', nombre='Fondo - Proa')
         clave = default_storage.save('inspecciones/originales/foto.png', ContentFile(png_bytes()))
         self.foto = FotoInspeccion.objects.create(
             inspeccion=insp, seccion=seccion, imagen_original=clave,

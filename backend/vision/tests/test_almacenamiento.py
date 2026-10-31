@@ -29,7 +29,9 @@ class AlmacenamientoBase(TestCase):
         self.insp = InspeccionCasco.objects.create(
             buque=Buque.objects.create(nombre='ARC Caribe', tipo='Fragata')
         )
-        self.seccion = SeccionCasco.objects.create(codigo='FWD-BTM', nombre='Fondo - Proa')
+        self.seccion = SeccionCasco.objects.create(
+            buque=self.insp.buque, codigo='FWD-BTM', nombre='Fondo - Proa'
+        )
         # Redis is not needed: SSE publishing is stubbed in the views and the task.
         self.eventos_tarea = self._parchear('vision.tasks.publicar_evento')
         self._parchear('vision.views.publicar_evento')
@@ -239,7 +241,7 @@ class MigracionPrefijoMediaTests(TestCase):
             'vision.migrations.0003_claves_de_almacenamiento'
         )
         insp = InspeccionCasco.objects.create(buque=Buque.objects.create(nombre='ARC', tipo='Fragata'))
-        self.seccion = SeccionCasco.objects.create(codigo='MID', nombre='Medio')
+        self.seccion = SeccionCasco.objects.create(buque=insp.buque, codigo='MID', nombre='Medio')
         self.insp = insp
 
     def _foto(self, original, anotada=None):

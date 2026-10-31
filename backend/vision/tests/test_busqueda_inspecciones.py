@@ -49,7 +49,7 @@ class FormaDeRespuestaTests(BusquedaBase):
 
     def test_resultado_incluye_nombre_severidad_y_total_fotos(self):
         insp = _crear(self.caribe, nombre='Dique', severidad=3)
-        seccion = SeccionCasco.objects.create(codigo='FWD-BTM', nombre='Fondo')
+        seccion = SeccionCasco.objects.create(buque=self.caribe, codigo='FWD-BTM', nombre='Fondo')
         for _ in range(2):
             FotoInspeccion.objects.create(
                 inspeccion=insp, seccion=seccion, imagen_original='media/x.jpg',

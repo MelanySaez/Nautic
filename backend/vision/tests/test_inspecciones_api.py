@@ -203,7 +203,9 @@ class SeveridadMaxTests(TestCase):
     def setUp(self):
         self.buque = _crear_buque()
         self.insp = InspeccionCasco.objects.create(buque=self.buque)
-        self.seccion = SeccionCasco.objects.create(codigo='FWD-BTM', nombre='Fondo - Proa')
+        self.seccion = SeccionCasco.objects.create(
+            buque=self.buque, codigo='FWD-BTM', nombre='Fondo - Proa'
+        )
 
     def _foto(self, severidad, estado=FotoInspeccion.Estado.COMPLETADA):
         return FotoInspeccion.objects.create(
@@ -300,7 +302,9 @@ class TareaActualizaSeveridadTests(TestCase):
             self.addCleanup(p.stop)
 
         self.insp = InspeccionCasco.objects.create(buque=_crear_buque())
-        self.seccion = SeccionCasco.objects.create(codigo='FWD-BTM', nombre='Fondo - Proa')
+        self.seccion = SeccionCasco.objects.create(
+            buque=self.insp.buque, codigo='FWD-BTM', nombre='Fondo - Proa'
+        )
 
     def _foto_en_storage(self):
         ruta = default_storage.save('inspecciones/originales/foto.png', ContentFile(png_bytes()))
@@ -342,7 +346,7 @@ class BackfillMigracionTests(TestCase):
             'vision.migrations.0002_inspeccion_nombre_severidad'
         )
         buque = _crear_buque('ARC Gorgona')
-        seccion = SeccionCasco.objects.create(codigo='MID-SS-P', nombre='Medio')
+        seccion = SeccionCasco.objects.create(buque=buque, codigo='MID-SS-P', nombre='Medio')
         vieja = InspeccionCasco.objects.create(buque=buque)
         con_nombre = InspeccionCasco.objects.create(buque=buque, nombre='Mío')
         vacia = InspeccionCasco.objects.create(buque=buque)
