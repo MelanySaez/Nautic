@@ -85,5 +85,13 @@ Branch `feat/vision-ia-01-datos` from `main` (c6ee64f).
   src/inspecciones/infrastructure src/inspecciones/domain`: 10 files, 82 tests passed. `pnpm lint` clean,
   `pnpm build` ok.
 
+- Reviews (user pre-authorized): slice 1 (main..cfe43dd) and slice 2 (..b6c73c5) medium,
+  slice_budget_reached, APPROVED + acknowledged. Applied: per-photo retry is disabled while the model
+  catalog loads or no model is usable (it could send no model); RED then GREEN in
+  `CargaPorZonaPage.test.tsx` (17 passed), lint and build clean. Open advisories (minimal-tests rule):
+  blank/whitespace `nombre` omission untested; catalog HTTP error untested; fallback, no-usable-model
+  and catalog-error branches untested; with every model unavailable the select shows a disabled
+  option as selected; `/inspecciones/nueva` redirect untested.
+
 ## Next step
 Review/PR of the two slices (stacked: `feat/vision-ia-01-datos` then `feat/vision-ia-02-pantallas`).

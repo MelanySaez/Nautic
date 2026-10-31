@@ -13,12 +13,15 @@ export function ColaFotos({
   modelos,
   ocupadas,
   alReintentar,
+  reintentoBloqueado = false,
   alEliminar,
 }: {
   fotos: Foto[]
   modelos: ModeloIA[]
   ocupadas: Set<number>
   alReintentar: (foto: Foto) => void
+  /** True while no model can be sent yet (catalog loading or no usable model). */
+  reintentoBloqueado?: boolean
   alEliminar: (foto: Foto) => void
 }) {
   return (
@@ -58,7 +61,7 @@ export function ColaFotos({
                   <button
                     type="button"
                     onClick={() => alReintentar(foto)}
-                    disabled={ocupada}
+                    disabled={ocupada || reintentoBloqueado}
                     aria-label="Reintentar análisis"
                     className="rounded p-1.5 text-ink-dim hover:bg-surface-2 hover:text-ink disabled:opacity-50"
                   >

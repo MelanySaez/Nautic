@@ -274,7 +274,7 @@ function CargaPorZona({ datos, aplicar }: { datos: DatosInspeccion; aplicar: (ev
             <p>Esta inspección todavía no tiene fotos.</p>
           </Vacio>
         ) : (
-          <ColaFotos fotos={detalle.fotos} modelos={modelos} ocupadas={ocupadas} alReintentar={reintentarFoto} alEliminar={eliminarFoto} />
+          <ColaFotos fotos={detalle.fotos} modelos={modelos} ocupadas={ocupadas} alReintentar={reintentarFoto} reintentoBloqueado={catalogo.tipo === 'cargando' || sinModeloUsable} alEliminar={eliminarFoto} />
         )}
       </Tarjeta>
 

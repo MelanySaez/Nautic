@@ -269,6 +269,18 @@ describe('CargaPorZonaPage', () => {
     expect(cola).toHaveTextContent('Pendiente')
   })
 
+  it('blocks the retry while the model catalog is loading', async () => {
+    const { dependencias } = preparar()
+    dependencias.modelos.listar.mockReturnValue(new Promise(() => {}))
+    dependencias.inspecciones.obtener.mockResolvedValue(
+      unDetalle({ id: 7, fotos: [unaFoto({ id: 21, estado: 'error' })] }),
+    )
+    renderizar(dependencias)
+    const cola = await screen.findByRole('list', { name: 'Fotos de la inspección' })
+
+    expect(within(cola).getByRole('button', { name: 'Reintentar análisis' })).toBeDisabled()
+  })
+
   it('deletes a photo after confirmation', async () => {
     const { dependencias } = preparar()
     dependencias.inspecciones.obtener.mockResolvedValue(
