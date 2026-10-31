@@ -296,7 +296,7 @@ Conventional Commit per task, tests and docs alongside the behavior.
       other errors (network, 500) in the alert. Disable submit while sending. On success navigate to
       `/buques/:id`. Tests: happy path (port called with the exact object), client-side required,
       per-field server errors incl. a 400 with several fields, generic error, double-submit guard.
-- [ ] T7 — `BuqueDetallePage` (`/buques/:id`, key the page by id like the existing route wrappers).
+- [x] T7 — `BuqueDetallePage` (`/buques/:id`, key the page by id like the existing route wrappers).
       Container loads `obtener(Number(id))`; presentational sheet grouped (see open questions);
       null values render as "—"; units in labels (m, m³, nudos, ton, h, días, años); dates via
       `formatearFecha`; JSON fields rendered read-only or hidden per the open question. Handle 404
@@ -393,6 +393,7 @@ Backend evidence: `buques-backend.md` (28 tests OK, `manage.py check` clean).
   `error` with `campos`).
 - T5 done (commit `feat(frontend): add the vessel list page`), route: delegated direct (single writer). RED: `ListaBuquesPage.test.tsx` failed to load (module `./ListaBuquesPage` did not exist; no tests ran). GREEN: 4 tests in that file passed (`pnpm vitest run src/buques/ui/ListaBuquesPage.test.tsx`). Filter helper `filtrarBuques` is covered through the page test.
 - T6 done (commit `feat(frontend): add the vessel creation form`), route: delegated direct (single writer). RED: `NuevoBuquePage.test.tsx` failed to load (module `./NuevoBuquePage` did not exist; no tests ran). GREEN: 5 tests in that file passed (happy path with exact object + navigation, client-side required, per-field server errors + unmapped keys in the alert, generic error, submit disabled while sending); `tsc -b` and lint clean. Field metadata shared with the detail page in `buques/domain/fichaTecnica.ts`.
+- T7 done (commit `feat(frontend): add the vessel technical sheet page`), route: delegated direct (single writer). RED: `BuqueDetallePage.test.tsx` failed to load (module `./BuqueDetallePage` did not exist; no tests ran). GREEN: 3 tests in that file passed (sheet by group with units and dashes, 404 message + back link, non-numeric id); `tsc -b` and lint clean. JSON fields not shown and `imagen` is a placeholder, per the Decisions section.
 
 ## Next step
 Slice 2: T5-T8 (list, create, detail pages, routes and nav). Slice 1 ready for push/PR (user decision).
