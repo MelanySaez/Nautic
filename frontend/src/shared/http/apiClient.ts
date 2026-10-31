@@ -1,10 +1,16 @@
+/** Per-field validation messages keyed by the API's snake_case field names. */
+export type ErroresDeCampo = Record<string, string[]>
+
 export class ApiError extends Error {
   readonly status: number
+  /** Field-level messages from a 400 `{"campos": {...}}` body; undefined when the body has none. */
+  readonly campos?: ErroresDeCampo
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, campos?: ErroresDeCampo) {
     super(message)
     this.name = 'ApiError'
     this.status = status
+    this.campos = campos
   }
 }
 
@@ -13,18 +19,28 @@ export type Fetcher = typeof fetch
 /** Base URL of the Django backend; empty means same origin (Vite dev proxy). */
 export const API_BASE_URL: string = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/+$/, '')
 
-async function mensajeDeError(respuesta: Response): Promise<string> {
+/** Keeps only the entries of `campos` that are arrays of strings; undefined when none survive. */
+function erroresDeCampo(campos: unknown): ErroresDeCampo | undefined {
+  if (!campos || typeof campos !== 'object' || Array.isArray(campos)) return undefined
+  const validos: ErroresDeCampo = {}
+  for (const [campo, mensajes] of Object.entries(campos)) {
+    if (Array.isArray(mensajes) && mensajes.every((m) => typeof m === 'string')) validos[campo] = mensajes
+  }
+  return Object.keys(validos).length > 0 ? validos : undefined
+}
+
+async function errorDeRespuesta(respuesta: Response): Promise<ApiError> {
   try {
     const cuerpo: unknown = await respuesta.json()
     if (cuerpo && typeof cuerpo === 'object') {
-      const { error, detail } = cuerpo as { error?: unknown; detail?: unknown }
-      if (typeof error === 'string' && error) return error
-      if (typeof detail === 'string' && detail) return detail
+      const { error, detail, campos } = cuerpo as { error?: unknown; detail?: unknown; campos?: unknown }
+      const mensaje = typeof error === 'string' && error ? error : typeof detail === 'string' && detail ? detail : null
+      if (mensaje) return new ApiError(respuesta.status, mensaje, erroresDeCampo(campos))
     }
   } catch {
     // Non-JSON body (HTML error page, empty body): fall through to the generic message.
   }
-  return `El servidor respondió con un error (${respuesta.status}).`
+  return new ApiError(respuesta.status, `El servidor respondió con un error (${respuesta.status}).`)
 }
 
 export class ApiClient {
@@ -44,7 +60,7 @@ export class ApiClient {
       throw new ApiError(0, 'No se pudo conectar con el servidor.')
     }
     if (!respuesta.ok) {
-      throw new ApiError(respuesta.status, await mensajeDeError(respuesta))
+      throw await errorDeRespuesta(respuesta)
     }
     if (respuesta.status === 204) return undefined as T
     return (await respuesta.json()) as T

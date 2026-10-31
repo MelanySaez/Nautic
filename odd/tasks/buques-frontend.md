@@ -12,7 +12,13 @@ still serves vessels from `EnMemoriaBuquesRepository` + a hard-coded seed whose 
 the database. Inspections depend on real vessels.
 
 ## Status
-NOT STARTED (handoff). Backend done and tested on branch `feat/buques-backend`
+IN PROGRESS (2026-10-31), branch `feat/buques-frontend` from `main` (71fe803). First of three frontend
+features requested by the user: Buques, then Visión IA (`odd/tasks/vision-ia-frontend.md`, inspection
+creation + section + upload + model + analyze), then the Inspecciones history
+(`odd/tasks/inspecciones-busqueda-frontend.md`). The existing frontend is a style reference (tokens,
+layout, theme); `frontend/interfaz/` mockups do not exist in the repo.
+
+Previously: NOT STARTED (handoff). Backend done and tested on branch `feat/buques-backend`
 (28 tests in `backend/vision/tests/test_buques_api.py`). Frontend work should branch from it (or from
 `main` once it is merged). No frontend file has been touched.
 
@@ -248,7 +254,7 @@ before implementing, then GREEN, then refactor.
 ## Checklist
 Conventional Commit per task, tests and docs alongside the behavior.
 
-- [ ] T1 — Field errors in `ApiClient`. Add optional `campos?: Record<string, string[]>` to `ApiError`;
+- [x] T1 — Field errors in `ApiClient`. Add optional `campos?: Record<string, string[]>` to `ApiError`;
       when the error body has `campos` (object of string arrays), keep it; the message stays
       `error`/`detail` (so `Datos inválidos.`). Tests (new `apiClient.test.ts` or via the buques adapter
       test): body with `campos` → `ApiError.campos` populated; malformed `campos` ignored; existing
@@ -342,6 +348,15 @@ Run from `frontend/`:
    over a fully loaded list. If the fleet may exceed a few hundred, the port should expose paged
    `listar({offset, limit})` and the selector in "Nueva inspección" needs a search-as-you-type.
 
+## Decisions (2026-10-31, proposals adopted as defaults; user may revise)
+1. Create form: required `nombre`, `tipo`; optional `etapa`, `descripcion`, `imagen` and the numeric
+   fields in collapsible groups (Dimensiones, Desempeño, Capacidades).
+2. Detail grouping as proposed: General, Dimensiones, Desempeño, Capacidades.
+3. `etapa`: free text with suggestions (`Activo`, `En construcción`) via `<datalist>`.
+4. JSON fields: not shown in the UI for now (API-only).
+5. `imagen`: placeholder in cards and detail (no serving contract).
+6. Fleet assumed small: client-side search over the fully loaded list.
+
 ## Discrepancies found (docs vs code), not fixed here
 - `frontend/README.md` line 55 still says the backend exposes no vessel endpoints (outdated; T4 fixes it).
 - `AGENTS.md` line 171 says the HTTP adapter is pending (accurate today; update in T4).
@@ -354,13 +369,18 @@ Run from `frontend/`:
   frontend test fixtures (`HttpInspeccionesRepository.test.ts`, `dobles.tsx`).
 
 ## Delivery
-Strategy: ask-on-risk (default). Forecast: roughly 700-900 authored changed lines across T1-T8
+Chosen: stacked PRs to main (cached from previous features). Slice 1 = T1-T4 (data layer +
+composition), slice 2 = T5-T8 (screens + routes). Route per task: delegated direct (writer trigger:
+2+ non-trivial files).
+
+Original note — Strategy: ask-on-risk (default). Forecast: roughly 700-900 authored changed lines across T1-T8
 (adapter, three pages, tests, docs) — above the ~400 heuristic, so plan slices before the first
 commit, e.g. slice 1 = T1-T4 (data layer + composition), slice 2 = T5-T8 (screens). Push, PR and merge
 remain the user's decisions.
 
 ## Progress / Evidence
-Nothing implemented. Backend evidence: `buques-backend.md` (28 tests OK, `manage.py check` clean).
+Backend evidence: `buques-backend.md` (28 tests OK, `manage.py check` clean).
+- T1 done (commit recorded in git log: `feat(frontend): expose field errors on ApiError`), route: delegated direct (single writer). RED: `apiClient.test.ts` "keeps the per-field messages of a 400 response..." and "drops entries that are not arrays of strings..." failed (`ApiError.campos` was undefined). GREEN: 7 new tests; full suite 82 passed, lint clean, build clean.
 
 ## Next step
 Create branch from `feat/buques-backend` (or `main` after merge), resolve open question 1 (form
