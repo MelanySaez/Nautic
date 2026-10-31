@@ -1,18 +1,19 @@
 import { describe, expect, it } from 'vitest'
+import { unBuque } from '../../test/dobles'
 import { EnMemoriaBuquesRepository } from './EnMemoriaBuquesRepository'
 
 describe('EnMemoriaBuquesRepository', () => {
   it('lists the seeded vessels sorted by name', async () => {
     const repo = new EnMemoriaBuquesRepository([
-      { id: 2, nombre: 'ARA Libertad', tipo: 'Fragata' },
-      { id: 1, nombre: 'ARA Almirante Brown', tipo: 'Destructor' },
+      unBuque({ id: 2, nombre: 'ARA Libertad', tipo: 'Fragata' }),
+      unBuque({ id: 1, nombre: 'ARA Almirante Brown', tipo: 'Destructor' }),
     ])
 
     expect((await repo.listar()).map((b) => b.nombre)).toEqual(['ARA Almirante Brown', 'ARA Libertad'])
   })
 
   it('returns a copy so callers cannot mutate the seed', async () => {
-    const repo = new EnMemoriaBuquesRepository([{ id: 1, nombre: 'ARA Libertad', tipo: 'Fragata' }])
+    const repo = new EnMemoriaBuquesRepository([unBuque({ id: 1, nombre: 'ARA Libertad', tipo: 'Fragata' })])
 
     ;(await repo.listar()).pop()
 

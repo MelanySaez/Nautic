@@ -259,7 +259,7 @@ Conventional Commit per task, tests and docs alongside the behavior.
       `error`/`detail` (so `Datos inválidos.`). Tests (new `apiClient.test.ts` or via the buques adapter
       test): body with `campos` → `ApiError.campos` populated; malformed `campos` ignored; existing
       `HttpInspeccionesRepository` tests stay green.
-- [ ] T2 — Domain + port. In `buques/domain/buque.ts` model: summary (`id, nombre, tipo, etapa,
+- [x] T2 — Domain + port. In `buques/domain/buque.ts` model: summary (`id, nombre, tipo, etapa,
       imagen, createdAt, updatedAt`; keep the exported `Buque` usable by `NuevaInspeccionPage` and its
       test, so either extend `Buque` or keep it as the summary), the sheet (`BuqueDetalle` with the 28
       fields in camelCase: numbers as `number | null`, JSON fields typed as `Record<string, unknown>` /
@@ -380,7 +380,8 @@ remain the user's decisions.
 
 ## Progress / Evidence
 Backend evidence: `buques-backend.md` (28 tests OK, `manage.py check` clean).
-- T1 done (commit recorded in git log: `feat(frontend): expose field errors on ApiError`), route: delegated direct (single writer). RED: `apiClient.test.ts` "keeps the per-field messages of a 400 response..." and "drops entries that are not arrays of strings..." failed (`ApiError.campos` was undefined). GREEN: 7 new tests; full suite 82 passed, lint clean, build clean.
+- T1 done (commit 2885f93 `feat(frontend): expose field errors on ApiError`), route: delegated direct (single writer). RED: `apiClient.test.ts` "keeps the per-field messages of a 400 response..." and "drops entries that are not arrays of strings..." failed (`ApiError.campos` was undefined). GREEN: 7 new tests; full suite 82 passed, lint clean, build clean.
+- T2 done (commit: see git log `feat(frontend): model vessel detail and extend the port`), route: delegated direct (single writer). RED: after adding `unBuque`/`unDetalleBuque`/`obtener`/`crear` to `src/test/dobles.tsx`, `tsc -b` failed (TS2305 no exported `BuqueDetalle`/`NuevoBuque`; TS2353 `etapa`/`obtener` unknown on `Buque`/`BuquesRepository`). GREEN: `tsc -b` clean, 82 tests passed, lint clean, build clean. `EnMemoriaBuquesRepository.obtener/crear` throw (removed in T4); seed and its test updated to the new `Buque`.
 
 ## Next step
 Create branch from `feat/buques-backend` (or `main` after merge), resolve open question 1 (form
