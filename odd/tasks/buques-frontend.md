@@ -287,7 +287,7 @@ Conventional Commit per task, tests and docs alongside the behavior.
       `filtrarInspecciones`); `Cargando`, `MensajeError` with retry, `Vacio` with a "Nuevo buque" CTA;
       header button to `/buques/nuevo`. Tests: renders vessels, filters, empty state, error + retry,
       links.
-- [ ] T6 — `NuevoBuquePage` (create form). Required `Nombre` and `Tipo` (client-side "required"
+- [x] T6 — `NuevoBuquePage` (create form). Required `Nombre` and `Tipo` (client-side "required"
       message before calling the port); optional `Etapa`, `Descripción`, `Imagen` and the numeric
       technical-sheet fields (final field set pending the open question; propose at least the
       dimension/performance group). Numeric inputs send `number` (empty → omitted), `>= 0`. On
@@ -392,6 +392,7 @@ Backend evidence: `buques-backend.md` (28 tests OK, `manage.py check` clean).
   a 400 with `campos` but no `error`/`detail` loses its field messages (the backend always sends
   `error` with `campos`).
 - T5 done (commit `feat(frontend): add the vessel list page`), route: delegated direct (single writer). RED: `ListaBuquesPage.test.tsx` failed to load (module `./ListaBuquesPage` did not exist; no tests ran). GREEN: 4 tests in that file passed (`pnpm vitest run src/buques/ui/ListaBuquesPage.test.tsx`). Filter helper `filtrarBuques` is covered through the page test.
+- T6 done (commit `feat(frontend): add the vessel creation form`), route: delegated direct (single writer). RED: `NuevoBuquePage.test.tsx` failed to load (module `./NuevoBuquePage` did not exist; no tests ran). GREEN: 5 tests in that file passed (happy path with exact object + navigation, client-side required, per-field server errors + unmapped keys in the alert, generic error, submit disabled while sending); `tsc -b` and lint clean. Field metadata shared with the detail page in `buques/domain/fichaTecnica.ts`.
 
 ## Next step
 Slice 2: T5-T8 (list, create, detail pages, routes and nav). Slice 1 ready for push/PR (user decision).
