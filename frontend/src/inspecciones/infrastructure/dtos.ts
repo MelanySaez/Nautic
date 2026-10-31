@@ -42,11 +42,20 @@ export interface InspeccionDto {
   id: number
   buque_id: number
   buque_nombre: string
+  nombre: string
+  severidad_max: Severidad | null
   descripcion: string
   tomado_por: string
   fecha_creacion: string
   fecha_modificacion: string
   total_fotos: number
+}
+
+/** Page of `GET /api/vision/inspecciones/` (cursor pagination, no total). */
+export interface ListaInspeccionesDto {
+  resultados: InspeccionDto[]
+  siguiente: string | null
+  hay_mas: boolean
 }
 
 export interface InspeccionDetalleDto extends InspeccionDto {
