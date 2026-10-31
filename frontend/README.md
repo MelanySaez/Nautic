@@ -38,7 +38,7 @@ src/
 ├── app/            # composición: router, layout, raíz de dependencias
 ├── inspecciones/
 │   ├── domain/         # tipos y reglas puras (progreso, severidad, eventos en vivo, búsqueda)
-│   ├── application/    # puertos: InspeccionesRepository, EventosInspeccion
+│   ├── application/    # puertos: InspeccionesRepository, ModelosIA, EventosInspeccion
 │   ├── infrastructure/ # adaptadores: HTTP (fetch) y SSE (EventSource), mapeo snake_case → dominio
 │   └── ui/             # páginas (contenedores) y componentes de presentación
 ├── buques/         # puerto BuquesRepository, adaptador HTTP (/api/buques/) y pantallas
@@ -46,6 +46,7 @@ src/
 └── test/           # setup de Vitest y dobles de prueba
 ```
 
+- **Rutas:** `/vision` (alta de inspección, con nombre opcional), `/vision/:id` (carga por zona, selector de modelo de IA y «Iniciar análisis») y `/vision/:id/resultados`; `/` es el historial de «Inspecciones» y `/buques` la flota. `/inspecciones/nueva` y `/inspecciones/:id/carga` redirigen a las rutas de Visión IA; `/inspecciones/:id/resultados` se mantiene. El selector usa `GET /api/vision/modelos/` (preselecciona el modelo por defecto y lista como «no disponible» los que el servidor no puede usar).
 - Las páginas obtienen los adaptadores con `useDependencias()`; `app/composicion.ts` es el único lugar que decide qué adaptador implementa cada puerto. Los tests inyectan dobles (`src/test/dobles.tsx`).
 - El estado de las fotos se actualiza por SSE (`/api/vision/inspecciones/<id>/stream/`), sin polling. `EventSource` reconecta solo.
 - Los errores del backend (`{"error": ...}` o `{"detail": ...}`) se muestran tal cual; los fallos de red o respuestas ilegibles muestran un mensaje genérico.

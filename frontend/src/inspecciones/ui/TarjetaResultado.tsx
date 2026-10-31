@@ -1,16 +1,18 @@
 import { useState } from 'react'
 import { porcentaje } from '../../shared/ui/formato'
 import type { Foto } from '../domain/inspeccion'
+import { etiquetaModelo, type ModeloIA } from '../domain/modelo'
 import { InsigniaSeveridad } from './Insignias'
 
 function segundos(ms: number | null): string {
   return ms === null ? '—' : `${(ms / 1000).toFixed(2)} s`
 }
 
-export function TarjetaResultado({ foto }: { foto: Foto }) {
+export function TarjetaResultado({ foto, modelos }: { foto: Foto; modelos: ModeloIA[] }) {
   const [anotada, setAnotada] = useState(true)
   const titulo = `${foto.seccion.codigo} · Foto #${foto.id}`
   const tieneAnotada = Boolean(foto.imagenAnotada)
+  const modelo = etiquetaModelo(foto.modelo, foto.modeloVersion, modelos)
   const imagen = tieneAnotada && anotada ? foto.imagenAnotada : foto.imagenOriginal
 
   return (
@@ -51,7 +53,10 @@ export function TarjetaResultado({ foto }: { foto: Foto }) {
 
       <div className="flex flex-col gap-3 p-4">
         <div className="flex items-center justify-between gap-3">
-          <span className="font-mono text-xs text-ink-muted">Inferencia: {segundos(foto.tiempoInferenciaMs)}</span>
+          <span className="font-mono text-xs text-ink-muted">
+            Inferencia: {segundos(foto.tiempoInferenciaMs)}
+            {modelo && ` · Modelo: ${modelo}`}
+          </span>
           {foto.severidad && <InsigniaSeveridad severidad={foto.severidad} />}
         </div>
         {foto.detecciones.length === 0 ? (

@@ -50,7 +50,7 @@ the full suite. Frontend TDD on (AGENTS.md); runner `pnpm vitest run <files>`, p
 
 ## Checklist
 - [x] T1 — Data layer. Route: delegated direct (writer trigger: 2+ non-trivial files).
-- [ ] T2 — Visión IA screens. Route: delegated direct.
+- [x] T2 — Visión IA screens. Route: delegated direct.
 
 ## Acceptance criteria
 - From "Visión IA" a user creates an inspection, uploads photos per section of that vessel, picks an
@@ -74,5 +74,24 @@ Branch `feat/vision-ia-01-datos` from `main` (c6ee64f).
   `pnpm vitest run` on infrastructure/, domain/, CargaPorZonaPage.test.tsx, ResultadosPage.test.tsx: 6 files,
   55 tests passed. `pnpm lint` clean, `pnpm build` ok.
 
+- T2 done — `feat(vision): add Visión IA section with model selector`. Route: delegated direct (single writer),
+  branch `feat/vision-ia-02-pantallas`. Routes `/vision`, `/vision/:id`, `/vision/:id/resultados` (plus
+  `/inspecciones/:id/resultados` kept); `/inspecciones/nueva` and `/inspecciones/:id/carga` redirect; nav order
+  Visión IA, Inspecciones, Buques; creation page has optional "Nombre"; upload page has `SelectorModelo`
+  (preselects `porDefecto`, falls back to the first available model when the default is unavailable, unavailable
+  options disabled "(no disponible)", description shown), "Iniciar análisis" and retry send the selected model,
+  `campos.modelo` 400 shown in the error area, photo cards and results show "label vX". Internal links moved to
+  `/vision/...`. RED: 15 tests failed before implementation. Ran `pnpm vitest run src/app src/inspecciones/ui
+  src/inspecciones/infrastructure src/inspecciones/domain`: 10 files, 82 tests passed. `pnpm lint` clean,
+  `pnpm build` ok.
+
+- Reviews (user pre-authorized): slice 1 (main..cfe43dd) and slice 2 (..b6c73c5) medium,
+  slice_budget_reached, APPROVED + acknowledged. Applied: per-photo retry is disabled while the model
+  catalog loads or no model is usable (it could send no model); RED then GREEN in
+  `CargaPorZonaPage.test.tsx` (17 passed), lint and build clean. Open advisories (minimal-tests rule):
+  blank/whitespace `nombre` omission untested; catalog HTTP error untested; fallback, no-usable-model
+  and catalog-error branches untested; with every model unavailable the select shows a disabled
+  option as selected; `/inspecciones/nueva` redirect untested.
+
 ## Next step
-T2 on `feat/vision-ia-02-pantallas`.
+Review/PR of the two slices (stacked: `feat/vision-ia-01-datos` then `feat/vision-ia-02-pantallas`).

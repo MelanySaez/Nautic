@@ -24,7 +24,7 @@ export function TarjetaInspeccion({
           <p className="label-caps text-ink-dim">INS-{String(id).padStart(4, '0')}</p>
           <h3 className="truncate text-xl font-semibold tracking-tight">
             <Link
-              to={`/inspecciones/${id}/carga`}
+              to={`/vision/${id}`}
               aria-label={`Abrir inspección de ${buqueNombre}`}
               className="after:absolute after:inset-0 focus-visible:outline-none"
             >

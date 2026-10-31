@@ -8,11 +8,11 @@ function renderizar(dependencias = crearDependenciasFalsas().dependencias) {
   const router = renderizarRutas(
     [
       { path: '/', element: <p>Listado</p> },
-      { path: '/inspecciones/nueva', element: <NuevaInspeccionPage /> },
-      { path: '/inspecciones/:id/carga', element: <p>Carga de fotos</p> },
+      { path: '/vision', element: <NuevaInspeccionPage /> },
+      { path: '/vision/:id', element: <p>Carga de fotos</p> },
     ],
     dependencias,
-    '/inspecciones/nueva',
+    '/vision',
   )
   return { router, dependencias }
 }
@@ -33,16 +33,18 @@ describe('NuevaInspeccionPage', () => {
     await screen.findByRole('option', { name: 'ARA Libertad · Fragata' })
 
     await userEvent.selectOptions(screen.getByLabelText('Buque'), '2')
+    await userEvent.type(screen.getByLabelText('Nombre (opcional)'), ' Control anual 2026 ')
     await userEvent.type(screen.getByLabelText('Inspector'), '  Juan Gómez ')
     await userEvent.type(screen.getByLabelText('Descripción'), ' Control de proa ')
     await userEvent.click(screen.getByRole('button', { name: 'Iniciar inspección' }))
 
     expect(dependencias.inspecciones.crear).toHaveBeenCalledWith({
       buqueId: 2,
+      nombre: 'Control anual 2026',
       tomadoPor: 'Juan Gómez',
       descripcion: 'Control de proa',
     })
-    expect(router.state.location.pathname).toBe('/inspecciones/42/carga')
+    expect(router.state.location.pathname).toBe('/vision/42')
   })
 
   it('requires a vessel before submitting', async () => {

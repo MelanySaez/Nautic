@@ -17,6 +17,7 @@ export function NuevaInspeccionPage() {
   const { estado: flota } = useRecurso(cargarBuques)
 
   const [buqueId, setBuqueId] = useState('')
+  const [nombre, setNombre] = useState('')
   const [tomadoPor, setTomadoPor] = useState('')
   const [descripcion, setDescripcion] = useState('')
   const [errorBuque, setErrorBuque] = useState<string | null>(null)
@@ -34,10 +35,11 @@ export function NuevaInspeccionPage() {
     try {
       const creada = await inspecciones.crear({
         buqueId: Number(buqueId),
+        nombre: nombre.trim(),
         tomadoPor: tomadoPor.trim(),
         descripcion: descripcion.trim(),
       })
-      navegar(`/inspecciones/${creada.id}/carga`)
+      navegar(`/vision/${creada.id}`)
     } catch (error) {
       setErrorEnvio(mensajeDe(error))
       setEnviando(false)
@@ -77,6 +79,15 @@ export function NuevaInspeccionPage() {
                     </option>
                   ))}
               </select>
+            </Campo>
+            <Campo etiqueta="Nombre (opcional)" ayuda="Si lo dejas vacío se genera uno con el número y el buque.">
+              <input
+                value={nombre}
+                onChange={(e) => setNombre(e.target.value)}
+                placeholder="Por ejemplo: Control anual 2026"
+                maxLength={255}
+                className={CLASES_CONTROL}
+              />
             </Campo>
             <Campo etiqueta="Inspector">
               <input

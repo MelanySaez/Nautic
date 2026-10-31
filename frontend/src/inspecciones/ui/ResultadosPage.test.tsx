@@ -2,7 +2,7 @@ import { act, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import type { Foto } from '../domain/inspeccion'
-import { crearDependenciasFalsas, renderizarRutas, SECCION_QUILLA, unaFoto, unDetalle } from '../../test/dobles'
+import { crearDependenciasFalsas, renderizarRutas, SECCION_QUILLA, unaFoto, unDetalle, unModelo } from '../../test/dobles'
 import { ResultadosRuta } from './ResultadosPage'
 
 const SECCION_PROA = { id: 1, codigo: 'FWD-BTM', nombre: 'Fondo - Proa', descripcion: '', orden: 1 }
@@ -24,13 +24,14 @@ function renderizar(fotos: Foto[]) {
   const falsas = crearDependenciasFalsas()
   falsas.dependencias.inspecciones.obtener.mockResolvedValue(unDetalle({ id: 7, buqueNombre: 'ARA Libertad', fotos }))
   falsas.dependencias.inspecciones.listarSecciones.mockResolvedValue([SECCION_QUILLA, SECCION_PROA])
+  falsas.dependencias.modelos.listar.mockResolvedValue([unModelo({ id: 'rtdetr', label: 'RT-DETR' })])
   const router = renderizarRutas(
     [
-      { path: '/inspecciones/:id/resultados', element: <ResultadosRuta /> },
-      { path: '/inspecciones/:id/carga', element: <p>Carga de fotos</p> },
+      { path: '/vision/:id/resultados', element: <ResultadosRuta /> },
+      { path: '/vision/:id', element: <p>Carga de fotos</p> },
     ],
     falsas.dependencias,
-    '/inspecciones/7/resultados',
+    '/vision/7/resultados',
   )
   return { ...falsas, router }
 }
@@ -47,6 +48,14 @@ describe('ResultadosPage', () => {
       expect.stringMatching(/corrosion.*×2.*98%/),
       expect.stringMatching(/marine growth.*×1.*85%/),
     ])
+  })
+
+  it('shows the model and version that analyzed each photo', async () => {
+    renderizar([{ ...CORROIDA, modelo: 'rtdetr', modeloVersion: '2.0.1' }])
+
+    const resultado = await screen.findByRole('article', { name: 'KEEL · Foto #21' })
+
+    expect(resultado).toHaveTextContent('RT-DETR v2.0.1')
   })
 
   it('shows the annotated image by default and switches to the original', async () => {
@@ -84,7 +93,7 @@ describe('ResultadosPage', () => {
     expect(screen.queryByRole('article', { name: 'KEEL · Foto #23' })).not.toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('link', { name: '1 foto sin analizar · ir a la carga' }))
-    expect(router.state.location.pathname).toBe('/inspecciones/7/carga')
+    expect(router.state.location.pathname).toBe('/vision/7')
   })
 
   it('filters the results by hull zone', async () => {
