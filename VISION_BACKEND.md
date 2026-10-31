@@ -62,12 +62,14 @@ Sesión de inspección: agrupa fotos de una misma campaña sobre un buque.
 | Campo | Tipo | Descripción |
 |---|---|---|
 | `buque` | FK → `Buque` | Embarcación inspeccionada (CASCADE) |
+| `nombre` | CharField(255) | Opcional al crear; si queda vacío se guarda `Inspección #<id> — <buque>`. Indexado con trigramas para búsqueda |
+| `severidad_max` | PositiveSmallInteger, null | Peor severidad de las fotos `completada` (`NivelSeveridad`: 1 low, 2 medium, 3 high, 4 critical). Desnormalizado: lo sube la tarea Celery con un UPDATE condicional atómico y se recalcula al borrar una foto |
 | `descripcion` | TextField | Contexto libre de la campaña |
 | `tomado_por` | CharField(255) | Nombre del inspector |
 | `fecha_creacion` | DateTimeField | Auto (auto_now_add) |
 | `fecha_modificacion` | DateTimeField | Auto (auto_now) |
 
-Tabla: `inspeccion_casco`. Ordenada por `-fecha_creacion`.
+Tabla: `inspeccion_casco`. Ordenada por `-fecha_creacion`. Índices: `(buque, -fecha_creacion, -id)`, `(severidad_max, -fecha_creacion, -id)`, `(-fecha_creacion, -id)` y GIN `gin_trgm_ops` sobre `nombre` (la migración `0002` habilita la extensión `pg_trgm`).
 
 ### `FotoInspeccion`
 Foto individual analizada por YOLO. Máquina de estados asíncrona.
@@ -109,9 +111,10 @@ Registrados en `vision/urls.py` y montados en la raíz por `backend/config/urls.
 |--------|-----|-------|-------------|
 | POST | `/api/ai/anomalias/` | `api_ai_anomalias` | Inferencia directa sin persistencia (retorna imagen JPEG o JSON con base64). Acepta `confidence`; ya no acepta ni devuelve `iou` |
 | GET | `/api/vision/secciones/` | `api_vision_secciones` | Catálogo completo de secciones del casco |
-| GET | `/api/vision/inspecciones/` | `api_vision_inspecciones` | Lista inspecciones (`?buque_id=` opcional) |
-| POST | `/api/vision/inspecciones/` | `api_vision_inspecciones` | Crear inspección (`buque_id`, `descripcion`, `tomado_por`) |
+| GET | `/api/vision/inspecciones/` | `api_vision_inspecciones` | Busca inspecciones: `{resultados, siguiente, hay_mas}`. Ver [Búsqueda de inspecciones](#búsqueda-de-inspecciones) |
+| POST | `/api/vision/inspecciones/` | `api_vision_inspecciones` | Crear inspección (`buque_id`, `nombre` opcional, `descripcion`, `tomado_por`) |
 | GET | `/api/vision/inspecciones/<id>/` | `api_vision_inspeccion_detalle` | Detalle con fotos anidadas |
+| PATCH | `/api/vision/inspecciones/<id>/` | `api_vision_inspeccion_detalle` | Edita `nombre` (vacío = regenerar el de por defecto) y `descripcion`; otros campos → 400 |
 | DELETE | `/api/vision/inspecciones/<id>/` | `api_vision_inspeccion_detalle` | Elimina inspección y archivos físicos |
 | POST | `/api/vision/inspecciones/<id>/fotos/` | `api_vision_subir_foto` | Sube foto (multipart: `imagen`, `seccion_id`) → HTTP 202 |
 | GET | `/api/vision/fotos/<id>/` | `api_vision_foto_detalle` | Estado y resultado de una foto |
@@ -119,6 +122,23 @@ Registrados en `vision/urls.py` y montados en la raíz por `backend/config/urls.
 | DELETE | `/api/vision/fotos/<id>/` | `api_vision_foto_detalle` | Elimina foto y archivos físicos |
 | POST | `/api/vision/inspecciones/<id>/analizar/` | `api_vision_analizar_inspeccion` | Disparar YOLO para todas las fotos `pendiente` |
 | GET | `/api/vision/inspecciones/<id>/stream/` | `api_vision_inspeccion_stream` | Stream SSE (text/event-stream) |
+
+### Búsqueda de inspecciones
+
+`GET /api/vision/inspecciones/` (implementada en `vision/busqueda.py`) ordena siempre por `-fecha_creacion, -id` y pagina por cursor (keyset); no calcula totales.
+
+| Parámetro | Formato | Efecto |
+|---|---|---|
+| `buque` (alias `buque_id`) | entero positivo | Inspecciones del buque |
+| `desde` / `hasta` | `AAAA-MM-DD` | Rango de `fecha_creacion`; `hasta` incluye el día completo; `desde` > `hasta` → 400 |
+| `severidad_min` | `low`, `medium`, `high`, `critical` | `severidad_max` igual o superior |
+| `q` | 2–100 caracteres | `nombre` contiene el texto (sin distinguir mayúsculas) |
+| `limit` | 1–100 (20 por defecto) | Tamaño de página |
+| `cursor` | opaco | El `siguiente` de la página anterior |
+
+Los filtros se combinan con AND. Los parámetros desconocidos se ignoran. Los inválidos devuelven `400 {"error": "Datos inválidos.", "campos": {"<param>": ["..."]}}` con todos los errores a la vez. Respuesta: `{"resultados": [...], "siguiente": "<cursor>"|null, "hay_mas": bool}`.
+
+Cada filtro es una entrada del registro `FILTROS`; `describir_filtros()` lo expone como JSON (nombre, tipo, valores permitidos) para derivar el esquema de un futuro intérprete de lenguaje natural.
 
 ### Endpoint SSE — `/api/vision/inspecciones/<id>/stream/`
 
