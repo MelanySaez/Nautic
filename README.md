@@ -10,14 +10,13 @@ El proyecto se organiza en tres secciones y avanza **backend primero**: cada sec
 
 | Sección | Qué es | Backend | Frontend |
 |---|---|---|---|
-| **Buques** | Entidad buque con ficha técnica (dimensiones, autonomía, capacidades…) | Alta (con sus secciones del casco: las 20 estándar o una lista propia), listado y ficha | Pendiente (hoy usa datos de ejemplo) |
-| **Inspecciones** | Sesiones de inspección por buque | Alta, listado con búsqueda y paginación, detalle, renombrado y borrado | Alta, historial con filtros (buque, fechas, severidad, nombre) y «Cargar más», resultados y renombrado |
-| **Visión IA** | Análisis del casco; todo análisis pertenece a una inspección | Fotos → cola Celery → inferencia → resultados en vivo (SSE) | Carga de fotos por zona y resultados en vivo |
+| **Buques** | Entidad buque con ficha técnica (dimensiones, autonomía, capacidades…) | Alta (con sus secciones del casco: las 20 estándar o una lista propia), listado y ficha | Listado, alta (con secciones estándar o propias) y ficha técnica |
+| **Inspecciones** | Historial de las inspecciones ya creadas | Alta, listado con búsqueda y paginación, detalle, renombrado y borrado | Historial con filtros (buque, fechas, severidad, nombre) y «Cargar más», resultados y renombrado |
+| **Visión IA** | Alta de la inspección y análisis de sus fotos; todo análisis pertenece a una inspección | Fotos → cola Celery → inferencia → resultados en vivo (SSE) | Alta de la inspección, carga de fotos por sección, elección del modelo y resultados en vivo |
 
 ### Hoja de ruta
 
-- **Interfaz de Buques** sobre la API existente.
-- **Búsqueda en lenguaje natural** que traduzca la consulta a esos mismos filtros.
+- **Búsqueda en lenguaje natural** que traduzca la consulta a los filtros del historial de inspecciones.
 
 El detalle de cada feature (alcance, decisiones, estado y traspasos pendientes) está en [`odd/tasks/`](odd/tasks/); el trabajo en curso, en las pull requests.
 
@@ -28,7 +27,7 @@ El detalle de cada feature (alcance, decisiones, estado y traspasos pendientes) 
 | `backend/config/` | Configuración del proyecto Django (settings, urls, Celery, wsgi/asgi) |
 | `backend/vision/` | Única app Django: modelos, API REST (inspecciones y buques), SSE, tareas Celery, tests |
 | `backend/pyproject.toml`, `backend/uv.lock` | Dependencias del backend (uv) |
-| `frontend/` | SPA React + TypeScript (Vite, Tailwind v4, pnpm). `frontend/interfaz/` guarda los mockups de referencia |
+| `frontend/` | SPA React + TypeScript (Vite, Tailwind v4, pnpm). |
 | `odd/tasks/` | Documentos de cada feature: alcance, decisiones, evidencia y traspasos pendientes |
 
 ## Puesta en marcha

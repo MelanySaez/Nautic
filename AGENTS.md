@@ -8,16 +8,16 @@ Guidance for agentic coding agents operating in this repository.
 
 Nautic is a hull-inspection system for naval vessels. This repository is a **monorepo root**:
 
-- **`backend/`** — the only code that exists today: a Django project (DRF + Celery) with a single app, `vision`.
-- **`frontend/`** — React + TypeScript SPA (Vite, Tailwind v4, React Router). `frontend/interfaz/` holds the original mockups: visual reference only, never imported or shipped.
+- **`backend/`** — a Django project (DRF + Celery) with a single app, `vision`.
+- **`frontend/`** — React + TypeScript SPA (Vite, Tailwind v4, React Router).
 
-Intended product (roadmap, **not implemented yet**): three sections.
+The product has three sections, each with its API and its screens:
 
 | Section | Purpose | Status |
 |---|---|---|
-| **Buques** | Vessel entity with a technical sheet and its own hull sections | Model + endpoints (create / list / detail) in `vision/views_buques.py`; no update/delete |
-| **Inspecciones** | Inspection sessions per vessel | Model + endpoints exist (`InspeccionCasco`) |
-| **Visión IA** | YOLO hull analysis; every analysis belongs to a concrete inspection | Implemented (photos → Celery → SSE) |
+| **Buques** | Vessel entity with a technical sheet and its own hull sections | API create / list / detail (`vision/views_buques.py`, no update/delete); screens `/buques`, `/buques/nuevo`, `/buques/:id` |
+| **Inspecciones** | History of the inspections already created | API search, detail, rename, delete; screens `/` (history with filters) and `/inspecciones/:id/resultados` |
+| **Visión IA** | Create an inspection and analyze its photos; every analysis belongs to an inspection | API photos → Celery → SSE with model selection; screens `/vision`, `/vision/:id`, `/vision/:id/resultados` |
 
 All endpoints live under `/api/`. The `vision` module needs infrastructure beyond Django + Postgres: **RabbitMQ** (Celery broker) and **Redis** (SSE pub/sub + rate limiting).
 
@@ -45,7 +45,6 @@ All endpoints live under `/api/`. The `vision` module needs infrastructure beyon
 │       └── INSPECCION_IA.md
 └── frontend/                    # React + TypeScript SPA (pnpm)
     ├── package.json, vite.config.ts
-    ├── interfaz/                # mockups (reference only)
     └── src/
         ├── app/                 # router, layout, composition root
         ├── inspecciones/        # domain / application / infrastructure / ui

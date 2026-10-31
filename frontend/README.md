@@ -1,10 +1,8 @@
 # Nautic · Frontend
 
-Interfaz web de inspección de cascos: listado de inspecciones, alta de inspección, carga de fotos por zona del casco con estado de análisis en vivo (SSE) y resultados del análisis de IA. Modo claro y oscuro.
+Interfaz web de inspección de cascos con tres secciones: **Buques** (listado, alta con secciones del casco y ficha técnica), **Visión IA** (alta de la inspección, carga de fotos por sección, elección del modelo y análisis en vivo por SSE) e **Inspecciones** (historial con filtros y resultados). Modo claro y oscuro.
 
 Stack: React 19, TypeScript, Vite, Tailwind CSS v4, React Router. Tests con Vitest y Testing Library.
-
-> `interfaz/` contiene los mockups originales. Son solo referencia visual: no se importan ni se publican.
 
 ## Puesta en marcha
 
