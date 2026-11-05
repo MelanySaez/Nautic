@@ -10,9 +10,18 @@ export interface SeccionCasco {
   orden: number
 }
 
+/** Class kind in the vision taxonomy: a hull part or a defect. */
+export type TipoClase = 'anomalia' | 'componente'
+
 /** One entry per detected class, as aggregated by the vision worker. */
 export interface Deteccion {
   clase: string
+  /** Spanish label from the taxonomy (the readable class name when the taxonomy does not know it). */
+  etiqueta: string
+  /** null when the taxonomy does not know the class. */
+  tipo: TipoClase | null
+  /** Anomalies only. */
+  severidad: Severidad | null
   cantidad: number
   confianzaMaxima: number
 }

@@ -34,7 +34,7 @@ manage.py test <module>`; frontend `pnpm vitest run <files>`, `pnpm lint`, `pnpm
 | ID | Specs | Route | Status | Commit / PR |
 |---|---|---|---|---|
 | T1 | S1, S2 | inline | done | 3239be2 |
-| T2 | S3 | inline | pending | |
+| T2 | S3 | inline | done | b9ea189 |
 | T3 | S4, S5 | inline | pending | |
 | T4 | S6 | inline | pending | |
 
@@ -58,3 +58,9 @@ units depend on each other and share files).
   test_versiones_foto, test_severidad (22 OK), test_inspecciones_api (35 OK), `manage.py check` clean.
   Env fix by user: Postgres collation refresh after the glibc 2.44 upgrade. Assess main..3239be2:
   medium, under_budget (pending in the chain). Risk: none (additive response fields and endpoint).
+- L6 (T2): RED 4 failures (repo DTO mapping, SSE mapping, Spanish rows, component-only photo
+  counter), GREEN after `Deteccion.etiqueta/tipo/severidad`, `esAnomalia`/`tieneAnomalias`, split
+  lists in `TarjetaResultado`. Ran ResultadosPage, infrastructure/, domain/, CargaPorZonaPage: 60
+  passed, 1 failed (`CargaPorZonaPage` "shows the model and version on the photos that have one"),
+  which also fails on the base without these changes (pre-existing, out of scope). Lint clean,
+  build ok. Assess main..b9ea189: medium, under_budget. Risk: none.

@@ -1,4 +1,4 @@
-import type { EventoInspeccion, Foto, Severidad } from './inspeccion'
+import type { Deteccion, EventoInspeccion, Foto, Severidad } from './inspeccion'
 
 export interface ResumenProgreso {
   total: number
@@ -35,6 +35,15 @@ export function severidadMaxima(fotos: Foto[]): Severidad | null {
     }
   }
   return maxima
+}
+
+/** A component is a hull part, not a defect; an unknown class counts as an anomaly so it is never hidden. */
+export function esAnomalia(deteccion: Deteccion): boolean {
+  return deteccion.tipo !== 'componente'
+}
+
+export function tieneAnomalias(foto: Foto): boolean {
+  return foto.detecciones.some(esAnomalia)
 }
 
 export function aplicarEvento(fotos: Foto[], evento: EventoInspeccion): Foto[] {

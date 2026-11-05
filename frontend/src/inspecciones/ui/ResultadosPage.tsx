@@ -7,7 +7,7 @@ import { Cargando, MensajeError, Vacio } from '../../shared/ui/Estados'
 import { Icon } from '../../shared/ui/Icon'
 import { clasesControlCompacto } from '../../shared/ui/clasesControl'
 import { mensajeDe } from '../../shared/ui/formato'
-import { resumirProgreso, severidadMaxima } from '../domain/reglas'
+import { resumirProgreso, severidadMaxima, tieneAnomalias } from '../domain/reglas'
 import { FormularioNombre } from './FormularioNombre'
 import { InsigniaSeveridad } from './Insignias'
 import { TarjetaResultado } from './TarjetaResultado'
@@ -110,7 +110,7 @@ function Resultados({ datos }: { datos: DatosInspeccion }) {
         <Indicador etiqueta="Fotos analizadas">
           {progreso.completadas} de {progreso.total}
         </Indicador>
-        <Indicador etiqueta="Con anomalías">{analizadas.filter((f) => f.detecciones.length > 0).length}</Indicador>
+        <Indicador etiqueta="Con anomalías">{analizadas.filter(tieneAnomalias).length}</Indicador>
         <Indicador etiqueta="Con error">{progreso.errores}</Indicador>
       </section>
 

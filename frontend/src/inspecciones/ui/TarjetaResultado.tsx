@@ -1,11 +1,31 @@
 import { useState } from 'react'
 import { porcentaje } from '../../shared/ui/formato'
-import type { Foto } from '../domain/inspeccion'
+import type { Deteccion, Foto } from '../domain/inspeccion'
 import { etiquetaModelo, type ModeloIA } from '../domain/modelo'
+import { esAnomalia } from '../domain/reglas'
 import { InsigniaSeveridad } from './Insignias'
 
 function segundos(ms: number | null): string {
   return ms === null ? '—' : `${(ms / 1000).toFixed(2)} s`
+}
+
+function ListaDetecciones({ titulo, detecciones }: { titulo: string; detecciones: Deteccion[] }) {
+  return (
+    <ul aria-label={titulo} className="divide-y divide-line border-t border-line">
+      {detecciones.map((d) => (
+        <li key={d.clase} className="flex items-baseline justify-between gap-3 py-2">
+          <span className="flex flex-wrap items-baseline gap-2">
+            <span className="font-semibold first-letter:uppercase">{d.etiqueta}</span>
+            <span className="font-mono text-xs text-ink-dim">×{d.cantidad}</span>
+            {d.severidad && <InsigniaSeveridad severidad={d.severidad} />}
+          </span>
+          <span className="font-mono text-xs text-ink-muted">
+            Confianza: <strong className="text-ink">{porcentaje(d.confianzaMaxima)}</strong>
+          </span>
+        </li>
+      ))}
+    </ul>
+  )
 }
 
 export function TarjetaResultado({ foto, modelos }: { foto: Foto; modelos: ModeloIA[] }) {
@@ -14,6 +34,8 @@ export function TarjetaResultado({ foto, modelos }: { foto: Foto; modelos: Model
   const tieneAnotada = Boolean(foto.imagenAnotada)
   const modelo = etiquetaModelo(foto.modelo, foto.modeloVersion, modelos)
   const imagen = tieneAnotada && anotada ? foto.imagenAnotada : foto.imagenOriginal
+  const anomalias = foto.detecciones.filter(esAnomalia)
+  const componentes = foto.detecciones.filter((d) => !esAnomalia(d))
 
   return (
     <article aria-label={titulo} className="flex flex-col overflow-hidden rounded-lg border border-line bg-surface">
@@ -59,21 +81,16 @@ export function TarjetaResultado({ foto, modelos }: { foto: Foto; modelos: Model
           </span>
           {foto.severidad && <InsigniaSeveridad severidad={foto.severidad} />}
         </div>
-        {foto.detecciones.length === 0 ? (
+        {anomalias.length === 0 ? (
           <p className="text-sm text-ink-muted">Sin anomalías detectadas.</p>
         ) : (
-          <ul aria-label="Detecciones" className="divide-y divide-line border-t border-line">
-            {foto.detecciones.map((d) => (
-              <li key={d.clase} className="flex items-baseline justify-between gap-3 py-2">
-                <span className="font-semibold capitalize">
-                  {d.clase.replace(/_/g, ' ')} <span className="font-mono text-xs font-normal text-ink-dim">×{d.cantidad}</span>
-                </span>
-                <span className="font-mono text-xs text-ink-muted">
-                  Confianza: <strong className="text-ink">{porcentaje(d.confianzaMaxima)}</strong>
-                </span>
-              </li>
-            ))}
-          </ul>
+          <ListaDetecciones titulo="Anomalías" detecciones={anomalias} />
+        )}
+        {componentes.length > 0 && (
+          <div className="flex flex-col gap-1">
+            <h4 className="label-caps text-ink-dim">Componentes</h4>
+            <ListaDetecciones titulo="Componentes" detecciones={componentes} />
+          </div>
         )}
       </div>
     </article>

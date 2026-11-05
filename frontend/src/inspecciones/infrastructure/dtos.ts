@@ -8,6 +8,7 @@ import type {
   PaginaInspecciones,
   SeccionCasco,
   Severidad,
+  TipoClase,
 } from '../domain/inspeccion'
 import type { ModeloIA } from '../domain/modelo'
 
@@ -25,6 +26,10 @@ export interface DeteccionDto {
   class_name: string
   count: number
   max_confidence: number
+  /** Taxonomy added by the backend at read time; absent on older servers. */
+  etiqueta?: string
+  tipo?: TipoClase | null
+  severidad?: Severidad | null
 }
 
 export interface FotoDto {
@@ -109,7 +114,14 @@ export function aSeccion(dto: SeccionDto): SeccionCasco {
 }
 
 function aDetecciones(dtos: DeteccionDto[] | null): Deteccion[] {
-  return (dtos ?? []).map((d) => ({ clase: d.class_name, cantidad: d.count, confianzaMaxima: d.max_confidence }))
+  return (dtos ?? []).map((d) => ({
+    clase: d.class_name,
+    etiqueta: d.etiqueta ?? d.class_name.replace(/_/g, ' '),
+    tipo: d.tipo ?? null,
+    severidad: d.severidad ?? null,
+    cantidad: d.count,
+    confianzaMaxima: d.max_confidence,
+  }))
 }
 
 export function aFoto(dto: FotoDto): Foto {
