@@ -4,6 +4,7 @@ import { vi } from 'vitest'
 import type { Dependencias } from '../app/composicion'
 import { DependenciasProvider } from '../app/DependenciasProvider'
 import type { Buque, BuqueDetalle, NuevoBuque } from '../buques/domain/buque'
+import type { DetallePorInstancia } from '../inspecciones/domain/detecciones'
 import type { ModeloIA } from '../inspecciones/domain/modelo'
 import type {
   EventoInspeccion,
@@ -97,6 +98,7 @@ export function unaFoto(overrides: Partial<Foto> = {}): Foto {
     modelo: null,
     modeloVersion: null,
     taxonomiaVersion: null,
+    detalleDisponible: false,
     fechaCreacion: '2026-10-01T10:05:00Z',
     ...overrides,
   }
@@ -137,6 +139,7 @@ export function crearDependenciasFalsas() {
       analizar: vi.fn(async (_inspeccionId: number, _modeloId?: string) => ({ iniciadas: 0, omitidasPorLimite: 0 })),
       reintentarFoto: vi.fn(async (_fotoId: number, _modeloId?: string) => unaFoto()),
       eliminarFoto: vi.fn(async () => {}),
+      obtenerDetecciones: vi.fn(async (_fotoId: number): Promise<DetallePorInstancia> => ({ ancho: 1, alto: 1, instancias: [] })),
     },
     modelos: {
       listar: vi.fn(async () => [unModelo()]),

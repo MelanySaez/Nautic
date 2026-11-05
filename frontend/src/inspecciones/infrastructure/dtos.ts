@@ -10,6 +10,7 @@ import type {
   Severidad,
   TipoClase,
 } from '../domain/inspeccion'
+import type { DetallePorInstancia } from '../domain/detecciones'
 import type { ModeloIA } from '../domain/modelo'
 
 // Wire shapes of the Django vision API (snake_case), mapped to the domain at the edge.
@@ -45,6 +46,8 @@ export interface FotoDto {
   modelo: string | null
   modelo_version: string | null
   taxonomia_version: string | null
+  /** Absent on servers older than the raw detections endpoint. */
+  detalle_disponible?: boolean
   fecha_creacion: string
 }
 
@@ -84,6 +87,7 @@ export interface FotoActualizadaDto {
   modelo: string | null
   modelo_version: string | null
   taxonomia_version: string | null
+  detalle_disponible?: boolean
 }
 
 export interface ModeloDto {
@@ -138,6 +142,7 @@ export function aFoto(dto: FotoDto): Foto {
     modelo: dto.modelo,
     modeloVersion: dto.modelo_version,
     taxonomiaVersion: dto.taxonomia_version,
+    detalleDisponible: dto.detalle_disponible ?? false,
     fechaCreacion: dto.fecha_creacion,
   }
 }
@@ -180,6 +185,7 @@ export function aActualizacionFoto(
     modelo: dto.modelo,
     modeloVersion: dto.modelo_version,
     taxonomiaVersion: dto.taxonomia_version,
+    detalleDisponible: dto.detalle_disponible ?? false,
   }
 }
 
@@ -194,5 +200,39 @@ export function aModelo(dto: ModeloDto): ModeloIA {
     confianzaPorDefecto: dto.confianza_por_defecto,
     porDefecto: dto.por_defecto,
     disponible: dto.disponible,
+  }
+}
+
+/** Payload of `GET /api/vision/fotos/<id>/detecciones/`: every instance of the last analysis. */
+export interface DetallePorInstanciaDto {
+  ancho: number
+  alto: number
+  detecciones: {
+    clase: string
+    etiqueta: string
+    tipo: TipoClase | null
+    severidad: Severidad | null
+    color: string | null
+    confianza: number
+    bbox: { x1: number; y1: number; x2: number; y2: number }
+    /** COCO RLE: `size` is `[height, width]`. */
+    mascara: { size: [number, number]; counts: number[] } | null
+  }[]
+}
+
+export function aDetallePorInstancia(dto: DetallePorInstanciaDto): DetallePorInstancia {
+  return {
+    ancho: dto.ancho,
+    alto: dto.alto,
+    instancias: dto.detecciones.map((d) => ({
+      clase: d.clase,
+      etiqueta: d.etiqueta,
+      tipo: d.tipo,
+      severidad: d.severidad,
+      color: d.color,
+      confianza: d.confianza,
+      caja: d.bbox,
+      mascara: d.mascara ? { alto: d.mascara.size[0], ancho: d.mascara.size[1], conteos: d.mascara.counts } : null,
+    })),
   }
 }

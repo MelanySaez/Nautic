@@ -124,6 +124,7 @@ describe('HttpInspeccionesRepository', () => {
       modelo: 'yolo-seg',
       modeloVersion: '1.2.0',
       taxonomiaVersion: '2026.1',
+      detalleDisponible: false,
       fechaCreacion: '2026-10-01T10:05:00Z',
     })
   })
@@ -150,6 +151,43 @@ describe('HttpInspeccionesRepository', () => {
       { clase: 'corrosion', etiqueta: 'Corrosión', tipo: 'anomalia', severidad: 'critical', cantidad: 2, confianzaMaxima: 0.92 },
       { clase: 'sea_chest_grating', etiqueta: 'sea chest grating', tipo: null, severidad: null, cantidad: 1, confianzaMaxima: 0.6 },
     ])
+  })
+
+  it('loads the boxes and masks of a photo with their taxonomy', async () => {
+    fetchMock.mockResolvedValue(
+      respuesta(200, {
+        ancho: 640,
+        alto: 480,
+        detecciones: [
+          {
+            clase: 'corrosion', etiqueta: 'Corrosión', tipo: 'anomalia', severidad: 'critical', color: '#f58230',
+            confianza: 0.91, bbox: { x1: 1, y1: 2, x2: 30, y2: 40 }, mascara: { size: [480, 640], counts: [5, 10] },
+          },
+          {
+            clase: 'ship_hull', etiqueta: 'Casco del buque', tipo: 'componente', severidad: null, color: '#aa6e28',
+            confianza: 0.8, bbox: { x1: 0, y1: 0, x2: 640, y2: 480 }, mascara: null,
+          },
+        ],
+      }),
+    )
+
+    const detalle = await repo.obtenerDetecciones(21)
+
+    expect(ultimaLlamada().url).toBe('http://api.test/api/vision/fotos/21/detecciones/')
+    expect(detalle).toEqual({
+      ancho: 640,
+      alto: 480,
+      instancias: [
+        {
+          clase: 'corrosion', etiqueta: 'Corrosión', tipo: 'anomalia', severidad: 'critical', color: '#f58230',
+          confianza: 0.91, caja: { x1: 1, y1: 2, x2: 30, y2: 40 }, mascara: { alto: 480, ancho: 640, conteos: [5, 10] },
+        },
+        {
+          clase: 'ship_hull', etiqueta: 'Casco del buque', tipo: 'componente', severidad: null, color: '#aa6e28',
+          confianza: 0.8, caja: { x1: 0, y1: 0, x2: 640, y2: 480 }, mascara: null,
+        },
+      ],
+    })
   })
 
   it('creates an inspection sending the snake_case payload', async () => {

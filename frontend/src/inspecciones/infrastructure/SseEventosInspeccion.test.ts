@@ -76,6 +76,7 @@ describe('SseEventosInspeccion', () => {
         taxonomia_version: '2026.1',
         imagen_anotada: 'media/inspecciones/anotadas/a.jpg',
         error_detalle: null,
+        detalle_disponible: true,
       }),
     )
 
@@ -93,6 +94,7 @@ describe('SseEventosInspeccion', () => {
           taxonomiaVersion: '2026.1',
           imagenAnotada: 'http://api.test/media/inspecciones/anotadas/a.jpg',
           errorDetalle: null,
+          detalleDisponible: true,
         },
       },
     ])

@@ -18,6 +18,7 @@ function foto(overrides: Partial<Foto> = {}): Foto {
     modelo: null,
     modeloVersion: null,
     taxonomiaVersion: null,
+    detalleDisponible: false,
     fechaCreacion: '2026-10-01T10:00:00Z',
     ...overrides,
   }
@@ -87,6 +88,7 @@ describe('aplicarEvento', () => {
         modelo: null,
         modeloVersion: null,
         taxonomiaVersion: null,
+        detalleDisponible: false,
       },
     })
 

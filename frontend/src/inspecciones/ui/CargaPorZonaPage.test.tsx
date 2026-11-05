@@ -128,6 +128,7 @@ describe('CargaPorZonaPage', () => {
           modelo: null,
           modeloVersion: null,
           taxonomiaVersion: null,
+          detalleDisponible: false,
         },
       }),
     )

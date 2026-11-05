@@ -142,7 +142,12 @@ function Resultados({ datos }: { datos: DatosInspeccion }) {
           </label>
           <div className="grid gap-6 lg:grid-cols-2">
             {visibles.map((foto) => (
-              <TarjetaResultado key={foto.id} foto={foto} modelos={modelos} />
+              <TarjetaResultado
+                key={foto.id}
+                foto={foto}
+                modelos={modelos}
+                alCargarDetecciones={(id) => inspecciones.obtenerDetecciones(id)}
+              />
             ))}
           </div>
         </>
