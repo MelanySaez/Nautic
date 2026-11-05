@@ -33,10 +33,10 @@ manage.py test <module>`; frontend `pnpm vitest run <files>`, `pnpm lint`, `pnpm
 
 | ID | Specs | Route | Status | Commit / PR |
 |---|---|---|---|---|
-| T1 | S1, S2 | inline | done | 3239be2 |
-| T2 | S3 | inline | done | b9ea189 |
-| T3 | S4, S5 | inline | done | cb6a389 |
-| T4 | S6 | inline | done | c1d1648 |
+| T1 | S1, S2 | inline | done | 3239be2, PR #26 |
+| T2 | S3 | inline | done | b9ea189, PR #27 |
+| T3 | S4, S5 | inline | done | cb6a389, PR #28 |
+| T4 | S6 | inline | done | c1d1648 + 332605b, PR #29 |
 
 Slices: T1 `feat/taxonomia-01-backend`, T2 `feat/taxonomia-02-frontend`, T3
 `feat/taxonomia-03-mascaras-backend`, T4 `feat/taxonomia-04-mascaras-frontend`, each stacked on the
@@ -99,4 +99,5 @@ units depend on each other and share files).
   log); a failed load leaves "Mostrar contornos" checked and "Mostrar anotada" disabled; local
   `detalle` shadows the component one; stroke width uses unnamed numbers; overlay state is not reset
   when an SSE update or retry changes the photo.
-- Next step: all tasks done; push the four branches and open the stacked PRs (user decision).
+- Next step: DONE — merged in PRs #26, #27, #28 and #29. Apply migration `0009` on each database
+  (`manage.py migrate`). Open advisories above remain as possible follow-up work.
