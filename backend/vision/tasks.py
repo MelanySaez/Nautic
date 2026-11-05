@@ -22,6 +22,7 @@ from .almacenamiento import guardar_anotada, leer_archivo, url_archivo
 from .inference import modelo_por_defecto, run_inference, severidad_por_clase
 from .models import FotoInspeccion, NivelSeveridad, subir_severidad_max
 from .pubsub import publicar_evento
+from .taxonomia import enriquecer_detecciones
 from .ratelimit import track_concurrent_end
 
 logger = logging.getLogger(__name__)
@@ -95,7 +96,7 @@ def _notificar(foto: FotoInspeccion) -> None:
             "inspeccion_id": foto.inspeccion_id,
             "estado": foto.estado,
             "severidad": foto.severidad,
-            "detecciones": foto.detecciones,
+            "detecciones": enriquecer_detecciones(foto.detecciones),
             "tiempo_inferencia_ms": foto.tiempo_inferencia_ms,
             "modelo": foto.modelo_id,
             "modelo_version": foto.modelo_version,

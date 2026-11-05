@@ -168,6 +168,8 @@ Cada entrada incluye:
 - `count` — cantidad de veces que esa clase fue detectada en la imagen
 - `max_confidence` — la mayor confianza entre todas las detecciones de esa clase
 
+La API añade a cada entrada, al leer, la taxonomía de `core_engine` (`vision/taxonomia.py`): `etiqueta` (nombre en español), `tipo` (`anomalia` o `componente`) y `severidad` (solo anomalías). `GET /api/vision/taxonomia/` lista todas las clases con su color.
+
 **Decisión de fragmentar los campos:** la versión inicial guardaba el resultado crudo completo del modelo YOLO como un solo JSON (bboxes, confidence, tiempos, metadatos de imagen). Esto producía un blob ilegible en la base de datos. Se dividió en tres campos con propósitos claros: `detecciones` para las clases, `tiempo_inferencia_ms` para el rendimiento, y `severidad` para la clasificación de riesgo. La agrupación por clase única se realiza en el backend con `_agrupar_detecciones()` al momento del procesamiento.
 
 **Otras decisiones:**
