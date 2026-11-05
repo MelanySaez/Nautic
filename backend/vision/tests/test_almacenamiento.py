@@ -155,7 +155,7 @@ class TareaStorageTests(AlmacenamientoBase):
 
         run = self._procesar(foto)
 
-        run.assert_called_once_with(png_bytes(), model_id=settings.VISION_MODEL_ID)
+        run.assert_called_once_with(png_bytes(), incluir_mascaras=True, model_id=settings.VISION_MODEL_ID)
         foto.refresh_from_db()
         self.assertEqual(foto.estado, FotoInspeccion.Estado.COMPLETADA)
         self.assertRegex(foto.imagen_anotada, rf'^inspecciones/anotadas/{foto.id}_[0-9a-f]{{8}}\.jpg$')

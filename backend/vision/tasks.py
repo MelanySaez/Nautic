@@ -13,12 +13,15 @@ DLQ (Dead Letter Queue):
   en Flower como tarea separada para diagnóstico y requeue manual.
 """
 import io
+import json
 import logging
 
 from PIL import Image
 from celery import shared_task
 
-from .almacenamiento import guardar_anotada, leer_archivo, url_archivo
+from .almacenamiento import (
+    borrar_archivo, guardar_anotada, guardar_detecciones, leer_archivo, url_archivo,
+)
 from .inference import modelo_por_defecto, run_inference, severidad_por_clase
 from .models import FotoInspeccion, NivelSeveridad, subir_severidad_max
 from .pubsub import publicar_evento
@@ -86,6 +89,29 @@ def _agrupar_detecciones(detections):
     return list(grouped.values())
 
 
+def _detecciones_crudas(resultados):
+    """One entry per detected instance: class, confidence, pixel box and RLE mask (or None).
+
+    The normalized box and the center/size duplicates of the library payload
+    are left out; the image size is kept so a client can scale the boxes.
+    """
+    tamano = resultados.get("image_size") or {}
+    return {
+        "ancho": tamano.get("width"),
+        "alto": tamano.get("height"),
+        "detecciones": [
+            {
+                "class_id": det.get("class_id"),
+                "class_name": det.get("class_name", ""),
+                "confidence": det.get("confidence", 0.0),
+                "bbox": {k: (det.get("bbox") or {}).get(k) for k in ("x1", "y1", "x2", "y2")},
+                "mask": det.get("mask"),
+            }
+            for det in resultados.get("detections", [])
+        ],
+    }
+
+
 def _notificar(foto: FotoInspeccion) -> None:
     """Publica el estado actual de la foto al canal pub/sub de su inspección."""
     publicar_evento(
@@ -105,6 +131,7 @@ def _notificar(foto: FotoInspeccion) -> None:
             # (``/media/...``) on local storage, absolute and signed on a bucket.
             "imagen_anotada": url_archivo(foto.imagen_anotada),
             "error_detalle": foto.error_detalle,
+            "detalle_disponible": bool(foto.detecciones_archivo),
         },
     )
 
@@ -193,15 +220,23 @@ def procesar_foto(self, foto_id: int):
         # Modelo elegido al disparar el análisis; fotos anteriores a esa
         # elección (modelo_id nulo) usan el modelo por defecto.
         imagen_anotada_bytes, resultados = run_inference(
-            imagen_bytes, model_id=foto.modelo_id or modelo_por_defecto()
+            imagen_bytes,
+            incluir_mascaras=True,
+            model_id=foto.modelo_id or modelo_por_defecto(),
         )
 
         # Persistir imagen anotada en el storage; se guarda la clave devuelta.
         clave_anotada = guardar_anotada(foto_id, imagen_anotada_bytes)
+        # Boxes and masks go to storage as JSON; Postgres keeps only the key.
+        detecciones_anteriores = foto.detecciones_archivo
+        clave_detecciones = guardar_detecciones(
+            foto_id, json.dumps(_detecciones_crudas(resultados)).encode("utf-8")
+        )
 
         raw_detections = resultados.get("detections", [])
 
         foto.imagen_anotada = clave_anotada
+        foto.detecciones_archivo = clave_detecciones
         foto.detecciones = _agrupar_detecciones(raw_detections)
         foto.tiempo_inferencia_ms = round(resultados.get("inference_time_ms", 0), 2)
         foto.severidad = _calcular_severidad(raw_detections)
@@ -212,10 +247,13 @@ def procesar_foto(self, foto_id: int):
         foto.estado = FotoInspeccion.Estado.COMPLETADA
         foto.error_detalle = None
         foto.save(update_fields=[
-            "imagen_anotada", "detecciones", "tiempo_inferencia_ms",
+            "imagen_anotada", "detecciones_archivo", "detecciones", "tiempo_inferencia_ms",
             "severidad", "modelo_version", "taxonomia_version", "estado",
             "error_detalle",
         ])
+        # The previous analysis' file is dropped only once the new key is saved.
+        if detecciones_anteriores and detecciones_anteriores != clave_detecciones:
+            borrar_archivo(detecciones_anteriores)
         # Mantener la peor severidad de la inspección (UPDATE condicional atómico).
         subir_severidad_max(
             foto.inspeccion_id, NivelSeveridad.desde_texto(foto.severidad)

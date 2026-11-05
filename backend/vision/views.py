@@ -17,7 +17,7 @@ from rest_framework.response import Response
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample
 from drf_spectacular.types import OpenApiTypes
 
-from .almacenamiento import borrar_archivo, guardar_original, url_archivo
+from .almacenamiento import borrar_archivo, guardar_original, leer_archivo, url_archivo
 from .busqueda import (
     BusquedaInvalida, LIMIT_MAXIMO, LIMIT_POR_DEFECTO, ValorInvalido,
     _parsear_entero_positivo, buscar_inspecciones,
@@ -33,7 +33,7 @@ from .models import (
 from .pubsub import publicar_evento, suscribirse
 from .ratelimit import check_upload_rate, get_client_ip, track_concurrent_start
 from .secciones import seccion_to_dict
-from .taxonomia import enriquecer_detecciones, listar_taxonomia
+from .taxonomia import color_clase, enriquecer_detecciones, info_clase, listar_taxonomia
 from .tasks import procesar_foto
 
 logger = logging.getLogger(__name__)
@@ -262,6 +262,7 @@ def _foto_to_dict(f, request=None):
         'modelo': f.modelo_id,
         'modelo_version': f.modelo_version,
         'taxonomia_version': f.taxonomia_version,
+        'detalle_disponible': bool(f.detecciones_archivo),
         'fecha_creacion': f.fecha_creacion.isoformat(),
     }
 
@@ -641,6 +642,7 @@ def api_vision_inspeccion_detalle(request, inspeccion_id):
         for foto in insp.fotos.all():
             borrar_archivo(foto.imagen_original)
             borrar_archivo(foto.imagen_anotada)
+            borrar_archivo(foto.detecciones_archivo)
         insp.delete()
         return Response(status=204)
 
@@ -789,6 +791,7 @@ def api_vision_foto_detalle(request, foto_id):
         foto_id_borrado = foto.pk
         borrar_archivo(foto.imagen_original)
         borrar_archivo(foto.imagen_anotada)
+        borrar_archivo(foto.detecciones_archivo)
         foto.delete()
         recalcular_severidad_max(inspeccion_id)
         publicar_evento(
@@ -817,6 +820,51 @@ def api_vision_foto_detalle(request, foto_id):
     foto.save(update_fields=['estado', 'error_detalle', 'modelo_id'])
     _disparar_procesamiento(foto.id)
     return Response(_foto_to_dict(foto, request), status=202)
+
+
+def _deteccion_cruda_to_dict(det):
+    return {
+        'clase': det.get('class_name', ''),
+        **info_clase(det.get('class_name', '')),
+        'color': color_clase(det.get('class_id')),
+        'confianza': det.get('confidence'),
+        'bbox': det.get('bbox'),
+        'mascara': det.get('mask'),
+    }
+
+
+@extend_schema(
+    tags=['Inspección IA'],
+    summary='Detecciones de una foto (cajas y máscaras)',
+    description=(
+        'Una entrada por instancia detectada en el último análisis: clase con su taxonomía '
+        '(`etiqueta`, `tipo`, `severidad`, `color`), `confianza`, `bbox` en píxeles de la imagen '
+        'original (`ancho` x `alto`) y `mascara` en RLE COCO sin comprimir (`size` = [alto, ancho], '
+        '`counts` por columnas, empezando por una racha de ceros) o `null` si el modelo no produce '
+        'máscaras. 404 si la foto no existe o no tiene detecciones guardadas '
+        '(`detalle_disponible=false`).'
+    ),
+    responses={200: OpenApiTypes.OBJECT, 404: OpenApiTypes.OBJECT, 500: OpenApiTypes.OBJECT},
+)
+@api_view(['GET'])
+def api_vision_foto_detecciones(request, foto_id):
+    """
+    GET /api/vision/fotos/<id>/detecciones/
+    Cajas y máscaras de cada detección del último análisis de la foto.
+    """
+    foto = get_object_or_404(FotoInspeccion, pk=foto_id)
+    if not foto.detecciones_archivo:
+        return Response({'error': 'La foto no tiene detecciones guardadas.'}, status=404)
+    try:
+        crudas = json.loads(leer_archivo(foto.detecciones_archivo))
+    except Exception:
+        logger.exception('No se pudieron leer las detecciones de la foto %s', foto_id)
+        return Response({'error': 'No se pudieron leer las detecciones de la foto.'}, status=500)
+    return Response({
+        'ancho': crudas.get('ancho'),
+        'alto': crudas.get('alto'),
+        'detecciones': [_deteccion_cruda_to_dict(d) for d in crudas.get('detecciones', [])],
+    })
 
 
 @extend_schema(

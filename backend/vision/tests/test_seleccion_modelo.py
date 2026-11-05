@@ -376,13 +376,13 @@ class TareaConModeloTests(TestCase):
 
         run = self._procesar()
 
-        run.assert_called_once_with(png_bytes(), model_id='rtdetr')
+        run.assert_called_once_with(png_bytes(), incluir_mascaras=True, model_id='rtdetr')
 
     @override_settings(VISION_MODEL_ID='maskrcnn')
     def test_foto_sin_modelo_usa_el_por_defecto(self):
         run = self._procesar()
 
-        run.assert_called_once_with(png_bytes(), model_id='maskrcnn')
+        run.assert_called_once_with(png_bytes(), incluir_mascaras=True, model_id='maskrcnn')
 
     def test_los_eventos_sse_llevan_el_modelo(self):
         self.foto.modelo_id = 'yolo-tiled'

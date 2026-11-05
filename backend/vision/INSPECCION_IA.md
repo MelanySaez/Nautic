@@ -170,6 +170,8 @@ Cada entrada incluye:
 
 La API añade a cada entrada, al leer, la taxonomía de `core_engine` (`vision/taxonomia.py`): `etiqueta` (nombre en español), `tipo` (`anomalia` o `componente`) y `severidad` (solo anomalías). `GET /api/vision/taxonomia/` lista todas las clases con su color.
 
+Las cajas y máscaras de cada instancia (que `detecciones` agrupa y descarta) se guardan en un JSON aparte en el storage de fotos (`detecciones_archivo`) y se sirven en `GET /api/vision/fotos/<id>/detecciones/`; `detalle_disponible` indica si la foto lo tiene.
+
 **Decisión de fragmentar los campos:** la versión inicial guardaba el resultado crudo completo del modelo YOLO como un solo JSON (bboxes, confidence, tiempos, metadatos de imagen). Esto producía un blob ilegible en la base de datos. Se dividió en tres campos con propósitos claros: `detecciones` para las clases, `tiempo_inferencia_ms` para el rendimiento, y `severidad` para la clasificación de riesgo. La agrupación por clase única se realiza en el backend con `_agrupar_detecciones()` al momento del procesamiento.
 
 **Otras decisiones:**
@@ -233,7 +235,7 @@ La IP real se extrae respetando `X-Forwarded-For` (primer valor) para funcionar 
 |---|---|---|
 | `ready` | vista SSE | `{inspeccion_id, ts}` |
 | `foto-created` | vista de upload | `{foto: {...}}` |
-| `foto-updated` | worker Celery | `{foto_id, inspeccion_id, estado, severidad, detecciones, tiempo_inferencia_ms, modelo, modelo_version, taxonomia_version, imagen_anotada, error_detalle}` |
+| `foto-updated` | worker Celery | `{foto_id, inspeccion_id, estado, severidad, detecciones, tiempo_inferencia_ms, modelo, modelo_version, taxonomia_version, imagen_anotada, error_detalle, detalle_disponible}` |
 | `foto-deleted` | vista de borrado | `{foto_id, inspeccion_id}` |
 
 **Nota sobre URLs de imagen:** el worker Celery no tiene `request`, por lo que `foto-updated` lleva la URL tal como la devuelve el storage: relativa (`/media/...`) en local, absoluta y firmada en un bucket. El `GET` de detalle devuelve URLs absolutas (en local usa `request.build_absolute_uri`). El cliente debe normalizar ambas formas antes de mergear el evento, para no pisar una URL buena con una relativa. Las URL firmadas caducan (`S3_URL_EXPIRE_SECONDS`); un `GET` posterior devuelve URLs nuevas.

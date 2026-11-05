@@ -222,6 +222,10 @@ class FotoInspeccion(models.Model):
     # Clases detectadas — una entrada por clase única:
     # [{"class_name": "corrosion", "count": 2, "max_confidence": 0.92}, ...]
     detecciones = models.JSONField(null=True, blank=True)
+    # Storage key of the raw detections of the last analysis (one box and,
+    # when the model produces it, one RLE mask per instance), kept as a JSON
+    # file next to the photos because masks are too heavy for a column.
+    detecciones_archivo = models.CharField(max_length=500, blank=True, null=True)
     tiempo_inferencia_ms = models.FloatField(null=True, blank=True)
     severidad = models.CharField(max_length=20, null=True, blank=True)  # critical/high/medium/low
     estado = models.CharField(
