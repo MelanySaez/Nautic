@@ -113,6 +113,7 @@ Los tests del backend crean una base temporal en PostgreSQL.
 | `UnicodeDecodeError ... byte 0xab` al conectar | PostgreSQL en español devolvió un error que psycopg no pudo decodificar: casi siempre contraseña incorrecta o base inexistente. Pruébalo con `psql -U postgres -h localhost -d NauticDB` |
 | La base se creó como `nauticdb` | En PowerShell 5.1 las comillas dobles se pierden al llamar a `psql`. Renómbrala desde dentro de `psql`: `ALTER DATABASE nauticdb RENAME TO "NauticDB";` |
 | `extension "pg_trgm" is not available` | Falta el paquete de extensiones de PostgreSQL (`postgresql-contrib`); instálalo y reinicia el servicio |
+| El worker se cae con `Queue.declare: (541) INTERNAL_ERROR - Feature transient_nonexcl_queues is deprecated` y `RestartFreqExceeded` | RabbitMQ 4.x ya no admite colas transitorias no exclusivas. El repo declara exclusivas las colas de control y eventos (`CELERY_CONTROL_QUEUE_EXCLUSIVE`, `CELERY_EVENT_QUEUE_EXCLUSIVE`, Celery ≥ 5.5): actualiza con `uv sync` |
 | Los tests fallan con `collation version mismatch` | Tras actualizar glibc: `ALTER DATABASE template1 REFRESH COLLATION VERSION;` (y lo mismo para `postgres`) |
 
 ## Documentación de API

@@ -230,6 +230,15 @@ CELERY_TASK_QUEUES = (
         routing_key="vision.dead",
     ),
 )
+# RabbitMQ 4.x rejects transient non-exclusive queues (deprecated feature
+# ``transient_nonexcl_queues``). The task queues above are durable; the
+# per-worker remote-control queue (``<worker>.celery.pidbox``, used by Flower
+# and ``celery inspect``), its reply queue and the event queues are transient,
+# so they are declared exclusive (needs celery>=5.5). Without this the worker
+# fails at startup with ``Queue.declare: (541) INTERNAL_ERROR``.
+CELERY_CONTROL_QUEUE_EXCLUSIVE = True
+CELERY_EVENT_QUEUE_EXCLUSIVE = True
+
 CELERY_TASK_DEFAULT_QUEUE = "vision"
 CELERY_TASK_DEFAULT_ROUTING_KEY = "vision"
 
