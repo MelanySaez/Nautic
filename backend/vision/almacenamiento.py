@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 
 PREFIJO_ORIGINALES = "inspecciones/originales"
 PREFIJO_ANOTADAS = "inspecciones/anotadas"
+PREFIJO_DETECCIONES = "inspecciones/detecciones"
 
 
 def clave_original(nombre_archivo: str) -> str:
@@ -31,6 +32,11 @@ def clave_original(nombre_archivo: str) -> str:
 def clave_anotada(foto_id: int) -> str:
     """Key for the annotated image of ``foto_id``; the suffix avoids overwriting retries."""
     return f"{PREFIJO_ANOTADAS}/{foto_id}_{uuid.uuid4().hex[:8]}.jpg"
+
+
+def clave_detecciones(foto_id: int) -> str:
+    """Key for the raw detections JSON of ``foto_id``; the suffix avoids overwriting re-analyses."""
+    return f"{PREFIJO_DETECCIONES}/{foto_id}_{uuid.uuid4().hex[:8]}.json"
 
 
 def guardar_original(archivo) -> str:
@@ -45,6 +51,11 @@ def guardar_original(archivo) -> str:
 def guardar_anotada(foto_id: int, contenido: bytes) -> str:
     """Store the annotated JPEG bytes and return the key actually stored."""
     return default_storage.save(clave_anotada(foto_id), ContentFile(contenido))
+
+
+def guardar_detecciones(foto_id: int, contenido: bytes) -> str:
+    """Store the raw detections JSON bytes and return the key actually stored."""
+    return default_storage.save(clave_detecciones(foto_id), ContentFile(contenido))
 
 
 def leer_archivo(clave: str) -> bytes:

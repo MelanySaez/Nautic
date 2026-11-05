@@ -26,6 +26,9 @@ urlpatterns = [
     # Estado de una foto individual (consulta puntual) + análisis manual + eliminación
     path('api/vision/fotos/<int:foto_id>/', views.api_vision_foto_detalle, name='api_vision_foto_detalle'),
 
+    # Cajas y máscaras de cada detección del último análisis de una foto
+    path('api/vision/fotos/<int:foto_id>/detecciones/', views.api_vision_foto_detecciones, name='api_vision_foto_detecciones'),
+
     # Disparar análisis YOLO para todas las fotos pendientes de una inspección
     path('api/vision/inspecciones/<int:inspeccion_id>/analizar/', views.api_vision_analizar_inspeccion, name='api_vision_analizar_inspeccion'),
 

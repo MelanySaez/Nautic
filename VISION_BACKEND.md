@@ -88,6 +88,7 @@ Foto individual analizada por YOLO. Máquina de estados asíncrona.
 | `error_detalle` | TextField null | Mensaje de error si `estado=error` (la tarea trunca a 500 chars al escribir) |
 | `modelo_id` | CharField(50) null | Id del modelo de `core_engine` con el que se pidió analizar la foto (se fija en `/analizar/` o al reintentar; migración `0004`). Se expone como `modelo` |
 | `modelo_version` | CharField(32) null | Versión del modelo (`model_version` de `analyze()`) con la que se completó el último análisis; migración `0005`. Null en fotos anteriores o sin analizar |
+| `detecciones_archivo` | CharField(500) null | Clave en el storage del JSON con cajas y máscaras por instancia del último análisis (`inspecciones/detecciones/...json`); migración `0009`. Las máscaras no van a Postgres por su tamaño |
 | `taxonomia_version` | CharField(32) null | Versión de la taxonomía de detección (`taxonomy_version`, nautic_core v3.1) del último análisis completado; migración `0005` |
 | `fecha_creacion` | DateTimeField | Auto (auto_now_add) |
 
@@ -117,6 +118,7 @@ Registrados en `vision/urls.py` y montados en la raíz por `backend/config/urls.
 |--------|-----|-------|-------------|
 | POST | `/api/ai/anomalias/` | `api_ai_anomalias` | Inferencia directa sin persistencia (retorna imagen JPEG o JSON con base64). Acepta `confidence`; ya no acepta ni devuelve `iou` |
 | GET | `/api/vision/secciones/?buque=<id>` | `api_vision_secciones` | Secciones del casco de un buque (`buque` requerido: 400 si falta o es inválido, 404 si no existe) |
+| GET | `/api/vision/fotos/<id>/detecciones/` | `api_vision_foto_detecciones` | Cajas y máscaras del último análisis: `{ancho, alto, detecciones: [{clase, etiqueta, tipo, severidad, color, confianza, bbox{x1,y1,x2,y2}, mascara}]}` (`mascara` en RLE COCO sin comprimir, columnas primero, o `null`); 404 si la foto no tiene archivo de detecciones |
 | GET | `/api/vision/taxonomia/` | `api_vision_taxonomia` | Taxonomía de clases de `core_engine`: `{version, clases: [{id, nombre, etiqueta, tipo, severidad, color}]}` (`color` = `#rrggbb` de la imagen anotada) |
 | GET | `/api/vision/modelos/` | `api_vision_modelos` | Catálogo de modelos de IA: `{modelos: [{id, label, descripcion, arquitectura, version, produce_mascaras, confianza_por_defecto, por_defecto, disponible}]}`. Ver [Selección de modelo](#selección-de-modelo) |
 | GET | `/api/vision/inspecciones/` | `api_vision_inspecciones` | Busca inspecciones: `{resultados, siguiente, hay_mas}`. Ver [Búsqueda de inspecciones](#búsqueda-de-inspecciones) |
@@ -376,7 +378,7 @@ El endpoint SSE desempaqueta el envelope y emite `event: foto-updated` al browse
 | Evento | Publicado desde | Payload `data` |
 |--------|----------------|----------------|
 | `foto-created` | `api_vision_subir_foto` | `{"foto": {foto_dict completo}}` |
-| `foto-updated` | `procesar_foto` task (×2: EN_PROCESO + COMPLETADA/ERROR) | `{foto_id, inspeccion_id, estado, severidad, detecciones, tiempo_inferencia_ms, modelo, modelo_version, taxonomia_version, imagen_anotada, error_detalle}` |
+| `foto-updated` | `procesar_foto` task (×2: EN_PROCESO + COMPLETADA/ERROR) | `{foto_id, inspeccion_id, estado, severidad, detecciones, tiempo_inferencia_ms, modelo, modelo_version, taxonomia_version, imagen_anotada, error_detalle, detalle_disponible}` |
 | `foto-deleted` | `api_vision_foto_detalle` DELETE | `{foto_id, inspeccion_id}` |
 
 ### Cliente Redis singleton

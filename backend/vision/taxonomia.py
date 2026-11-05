@@ -24,8 +24,10 @@ def _clases_por_nombre() -> Dict[str, Any]:
     return {c.name: c for c in CLASSES}
 
 
-def _color(class_id: int) -> Optional[str]:
+def color_clase(class_id: Optional[int]) -> Optional[str]:
     """``#rrggbb`` the library draws ``class_id`` with on the annotated image."""
+    if class_id is None:
+        return None
     try:
         from core_engine.vision.rendering import class_color
     except ImportError:
@@ -70,7 +72,7 @@ def listar_taxonomia() -> Dict[str, Any]:
                 "etiqueta": c.label_es,
                 "tipo": _tipo(c),
                 "severidad": c.severity,
-                "color": _color(c.id),
+                "color": color_clase(c.id),
             }
             for c in sorted(CLASSES, key=lambda c: c.id)
         ],
