@@ -80,7 +80,7 @@ describe('aplicarEvento', () => {
         fotoId: 1,
         estado: 'completada',
         severidad: 'critical',
-        detecciones: [{ clase: 'corrosion', cantidad: 2, confianzaMaxima: 0.92 }],
+        detecciones: [{ clase: 'corrosion', etiqueta: 'Corrosión', tipo: 'anomalia', severidad: 'critical', cantidad: 2, confianzaMaxima: 0.92 }],
         tiempoInferenciaMs: 1200,
         imagenAnotada: 'http://api/media/a-anotada.jpg',
         errorDetalle: null,

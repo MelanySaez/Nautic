@@ -128,17 +128,28 @@ describe('HttpInspeccionesRepository', () => {
     })
   })
 
-  it('maps grouped detections', async () => {
+  it('maps grouped detections with their taxonomy, falling back when the server omits it', async () => {
     fetchMock.mockResolvedValue(
       respuesta(200, {
         ...inspeccionDto,
-        fotos: [{ ...fotoDto, detecciones: [{ class_name: 'corrosion', count: 2, max_confidence: 0.92 }] }],
+        fotos: [
+          {
+            ...fotoDto,
+            detecciones: [
+              { class_name: 'corrosion', count: 2, max_confidence: 0.92, etiqueta: 'Corrosión', tipo: 'anomalia', severidad: 'critical' },
+              { class_name: 'sea_chest_grating', count: 1, max_confidence: 0.6 },
+            ],
+          },
+        ],
       }),
     )
 
     const detalle = await repo.obtener(7)
 
-    expect(detalle.fotos[0].detecciones).toEqual([{ clase: 'corrosion', cantidad: 2, confianzaMaxima: 0.92 }])
+    expect(detalle.fotos[0].detecciones).toEqual([
+      { clase: 'corrosion', etiqueta: 'Corrosión', tipo: 'anomalia', severidad: 'critical', cantidad: 2, confianzaMaxima: 0.92 },
+      { clase: 'sea_chest_grating', etiqueta: 'sea chest grating', tipo: null, severidad: null, cantidad: 1, confianzaMaxima: 0.6 },
+    ])
   })
 
   it('creates an inspection sending the snake_case payload', async () => {

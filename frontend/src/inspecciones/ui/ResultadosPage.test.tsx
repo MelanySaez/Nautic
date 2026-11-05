@@ -16,8 +16,17 @@ const CORROIDA = unaFoto({
   imagenAnotada: 'http://api.test/media/anotadas/21.jpg',
   tiempoInferenciaMs: 1234,
   detecciones: [
-    { clase: 'corrosion', cantidad: 2, confianzaMaxima: 0.981 },
-    { clase: 'marine_growth', cantidad: 1, confianzaMaxima: 0.85 },
+    { clase: 'corrosion', etiqueta: 'Corrosión', tipo: 'anomalia', severidad: 'critical', cantidad: 2, confianzaMaxima: 0.981 },
+    { clase: 'marine_growth', etiqueta: 'Incrustación marina', tipo: 'anomalia', severidad: 'medium', cantidad: 1, confianzaMaxima: 0.85 },
+    { clase: 'ship_hull', etiqueta: 'Casco del buque', tipo: 'componente', severidad: null, cantidad: 1, confianzaMaxima: 0.9 },
+  ],
+})
+
+const SOLO_CASCO = unaFoto({
+  id: 26,
+  estado: 'completada',
+  detecciones: [
+    { clase: 'ship_hull', etiqueta: 'Casco del buque', tipo: 'componente', severidad: null, cantidad: 1, confianzaMaxima: 0.9 },
   ],
 })
 
@@ -69,17 +78,31 @@ describe('ResultadosPage', () => {
     )
   })
 
-  it('shows each analyzed photo with its severity, inference time and detections', async () => {
+  it('shows each analyzed photo with its severity, inference time and detections in Spanish', async () => {
     renderizar([CORROIDA])
 
     const resultado = await screen.findByRole('article', { name: 'KEEL · Foto #21' })
-    expect(resultado).toHaveTextContent('Crítica')
     expect(resultado).toHaveTextContent('1.23 s')
-    const detecciones = within(resultado).getByRole('list', { name: 'Detecciones' })
-    expect(within(detecciones).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
-      expect.stringMatching(/corrosion.*×2.*98%/),
-      expect.stringMatching(/marine growth.*×1.*85%/),
+    const anomalias = within(resultado).getByRole('list', { name: 'Anomalías' })
+    expect(within(anomalias).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
+      expect.stringMatching(/Corrosión.*×2.*Crítica.*98%/),
+      expect.stringMatching(/Incrustación marina.*×1.*Media.*85%/),
     ])
+    const componentes = within(resultado).getByRole('list', { name: 'Componentes' })
+    expect(within(componentes).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
+      expect.stringMatching(/Casco del buque.*×1.*90%/),
+    ])
+  })
+
+  it('does not count a photo with only hull components as one with anomalies', async () => {
+    renderizar([CORROIDA, SOLO_CASCO])
+
+    const resultado = await screen.findByRole('article', { name: 'KEEL · Foto #26' })
+    expect(resultado).toHaveTextContent('Sin anomalías detectadas.')
+    expect(within(resultado).getByRole('list', { name: 'Componentes' })).toHaveTextContent('Casco del buque')
+    expect(within(screen.getByRole('region', { name: 'Resumen' })).getByText('Con anomalías').parentElement).toHaveTextContent(
+      /Con anomalías\s*1$/,
+    )
   })
 
   it('shows the model and version that analyzed each photo', async () => {
@@ -148,7 +171,7 @@ describe('ResultadosPage', () => {
           fotoId: 25,
           estado: 'completada',
           severidad: 'medium',
-          detecciones: [{ clase: 'barnacles', cantidad: 3, confianzaMaxima: 0.72 }],
+          detecciones: [{ clase: 'barnacles', etiqueta: 'barnacles', tipo: null, severidad: null, cantidad: 3, confianzaMaxima: 0.72 }],
           tiempoInferenciaMs: 500,
           imagenAnotada: 'http://api.test/media/anotadas/25.jpg',
           errorDetalle: null,
