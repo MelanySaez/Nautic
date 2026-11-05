@@ -36,7 +36,7 @@ manage.py test <module>`; frontend `pnpm vitest run <files>`, `pnpm lint`, `pnpm
 | T1 | S1, S2 | inline | done | 3239be2 |
 | T2 | S3 | inline | done | b9ea189 |
 | T3 | S4, S5 | inline | done | cb6a389 |
-| T4 | S6 | inline | pending | |
+| T4 | S6 | inline | done | c1d1648 |
 
 Slices: T1 `feat/taxonomia-01-backend`, T2 `feat/taxonomia-02-frontend`, T3
 `feat/taxonomia-03-mascaras-backend`, T4 `feat/taxonomia-04-mascaras-frontend`, each stacked on the
@@ -81,3 +81,10 @@ units depend on each other and share files).
   error retries the task; masks are JSON-native, verified: `encode_rle` uses `.tolist()`); orphan
   JSON on concurrent runs or a failed save; no test for the 500 branch nor for inspection delete
   cleanup; `crudas.get` outside the try.
+- L9 (T4): RED 5 (missing `domain/detecciones`, `obtenerDetecciones`, `detalleDisponible` in REST
+  and SSE mapping, overlay switch and its error), GREEN after `decodificarRle`, port + HTTP adapter,
+  `CapaDetecciones` canvas and the "Mostrar contornos" switch with the "Clases visibles" filter.
+  Ran `pnpm vitest run src/inspecciones`: 85 passed, 1 failed (the same pre-existing
+  `CargaPorZonaPage` test). Lint clean, build ok. Drawing itself is not covered: jsdom has no 2D
+  canvas context (`pintar` returns early). Risk: none for T4 (UI over an additive endpoint).
+  Independent verifier launched for the feature (T3 names item 1) before the T4 review.
