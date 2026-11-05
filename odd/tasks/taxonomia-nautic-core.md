@@ -33,7 +33,7 @@ manage.py test <module>`; frontend `pnpm vitest run <files>`, `pnpm lint`, `pnpm
 
 | ID | Specs | Route | Status | Commit / PR |
 |---|---|---|---|---|
-| T1 | S1, S2 | inline | pending | |
+| T1 | S1, S2 | inline | done | 3239be2 |
 | T2 | S3 | inline | pending | |
 | T3 | S4, S5 | inline | pending | |
 | T4 | S6 | inline | pending | |
@@ -53,3 +53,8 @@ units depend on each other and share files).
   `clear_cache` (per-process detector cache needs no management). Masks go to storage, not a
   JSONField: RLE per detection can weigh tens to hundreds of KB.
 - L4: Test rule: minimal tests only, run only the touched test files, never the full suite.
+- L5 (T1): RED 3 failures in `test_taxonomia.py` (no enrichment, 404 on the endpoint), GREEN after
+  `vision/taxonomia.py` + wiring in `_foto_to_dict`, `_notificar`, urls. Ran test_taxonomia,
+  test_versiones_foto, test_severidad (22 OK), test_inspecciones_api (35 OK), `manage.py check` clean.
+  Env fix by user: Postgres collation refresh after the glibc 2.44 upgrade. Assess main..3239be2:
+  medium, under_budget (pending in the chain). Risk: none (additive response fields and endpoint).
