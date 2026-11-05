@@ -105,6 +105,8 @@ pendiente → en_proceso → completada
 ]
 ```
 
+En la API (dict de la foto y evento `foto-updated`) cada entrada sale además con `etiqueta`, `tipo` (`anomalia` | `componente`) y `severidad` (solo anomalías), calculados al leer desde la taxonomía de `core_engine` (`vision/taxonomia.py`, `enriquecer_detecciones`). La base guarda solo las tres claves de arriba, así que las fotos antiguas también salen con la taxonomía. Una clase que la taxonomía instalada no conoce sale con el nombre sin `_`, `tipo` y `severidad` en `null`.
+
 ---
 
 ## API Endpoints (`vision/urls.py`)
@@ -115,6 +117,7 @@ Registrados en `vision/urls.py` y montados en la raíz por `backend/config/urls.
 |--------|-----|-------|-------------|
 | POST | `/api/ai/anomalias/` | `api_ai_anomalias` | Inferencia directa sin persistencia (retorna imagen JPEG o JSON con base64). Acepta `confidence`; ya no acepta ni devuelve `iou` |
 | GET | `/api/vision/secciones/?buque=<id>` | `api_vision_secciones` | Secciones del casco de un buque (`buque` requerido: 400 si falta o es inválido, 404 si no existe) |
+| GET | `/api/vision/taxonomia/` | `api_vision_taxonomia` | Taxonomía de clases de `core_engine`: `{version, clases: [{id, nombre, etiqueta, tipo, severidad, color}]}` (`color` = `#rrggbb` de la imagen anotada) |
 | GET | `/api/vision/modelos/` | `api_vision_modelos` | Catálogo de modelos de IA: `{modelos: [{id, label, descripcion, arquitectura, version, produce_mascaras, confianza_por_defecto, por_defecto, disponible}]}`. Ver [Selección de modelo](#selección-de-modelo) |
 | GET | `/api/vision/inspecciones/` | `api_vision_inspecciones` | Busca inspecciones: `{resultados, siguiente, hay_mas}`. Ver [Búsqueda de inspecciones](#búsqueda-de-inspecciones) |
 | POST | `/api/vision/inspecciones/` | `api_vision_inspecciones` | Crear inspección (`buque_id`, `nombre` opcional, `descripcion`, `tomado_por`) |

@@ -11,6 +11,9 @@ urlpatterns = [
     # Catálogo de modelos de IA (con disponibilidad en este servidor)
     path('api/vision/modelos/', views.api_vision_modelos, name='api_vision_modelos'),
 
+    # Taxonomía de clases de la librería de visión
+    path('api/vision/taxonomia/', views.api_vision_taxonomia, name='api_vision_taxonomia'),
+
     # Inspecciones (lista + creación)
     path('api/vision/inspecciones/', views.api_vision_inspecciones, name='api_vision_inspecciones'),
 

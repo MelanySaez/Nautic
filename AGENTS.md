@@ -39,7 +39,7 @@ All endpoints live under `/api/`. The `vision` module needs infrastructure beyon
 │   │   ├── wsgi.py, asgi.py
 │   │   └── spectacular_hooks.py
 │   └── vision/                  # the only Django app
-│       ├── models.py, views.py, views_buques.py, busqueda.py, secciones.py, urls.py, tasks.py
+│       ├── models.py, views.py, views_buques.py, busqueda.py, secciones.py, taxonomia.py, urls.py, tasks.py
 │       ├── almacenamiento.py
 │       ├── inference.py, pubsub.py, ratelimit.py
 │       └── INSPECCION_IA.md
@@ -115,7 +115,7 @@ Inspection photos (originals and annotated) live behind Django's storage API, se
 
 ## Test Commands
 
-Backend tests live in `backend/vision/tests/` (`test_buques_api.py` for the Buques API, `test_inspecciones_api.py` and `test_busqueda_inspecciones.py` for inspection name/severity and search, `test_modelos.py` and `test_seleccion_modelo.py` for the model catalog and model selection, `test_secciones_migracion.py` for the sections-per-vessel data migration, `test_versiones_foto.py` for the `procesar_foto` task with `run_inference` mocked, `test_severidad.py` for its severity helper). There is no end-to-end test with a real broker or real inference.
+Backend tests live in `backend/vision/tests/` (`test_buques_api.py` for the Buques API, `test_inspecciones_api.py` and `test_busqueda_inspecciones.py` for inspection name/severity and search, `test_modelos.py` and `test_seleccion_modelo.py` for the model catalog and model selection, `test_secciones_migracion.py` for the sections-per-vessel data migration, `test_versiones_foto.py` for the `procesar_foto` task with `run_inference` mocked, `test_severidad.py` for its severity helper, `test_taxonomia.py` for the class taxonomy on detections and its endpoint). There is no end-to-end test with a real broker or real inference.
 
 ```bash
 cd backend
@@ -220,6 +220,7 @@ pnpm add <pkg>     # add a dependency (pnpm add -D <pkg> for dev)
 - Postgres (`FotoInspeccion.estado`) is the source of truth — there is no Celery result backend.
 - Failures that exhaust retries go to the `vision.dead` DLQ, visible in Flower.
 - **Model selection**: the model is chosen when analyzing, not at upload. `GET /api/vision/modelos/` lists the catalog (`id, label, descripcion, arquitectura, version, produce_mascaras, confianza_por_defecto, por_defecto, disponible`). `POST /api/vision/inspecciones/<id>/analizar/` and the photo retry `POST /api/vision/fotos/<id>/` accept an optional `{"modelo": "<id>"}` (default: `VISION_MODEL_ID`, or the photo's own `modelo_id` on retry). An unknown or unavailable model returns 400 and nothing is enqueued or changed. Each photo stores the model in `FotoInspeccion.modelo_id` (exposed as `modelo` in the photo dict and SSE events) and the worker runs `run_inference(..., model_id=foto.modelo_id)`. On completion the worker also stores `FotoInspeccion.modelo_version` and `taxonomia_version` from the `analyze()` result (`model_version`, `taxonomy_version`; null when absent or for photos analyzed before migration `0005`; overwritten by a re-analysis), exposed under the same names in the photo dict and the `foto-updated` SSE event. When no confidence is given each model uses its own calibrated default (`run_inference` no longer forces 0.25).
+- **Taxonomy**: `vision/taxonomia.py` is the only reader of the `core_engine.vision.domain` taxonomy (`CLASSES`, `TAXONOMY_VERSION`). Stored `detecciones` keep `{class_name, count, max_confidence}`; the photo dict and `foto-updated` add `etiqueta`, `tipo` (`anomalia` | `componente`) and `severidad` at read time (`enriquecer_detecciones`). `GET /api/vision/taxonomia/` returns `{version, clases: [{id, nombre, etiqueta, tipo, severidad, color}]}`.
 - Rate limiting is per IP, Redis-backed and fail-open. Limits: `VISION_RATE_LIMIT_UPLOADS_PER_MINUTE` and `VISION_RATE_LIMIT_MAX_CONCURRENT` in `backend/config/settings.py`.
 
 ---
@@ -238,6 +239,7 @@ pnpm add <pkg>     # add a dependency (pnpm add -D <pkg> for dev)
 | `backend/vision/views_buques.py` | Buques REST endpoints (`/api/buques/`): list, create, detail |
 | `backend/vision/urls.py` | URL routing for the vision app |
 | `backend/vision/tasks.py` | Celery task `procesar_foto` + dead-letter task |
+| `backend/vision/taxonomia.py` | Class taxonomy of `core_engine`: read-time enrichment of detections + `/api/vision/taxonomia/` payload |
 | `backend/vision/inference.py` | `run_inference(model_id=...)` adapter over `core_engine.vision.analyze`, model catalog/availability helpers + config validation |
 | `backend/config/almacenamiento.py` | `configurar_storages(env)`: builds `STORAGES` (local or S3) from environment variables |
 | `backend/vision/almacenamiento.py` | Photo storage helpers over `default_storage` (keys, save, read, delete, URL) |

@@ -33,6 +33,7 @@ from .models import (
 from .pubsub import publicar_evento, suscribirse
 from .ratelimit import check_upload_rate, get_client_ip, track_concurrent_start
 from .secciones import seccion_to_dict
+from .taxonomia import enriquecer_detecciones, listar_taxonomia
 from .tasks import procesar_foto
 
 logger = logging.getLogger(__name__)
@@ -253,7 +254,7 @@ def _foto_to_dict(f, request=None):
         'seccion': seccion_to_dict(f.seccion),
         'imagen_original': url_archivo(f.imagen_original, request),
         'imagen_anotada': url_archivo(f.imagen_anotada, request),
-        'detecciones': f.detecciones,
+        'detecciones': enriquecer_detecciones(f.detecciones),
         'tiempo_inferencia_ms': f.tiempo_inferencia_ms,
         'severidad': f.severidad,
         'estado': f.estado,
@@ -475,6 +476,25 @@ def api_vision_modelos(request):
     Lista los modelos de IA del catálogo con su disponibilidad en este servidor.
     """
     return Response({'modelos': listar_modelos()})
+
+
+@extend_schema(
+    tags=['Inspección IA'],
+    summary='Taxonomía de clases',
+    description=(
+        'Clases que detectan los modelos, según la taxonomía de `core_engine`: etiqueta en '
+        'español, `tipo` (`anomalia` o `componente`), `severidad` (solo anomalías) y `color` '
+        '(`#rrggbb`, el mismo de la imagen anotada). `version` es la versión de la taxonomía.'
+    ),
+    responses={200: OpenApiTypes.OBJECT},
+)
+@api_view(['GET'])
+def api_vision_taxonomia(request):
+    """
+    GET /api/vision/taxonomia/
+    Lista las clases de la taxonomía de la librería de visión.
+    """
+    return Response(listar_taxonomia())
 
 
 # ─────────────────────────────────────────────────────────────────────────────
