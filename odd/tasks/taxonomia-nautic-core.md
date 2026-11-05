@@ -35,7 +35,7 @@ manage.py test <module>`; frontend `pnpm vitest run <files>`, `pnpm lint`, `pnpm
 |---|---|---|---|---|
 | T1 | S1, S2 | inline | done | 3239be2 |
 | T2 | S3 | inline | done | b9ea189 |
-| T3 | S4, S5 | inline | pending | |
+| T3 | S4, S5 | inline | done | cb6a389 |
 | T4 | S6 | inline | pending | |
 
 Slices: T1 `feat/taxonomia-01-backend`, T2 `feat/taxonomia-02-frontend`, T3
@@ -64,3 +64,20 @@ units depend on each other and share files).
   passed, 1 failed (`CargaPorZonaPage` "shows the model and version on the photos that have one"),
   which also fails on the base without these changes (pre-existing, out of scope). Lint clean,
   build ok. Assess main..b9ea189: medium, under_budget. Risk: none.
+- L7 (T3): RED 4 (missing `incluir_mascaras`, field, endpoint, 404 body), GREEN after migration
+  `0009`, `guardar_detecciones`, `_detecciones_crudas`, `api_vision_foto_detecciones`. Updated 3
+  existing tests that pin the exact `run_inference` call (now `incluir_mascaras=True`, intended).
+  Ran test_detecciones_foto, test_taxonomia, test_versiones_foto, test_inspecciones_api,
+  test_almacenamiento, test_seleccion_modelo: 107 OK; `check` and `makemigrations --check` clean.
+  Risk: item 1 (additive migration + new persisted file per photo); independent verifier at the
+  feature end.
+- L8 Reviews (user pre-authorized): slice main..e383038 (T1+T2) medium, granted, lenses
+  readability+reliability, APPROVED + acknowledged. Slice e383038..cb6a389 (T3) high (escalated item
+  1), granted, lenses risk+resilience+reliability, APPROVED + acknowledged. Open advisories (no
+  blocker): taxonomy import unguarded (core_engine is a hard dependency anyway); endpoint test pins
+  library values (1.0.0, 10 classes, color); fallback label rule duplicated in backend and DTO
+  mapper; photo-level badge no longer pinned by a test; `first-letter:uppercase` replaces
+  `capitalize` for unknown labels; storing the detections JSON is on the completion path (a storage
+  error retries the task; masks are JSON-native, verified: `encode_rle` uses `.tolist()`); orphan
+  JSON on concurrent runs or a failed save; no test for the 500 branch nor for inspection delete
+  cleanup; `crudas.get` outside the try.
