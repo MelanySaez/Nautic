@@ -94,4 +94,4 @@ Branch `feat/vision-ia-01-datos` from `main` (c6ee64f).
   option as selected; `/inspecciones/nueva` redirect untested.
 
 ## Next step
-Review/PR of the two slices (stacked: `feat/vision-ia-01-datos` then `feat/vision-ia-02-pantallas`).
+DONE — merged to main in PR #20 (data layer) and #21 (screens).

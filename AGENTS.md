@@ -115,7 +115,7 @@ Inspection photos (originals and annotated) live behind Django's storage API, se
 
 ## Test Commands
 
-Backend tests live in `backend/vision/tests/` (`test_buques_api.py` for the Buques API, `test_inspecciones_api.py` and `test_busqueda_inspecciones.py` for inspection name/severity and search, `test_modelos.py` and `test_seleccion_modelo.py` for the model catalog and model selection, `test_secciones_migracion.py` for the sections-per-vessel data migration). The vision pipeline itself has no tests yet.
+Backend tests live in `backend/vision/tests/` (`test_buques_api.py` for the Buques API, `test_inspecciones_api.py` and `test_busqueda_inspecciones.py` for inspection name/severity and search, `test_modelos.py` and `test_seleccion_modelo.py` for the model catalog and model selection, `test_secciones_migracion.py` for the sections-per-vessel data migration, `test_versiones_foto.py` for the `procesar_foto` task with `run_inference` mocked, `test_severidad.py` for its severity helper). There is no end-to-end test with a real broker or real inference.
 
 ```bash
 cd backend

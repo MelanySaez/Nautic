@@ -163,4 +163,4 @@ From `frontend/`: touched test files only (`pnpm vitest run <files>`), `pnpm lin
   `ListaInspeccionesPage.test.tsx` (14 passed), lint and build clean.
 
 ## Next step
-Manual smoke against the backend (filters, Cargar más, rename), then open the stacked PRs (slice 1 = T1+T2, slice 2 = T3-T5).
+DONE — merged to main in PR #22 (data layer) and #23 (screens). Manual end-to-end smoke against the real backend still pending.

@@ -112,4 +112,4 @@ Branch `feat/secciones-buque-01-backend` from `feat/buques-frontend-02-pantallas
   both slices merge together).
 
 ## Next step
-Push/PR at the user's decision (slice 2 = T3; merge with slice 1 together).
+DONE — merged to main in PR #18 (backend) and #19 (frontend).
