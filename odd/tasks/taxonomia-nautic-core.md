@@ -94,3 +94,9 @@ units depend on each other and share files).
   lint clean, build ok. Open advisories: a mask whose size differs from the image is skipped (box
   only); the loaded detail is not refreshed after a re-analysis until re-toggled; EXIF-rotated
   photos may misalign the overlay (unverified).
+- L11 Review slice cb6a389..332605b (T4 + fix) medium, granted, lenses reliability+readability,
+  APPROVED + acknowledged. Advisories: masks dropped silently on size mismatch or decode error (no
+  log); a failed load leaves "Mostrar contornos" checked and "Mostrar anotada" disabled; local
+  `detalle` shadows the component one; stroke width uses unnamed numbers; overlay state is not reset
+  when an SSE update or retry changes the photo.
+- Next step: all tasks done; push the four branches and open the stacked PRs (user decision).
