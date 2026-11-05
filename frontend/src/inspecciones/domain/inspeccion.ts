@@ -40,6 +40,8 @@ export interface Foto {
   modelo: string | null
   modeloVersion: string | null
   taxonomiaVersion: string | null
+  /** The server keeps the boxes and masks of the last analysis (see `obtenerDetecciones`). */
+  detalleDisponible: boolean
   fechaCreacion: string
 }
 
@@ -102,6 +104,7 @@ export interface ActualizacionFoto {
   modelo: string | null
   modeloVersion: string | null
   taxonomiaVersion: string | null
+  detalleDisponible: boolean
 }
 
 export type EventoInspeccion =

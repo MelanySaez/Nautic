@@ -36,7 +36,7 @@ manage.py test <module>`; frontend `pnpm vitest run <files>`, `pnpm lint`, `pnpm
 | T1 | S1, S2 | inline | done | 3239be2 |
 | T2 | S3 | inline | done | b9ea189 |
 | T3 | S4, S5 | inline | done | cb6a389 |
-| T4 | S6 | inline | pending | |
+| T4 | S6 | inline | done | c1d1648 |
 
 Slices: T1 `feat/taxonomia-01-backend`, T2 `feat/taxonomia-02-frontend`, T3
 `feat/taxonomia-03-mascaras-backend`, T4 `feat/taxonomia-04-mascaras-frontend`, each stacked on the
@@ -81,3 +81,22 @@ units depend on each other and share files).
   error retries the task; masks are JSON-native, verified: `encode_rle` uses `.tolist()`); orphan
   JSON on concurrent runs or a failed save; no test for the 500 branch nor for inspection delete
   cleanup; `crudas.get` outside the try.
+- L9 (T4): RED 5 (missing `domain/detecciones`, `obtenerDetecciones`, `detalleDisponible` in REST
+  and SSE mapping, overlay switch and its error), GREEN after `decodificarRle`, port + HTTP adapter,
+  `CapaDetecciones` canvas and the "Mostrar contornos" switch with the "Clases visibles" filter.
+  Ran `pnpm vitest run src/inspecciones`: 85 passed, 1 failed (the same pre-existing
+  `CargaPorZonaPage` test). Lint clean, build ok. Drawing itself is not covered: jsdom has no 2D
+  canvas context (`pintar` returns early). Risk: none for T4 (UI over an additive endpoint).
+  Independent verifier launched for the feature (T3 names item 1) before the T4 review.
+- L10 Independent verifier (feature, base main): S1-S6 met, no blockers; RLE parity probe against
+  the library `encode_rle` 5/5 OK (including masks starting with 1). Fixed advisory "switching the
+  overlay off while loading re-shows it": RED then GREEN in `ResultadosPage.test.tsx` (13 passed),
+  lint clean, build ok. Open advisories: a mask whose size differs from the image is skipped (box
+  only); the loaded detail is not refreshed after a re-analysis until re-toggled; EXIF-rotated
+  photos may misalign the overlay (unverified).
+- L11 Review slice cb6a389..332605b (T4 + fix) medium, granted, lenses reliability+readability,
+  APPROVED + acknowledged. Advisories: masks dropped silently on size mismatch or decode error (no
+  log); a failed load leaves "Mostrar contornos" checked and "Mostrar anotada" disabled; local
+  `detalle` shadows the component one; stroke width uses unnamed numbers; overlay state is not reset
+  when an SSE update or retry changes the photo.
+- Next step: all tasks done; push the four branches and open the stacked PRs (user decision).

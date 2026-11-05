@@ -134,6 +134,7 @@ function CargaPorZona({ datos, aplicar }: { datos: DatosInspeccion; aplicar: (ev
           modelo: f.modelo,
           modeloVersion: f.modeloVersion,
           taxonomiaVersion: f.taxonomiaVersion,
+          detalleDisponible: f.detalleDisponible,
         },
       })
     })

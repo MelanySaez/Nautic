@@ -20,7 +20,23 @@ const CORROIDA = unaFoto({
     { clase: 'marine_growth', etiqueta: 'Incrustación marina', tipo: 'anomalia', severidad: 'medium', cantidad: 1, confianzaMaxima: 0.85 },
     { clase: 'ship_hull', etiqueta: 'Casco del buque', tipo: 'componente', severidad: null, cantidad: 1, confianzaMaxima: 0.9 },
   ],
+  detalleDisponible: true,
 })
+
+const DETALLE_CORROIDA = {
+  ancho: 640,
+  alto: 480,
+  instancias: [
+    {
+      clase: 'corrosion', etiqueta: 'Corrosión', tipo: 'anomalia' as const, severidad: 'critical' as const, color: '#f58230',
+      confianza: 0.98, caja: { x1: 1, y1: 2, x2: 30, y2: 40 }, mascara: { alto: 480, ancho: 640, conteos: [307200] },
+    },
+    {
+      clase: 'ship_hull', etiqueta: 'Casco del buque', tipo: 'componente' as const, severidad: null, color: '#aa6e28',
+      confianza: 0.9, caja: { x1: 0, y1: 0, x2: 640, y2: 480 }, mascara: null,
+    },
+  ],
+}
 
 const SOLO_CASCO = unaFoto({
   id: 26,
@@ -92,6 +108,52 @@ describe('ResultadosPage', () => {
     expect(within(componentes).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
       expect.stringMatching(/Casco del buque.*×1.*90%/),
     ])
+  })
+
+  it('draws the boxes and masks over the original image and filters them by class', async () => {
+    const { dependencias } = renderizar([CORROIDA])
+    dependencias.inspecciones.obtenerDetecciones.mockResolvedValue(DETALLE_CORROIDA)
+    const resultado = await screen.findByRole('article', { name: 'KEEL · Foto #21' })
+
+    await userEvent.click(within(resultado).getByRole('switch', { name: 'Mostrar contornos' }))
+
+    expect(dependencias.inspecciones.obtenerDetecciones).toHaveBeenCalledWith(21)
+    const filtro = await within(resultado).findByRole('group', { name: 'Clases visibles' })
+    expect(within(resultado).getByRole('img', { name: /Imagen original/ })).toHaveAttribute(
+      'src',
+      'http://api.test/media/originales/21.jpg',
+    )
+    expect(within(resultado).getByRole('switch', { name: 'Mostrar anotada' })).toBeDisabled()
+    expect(resultado).toHaveTextContent('Mostrando 2 de 2 detecciones')
+
+    await userEvent.click(within(filtro).getByRole('checkbox', { name: /Corrosión/ }))
+
+    expect(resultado).toHaveTextContent('Mostrando 1 de 2 detecciones')
+  })
+
+  it('keeps the overlay off when it is switched off before the detections arrive', async () => {
+    const { dependencias } = renderizar([CORROIDA])
+    let entregar: (detalle: typeof DETALLE_CORROIDA) => void = () => {}
+    dependencias.inspecciones.obtenerDetecciones.mockReturnValue(new Promise((r) => (entregar = r)))
+    const resultado = await screen.findByRole('article', { name: 'KEEL · Foto #21' })
+    const interruptor = within(resultado).getByRole('switch', { name: 'Mostrar contornos' })
+
+    await userEvent.click(interruptor)
+    await userEvent.click(interruptor)
+    await act(async () => entregar(DETALLE_CORROIDA))
+
+    expect(interruptor).not.toBeChecked()
+    expect(within(resultado).queryByRole('group', { name: 'Clases visibles' })).not.toBeInTheDocument()
+  })
+
+  it('reports when the boxes and masks of a photo cannot be loaded', async () => {
+    const { dependencias } = renderizar([CORROIDA])
+    dependencias.inspecciones.obtenerDetecciones.mockRejectedValue(new Error('La foto no tiene detecciones guardadas.'))
+    const resultado = await screen.findByRole('article', { name: 'KEEL · Foto #21' })
+
+    await userEvent.click(within(resultado).getByRole('switch', { name: 'Mostrar contornos' }))
+
+    expect(await within(resultado).findByRole('alert')).toHaveTextContent('La foto no tiene detecciones guardadas.')
   })
 
   it('does not count a photo with only hull components as one with anomalies', async () => {
@@ -178,6 +240,7 @@ describe('ResultadosPage', () => {
           modelo: null,
           modeloVersion: null,
           taxonomiaVersion: null,
+          detalleDisponible: false,
         },
       }),
     )

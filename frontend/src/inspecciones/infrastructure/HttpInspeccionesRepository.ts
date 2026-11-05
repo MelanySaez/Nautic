@@ -9,12 +9,15 @@ import type {
   PaginaInspecciones,
   SeccionCasco,
 } from '../domain/inspeccion'
+import type { DetallePorInstancia } from '../domain/detecciones'
 import {
+  aDetallePorInstancia,
   aFoto,
   aInspeccion,
   aInspeccionDetalle,
   aPagina,
   aSeccion,
+  type DetallePorInstanciaDto,
   type FotoDto,
   type InspeccionDetalleDto,
   type InspeccionDto,
@@ -93,5 +96,9 @@ export class HttpInspeccionesRepository implements InspeccionesRepository {
 
   eliminarFoto(fotoId: number): Promise<void> {
     return this.api.delete(`/api/vision/fotos/${fotoId}/`)
+  }
+
+  async obtenerDetecciones(fotoId: number): Promise<DetallePorInstancia> {
+    return aDetallePorInstancia(await this.api.get<DetallePorInstanciaDto>(`/api/vision/fotos/${fotoId}/detecciones/`))
   }
 }
