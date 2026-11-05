@@ -131,6 +131,21 @@ describe('ResultadosPage', () => {
     expect(resultado).toHaveTextContent('Mostrando 1 de 2 detecciones')
   })
 
+  it('keeps the overlay off when it is switched off before the detections arrive', async () => {
+    const { dependencias } = renderizar([CORROIDA])
+    let entregar: (detalle: typeof DETALLE_CORROIDA) => void = () => {}
+    dependencias.inspecciones.obtenerDetecciones.mockReturnValue(new Promise((r) => (entregar = r)))
+    const resultado = await screen.findByRole('article', { name: 'KEEL · Foto #21' })
+    const interruptor = within(resultado).getByRole('switch', { name: 'Mostrar contornos' })
+
+    await userEvent.click(interruptor)
+    await userEvent.click(interruptor)
+    await act(async () => entregar(DETALLE_CORROIDA))
+
+    expect(interruptor).not.toBeChecked()
+    expect(within(resultado).queryByRole('group', { name: 'Clases visibles' })).not.toBeInTheDocument()
+  })
+
   it('reports when the boxes and masks of a photo cannot be loaded', async () => {
     const { dependencias } = renderizar([CORROIDA])
     dependencias.inspecciones.obtenerDetecciones.mockRejectedValue(new Error('La foto no tiene detecciones guardadas.'))

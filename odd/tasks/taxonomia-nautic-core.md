@@ -88,3 +88,9 @@ units depend on each other and share files).
   `CargaPorZonaPage` test). Lint clean, build ok. Drawing itself is not covered: jsdom has no 2D
   canvas context (`pintar` returns early). Risk: none for T4 (UI over an additive endpoint).
   Independent verifier launched for the feature (T3 names item 1) before the T4 review.
+- L10 Independent verifier (feature, base main): S1-S6 met, no blockers; RLE parity probe against
+  the library `encode_rle` 5/5 OK (including masks starting with 1). Fixed advisory "switching the
+  overlay off while loading re-shows it": RED then GREEN in `ResultadosPage.test.tsx` (13 passed),
+  lint clean, build ok. Open advisories: a mask whose size differs from the image is skipped (box
+  only); the loaded detail is not refreshed after a re-analysis until re-toggled; EXIF-rotated
+  photos may misalign the overlay (unverified).

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { MensajeError } from '../../shared/ui/Estados'
 import { mensajeDe, porcentaje } from '../../shared/ui/formato'
 import type { DetallePorInstancia } from '../domain/detecciones'
@@ -93,6 +93,8 @@ export function TarjetaResultado({ foto, modelos, alCargarDetecciones }: {
   const [anotada, setAnotada] = useState(true)
   const [contornos, setContornos] = useState<EstadoDetalle>({ tipo: 'apagado' })
   const [ocultas, setOcultas] = useState<Set<string>>(new Set())
+  // Bumped on every toggle so a response for an earlier request cannot turn the overlay back on.
+  const solicitud = useRef(0)
   const titulo = `${foto.seccion.codigo} · Foto #${foto.id}`
   const tieneAnotada = Boolean(foto.imagenAnotada)
   const modelo = etiquetaModelo(foto.modelo, foto.modeloVersion, modelos)
@@ -107,15 +109,17 @@ export function TarjetaResultado({ foto, modelos, alCargarDetecciones }: {
   )
 
   async function alternarContornos(activo: boolean) {
+    const actual = ++solicitud.current
     if (!activo) {
       setContornos({ tipo: 'apagado' })
       return
     }
     setContornos({ tipo: 'cargando' })
     try {
-      setContornos({ tipo: 'listo', detalle: await alCargarDetecciones(foto.id) })
+      const detalle = await alCargarDetecciones(foto.id)
+      if (actual === solicitud.current) setContornos({ tipo: 'listo', detalle })
     } catch (error) {
-      setContornos({ tipo: 'error', mensaje: mensajeDe(error) })
+      if (actual === solicitud.current) setContornos({ tipo: 'error', mensaje: mensajeDe(error) })
     }
   }
 
