@@ -172,7 +172,8 @@ describe('ResultadosPage', () => {
 
     const resultado = await screen.findByRole('article', { name: 'KEEL · Foto #21' })
 
-    expect(resultado).toHaveTextContent('RT-DETR v2.0.1')
+    // The model catalog loads independently of the inspection, so the label arrives later.
+    await waitFor(() => expect(resultado).toHaveTextContent('RT-DETR v2.0.1'))
   })
 
   it('shows the annotated image by default and switches to the original', async () => {
