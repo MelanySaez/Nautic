@@ -22,10 +22,10 @@ export function TarjetaInspeccion({
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <p className="label-caps text-ink-dim">INS-{String(id).padStart(4, '0')}</p>
-            {severidadMax && <InsigniaSeveridad severidad={severidadMax} />}
-          </div>
+          <p className="flex min-w-0 items-center gap-1.5 text-sm text-ink-muted">
+            <Icon name="ship" className="size-4 shrink-0 text-ink-dim" />
+            <span className="truncate">{buqueNombre}</span>
+          </p>
           <h3 className="truncate text-xl font-semibold tracking-tight">
             <Link
               to={`/inspecciones/${id}/resultados`}
@@ -35,7 +35,7 @@ export function TarjetaInspeccion({
               {nombre}
             </Link>
           </h3>
-          <p className="truncate text-sm text-ink-muted">{buqueNombre}</p>
+          <p className="label-caps text-ink-dim">INS-{String(id).padStart(4, '0')}</p>
         </div>
         <button
           type="button"
@@ -50,25 +50,33 @@ export function TarjetaInspeccion({
 
       <p className="line-clamp-2 min-h-10 text-sm text-ink-muted">{descripcion || 'Sin descripción.'}</p>
 
-      <dl className="mt-auto grid grid-cols-2 gap-y-2 border-t border-line pt-3 font-mono text-xs text-ink-muted">
-        <div className="flex items-center gap-1.5">
-          <dt className="sr-only">Inspector</dt>
-          <Icon name="user" className="size-4" />
-          <dd className="truncate">{tomadoPor || 'Sin asignar'}</dd>
-        </div>
-        <div className="flex items-center gap-1.5 justify-self-end">
-          <dt className="sr-only">Fecha</dt>
-          <Icon name="calendar" className="size-4" />
-          <dd>{formatearFecha(fechaCreacion)}</dd>
-        </div>
-        <div className="col-span-2 flex items-center gap-1.5 text-accent-ink">
-          <dt className="sr-only">Fotos</dt>
-          <Icon name="photos" className="size-4" />
-          <dd>
-            {totalFotos} {totalFotos === 1 ? 'foto' : 'fotos'}
-          </dd>
-        </div>
-      </dl>
+      <div className="mt-auto flex flex-col gap-3">
+        {severidadMax && (
+          <div>
+            <InsigniaSeveridad severidad={severidadMax} />
+          </div>
+        )}
+
+        <dl className="grid grid-cols-2 gap-y-2 border-t border-line pt-3 font-mono text-xs text-ink-muted">
+          <div className="flex items-center gap-1.5">
+            <dt className="sr-only">Inspector</dt>
+            <Icon name="user" className="size-4" />
+            <dd className="truncate">{tomadoPor || 'Sin asignar'}</dd>
+          </div>
+          <div className="flex items-center gap-1.5 justify-self-end">
+            <dt className="sr-only">Fecha</dt>
+            <Icon name="calendar" className="size-4" />
+            <dd>{formatearFecha(fechaCreacion)}</dd>
+          </div>
+          <div className="col-span-2 flex items-center gap-1.5 text-accent-ink">
+            <dt className="sr-only">Fotos</dt>
+            <Icon name="photos" className="size-4" />
+            <dd>
+              {totalFotos} {totalFotos === 1 ? 'foto' : 'fotos'}
+            </dd>
+          </div>
+        </dl>
+      </div>
     </article>
   )
 }

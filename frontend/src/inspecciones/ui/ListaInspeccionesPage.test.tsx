@@ -43,6 +43,28 @@ describe('ListaInspeccionesPage', () => {
     expect(tarjeta).toHaveTextContent('12 fotos')
   })
 
+  it('orders the card as vessel, name, identifier, description, severity and then the inspector', async () => {
+    const { dependencias } = crearDependenciasFalsas()
+    dependencias.inspecciones.buscar.mockResolvedValue(unaPagina([
+      unaInspeccion({
+        id: 1,
+        nombre: 'Control de casco 2026',
+        buqueNombre: 'ARA Almirante Brown',
+        severidadMax: 'high',
+        descripcion: 'Control anual de casco',
+        tomadoPor: 'María Pérez',
+      }),
+    ]))
+
+    renderizar(dependencias)
+
+    const texto = (await screen.findByRole('article', { name: 'Control de casco 2026' })).textContent ?? ''
+    const posiciones = ['ARA Almirante Brown', 'Control de casco 2026', 'INS-0001', 'Control anual de casco', 'Alta', 'María Pérez']
+      .map((fragmento) => texto.indexOf(fragmento))
+    expect(posiciones).not.toContain(-1)
+    expect(posiciones).toEqual([...posiciones].sort((a, b) => a - b))
+  })
+
   it('shows "Sin asignar" when the inspector is blank', async () => {
     const { dependencias } = crearDependenciasFalsas()
     dependencias.inspecciones.buscar.mockResolvedValue(unaPagina([unaInspeccion({ tomadoPor: '' })]))
