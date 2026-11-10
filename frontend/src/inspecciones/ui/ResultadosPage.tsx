@@ -2,9 +2,10 @@ import { useState, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router'
 import { useDependencias } from '../../app/useDependencias'
 import { ApiError } from '../../shared/http/apiClient'
-import { Boton } from '../../shared/ui/Boton'
+import { Boton, EnlaceBoton } from '../../shared/ui/Boton'
 import { Cargando, MensajeError, Vacio } from '../../shared/ui/Estados'
 import { Icon } from '../../shared/ui/Icon'
+import { Modal } from '../../shared/ui/Modal'
 import { clasesControlCompacto } from '../../shared/ui/clasesControl'
 import { mensajeDe } from '../../shared/ui/formato'
 import { resumirProgreso, severidadMaxima, tieneAnomalias } from '../domain/reglas'
@@ -75,22 +76,10 @@ function Resultados({ datos }: { datos: DatosInspeccion }) {
         </Link>
         <div className="min-w-0 flex-1">
           <p className="label-caps text-ink-dim">Resultados del análisis · INS-{String(detalle.id).padStart(4, '0')}</p>
-          {renombrando ? (
-            <FormularioNombre
-              valorInicial={nombre}
-              guardando={guardandoNombre}
-              error={errorNombre}
-              alGuardar={guardarNombre}
-              alCancelar={() => setRenombrando(false)}
-            />
-          ) : (
-            <>
-              <h1 className="truncate text-2xl font-semibold tracking-tight md:text-3xl">{nombre}</h1>
-              <p className="truncate text-sm text-ink-muted">{detalle.buqueNombre}</p>
-            </>
-          )}
+          <h1 className="truncate text-2xl font-semibold tracking-tight md:text-3xl">{nombre}</h1>
+          <p className="truncate text-sm text-ink-muted">{detalle.buqueNombre}</p>
         </div>
-        {!renombrando && (
+        <div className="flex flex-wrap gap-2">
           <Boton
             variante="secundario"
             onClick={() => {
@@ -100,8 +89,21 @@ function Resultados({ datos }: { datos: DatosInspeccion }) {
           >
             Renombrar inspección
           </Boton>
-        )}
+          <EnlaceBoton to={`/vision/${detalle.id}`}>Editar inspección</EnlaceBoton>
+        </div>
       </header>
+
+      {renombrando && (
+        <Modal titulo="Renombrar inspección" alCerrar={() => !guardandoNombre && setRenombrando(false)}>
+          <FormularioNombre
+            valorInicial={nombre}
+            guardando={guardandoNombre}
+            error={errorNombre}
+            alGuardar={guardarNombre}
+            alCancelar={() => setRenombrando(false)}
+          />
+        </Modal>
+      )}
 
       <section aria-label="Resumen" className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <Indicador etiqueta="Severidad máxima">

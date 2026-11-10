@@ -213,6 +213,43 @@ describe('ResultadosPage', () => {
     expect(router.state.location.pathname).toBe('/vision/7')
   })
 
+  it('goes back to the photo upload to add more photos to the inspection', async () => {
+    const { router } = renderizar([CORROIDA])
+
+    await userEvent.click(await screen.findByRole('link', { name: 'Editar inspección' }))
+
+    expect(router.state.location.pathname).toBe('/vision/7')
+    expect(screen.getByText('Carga de fotos')).toBeInTheDocument()
+  })
+
+  it('renames in a modal dialog in front of the page, keeping the header visible', async () => {
+    renderizar([CORROIDA])
+    const titulo = await screen.findByRole('heading', { level: 1 })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Renombrar inspección' }))
+
+    const dialogo = screen.getByRole('dialog', { name: 'Renombrar inspección' })
+    expect(dialogo).toHaveAttribute('aria-modal', 'true')
+    expect(within(dialogo).getByRole('textbox', { name: 'Nombre' })).toHaveValue(titulo.textContent)
+    expect(within(dialogo).getByRole('textbox', { name: 'Nombre' })).toHaveFocus()
+    expect(titulo).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Editar inspección' })).toBeInTheDocument()
+  })
+
+  it('closes the rename dialog without saving on Cancel or Escape', async () => {
+    const { dependencias } = renderizar([CORROIDA])
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Renombrar inspección' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Renombrar inspección' }))
+    await userEvent.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+
+    expect(dependencias.inspecciones.renombrar).not.toHaveBeenCalled()
+  })
+
   it('filters the results by hull zone', async () => {
     renderizar([CORROIDA, unaFoto({ id: 24, estado: 'completada', seccion: SECCION_PROA })])
     await screen.findByRole('article', { name: 'KEEL · Foto #21' })
