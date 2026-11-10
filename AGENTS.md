@@ -205,6 +205,11 @@ pnpm add <pkg>     # add a dependency (pnpm add -D <pkg> for dev)
 - `InspeccionCasco.nombre` is optional on create; when blank the backend stores `Inspección #<id> — <buque>`. `PATCH /api/vision/inspecciones/<id>/` edits `nombre` and `descripcion` only.
 - Migration `0002` runs `CREATE EXTENSION pg_trgm`: the PostgreSQL `contrib` package must be installed (Fedora: `postgresql-contrib`) and the DB user must be allowed to create extensions.
 
+### Vessels API (`vision/views_buques.py`)
+
+- `GET /api/buques/` returns `{total, offset, limit, resultados}` ordered by `nombre, id`; each result adds `total_inspecciones` (the vessel's inspection count).
+- `?con_inspecciones=1` keeps only vessels with at least one inspection (accepts `true`/`false`/`1`/`0`; anything else is a 400). Absent means every vessel.
+
 ### Hull sections (`vision/secciones.py`)
 
 - Sections belong to a vessel: `SeccionCasco.buque` (FK, cascade) and `codigo` is unique **per vessel** (`UniqueConstraint(buque, codigo)`). There is no global catalog and no seed command.

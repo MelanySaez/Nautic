@@ -1,7 +1,7 @@
 from django.test import TestCase
 from rest_framework.test import APIClient
 
-from vision.models import Buque, SeccionCasco
+from vision.models import Buque, InspeccionCasco, SeccionCasco
 from vision.secciones import SECCIONES_ESTANDAR
 
 URL_LISTA = '/api/buques/'
@@ -209,7 +209,7 @@ class ListarBuquesTests(TestCase):
         self.assertEqual([b['nombre'] for b in body['resultados']], ['Alfa', 'Mike', 'Zeta'])
         self.assertEqual(
             set(body['resultados'][0]),
-            {'id', 'nombre', 'tipo', 'etapa', 'imagen', 'created_at', 'updated_at'},
+            {'id', 'nombre', 'tipo', 'etapa', 'imagen', 'created_at', 'updated_at', 'total_inspecciones'},
         )
         self.assertEqual(body['resultados'][0]['imagen'], 'a.png')
 
@@ -245,6 +245,42 @@ class ListarBuquesTests(TestCase):
 
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.json()['limit'], 200)
+
+    def test_cuenta_las_inspecciones_de_cada_buque(self):
+        con_dos = Buque.objects.create(nombre='Alfa', tipo='T')
+        Buque.objects.create(nombre='Beta', tipo='T')
+        InspeccionCasco.objects.create(buque=con_dos)
+        InspeccionCasco.objects.create(buque=con_dos)
+
+        body = self.client.get(URL_LISTA).json()
+
+        self.assertEqual(
+            [(b['nombre'], b['total_inspecciones']) for b in body['resultados']], [('Alfa', 2), ('Beta', 0)],
+        )
+
+    def test_con_inspecciones_deja_solo_los_buques_que_tienen_alguna(self):
+        sin = Buque.objects.create(nombre='Alfa', tipo='T')
+        con = Buque.objects.create(nombre='Beta', tipo='T')
+        InspeccionCasco.objects.create(buque=con)
+
+        for valor in ('1', 'true'):
+            with self.subTest(valor=valor):
+                body = self.client.get(URL_LISTA, {'con_inspecciones': valor}).json()
+
+                self.assertEqual(body['total'], 1)
+                self.assertEqual([b['id'] for b in body['resultados']], [con.id])
+
+        for valor in ('0', 'false'):
+            with self.subTest(valor=valor):
+                body = self.client.get(URL_LISTA, {'con_inspecciones': valor}).json()
+
+                self.assertEqual([b['id'] for b in body['resultados']], [sin.id, con.id])
+
+    def test_con_inspecciones_invalido_devuelve_400(self):
+        res = self.client.get(URL_LISTA, {'con_inspecciones': 'quizas'})
+
+        self.assertEqual(res.status_code, 400)
+        self.assertIn('error', res.json())
 
     def test_parametros_invalidos(self):
         casos = [
