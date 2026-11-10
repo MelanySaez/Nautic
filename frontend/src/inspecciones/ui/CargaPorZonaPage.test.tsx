@@ -237,7 +237,8 @@ describe('CargaPorZonaPage', () => {
 
     const cola = await screen.findByRole('list', { name: 'Fotos de la inspección' })
 
-    expect(cola).toHaveTextContent('RT-DETR v2.0.1')
+    // The model catalog loads independently of the inspection, so the label arrives later.
+    await waitFor(() => expect(cola).toHaveTextContent('RT-DETR v2.0.1'))
   })
 
   it('disables the analysis when nothing is pending', async () => {
