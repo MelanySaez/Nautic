@@ -1,5 +1,7 @@
 import { useCallback, type ReactNode } from 'react'
-import { Link, useParams } from 'react-router'
+import { useParams } from 'react-router'
+import { Enlace } from '../../shared/ui/Enlace'
+import { transicionNombreBuque } from '../../shared/ui/transiciones'
 import { useDependencias } from '../../app/useDependencias'
 import { useRecurso } from '../../shared/hooks/useRecurso'
 import { Cargando, MensajeError } from '../../shared/ui/Estados'
@@ -46,10 +48,10 @@ export function BuqueDetallePage({ buqueId }: { buqueId: number }) {
 function Marco({ children }: { children: ReactNode }) {
   return (
     <div className="flex flex-col gap-6">
-      <Link to="/buques" className="label-caps inline-flex items-center gap-2 self-start text-ink-muted hover:text-ink">
+      <Enlace to="/buques" className="label-caps inline-flex items-center gap-2 self-start text-ink-muted hover:text-ink">
         <Icon name="back" className="size-4" />
         Volver a buques
-      </Link>
+      </Enlace>
       {children}
     </div>
   )
@@ -57,18 +59,20 @@ function Marco({ children }: { children: ReactNode }) {
 
 function FichaTecnica({ buque }: { buque: BuqueDetalle }) {
   return (
-    <div className="flex flex-col gap-6">
+    <div className="animar-entrada flex flex-col gap-6">
       <header className="flex items-center gap-4">
-        <Link to="/buques" aria-label="Volver a buques" className="rounded p-1 text-ink-muted hover:text-ink">
+        <Enlace to="/buques" aria-label="Volver a buques" className="rounded p-1 text-ink-muted hover:text-ink">
           <Icon name="back" className="size-6" />
-        </Link>
+        </Enlace>
         {/* There is no image serving contract yet, so the picture is always a placeholder. */}
         <div className="flex size-14 shrink-0 items-center justify-center rounded bg-surface-2 text-ink-dim">
           <Icon name="ship" className="size-7" />
         </div>
         <div className="min-w-0 flex-1">
           <p className="label-caps text-ink-dim">Ficha técnica · BUQ-{String(buque.id).padStart(4, '0')}</p>
-          <h1 className="truncate text-2xl font-semibold tracking-tight md:text-3xl">{buque.nombre}</h1>
+          <h1 className="truncate text-2xl font-semibold tracking-tight md:text-3xl">
+            <span style={{ viewTransitionName: transicionNombreBuque(buque.id) }}>{buque.nombre}</span>
+          </h1>
         </div>
       </header>
 

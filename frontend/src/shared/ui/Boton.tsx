@@ -1,5 +1,6 @@
 import type { ButtonHTMLAttributes } from 'react'
-import { Link, type LinkProps } from 'react-router'
+import type { LinkProps } from 'react-router'
+import { Enlace } from './Enlace'
 
 export type VarianteBoton = 'primario' | 'accion' | 'secundario' | 'fantasma'
 
@@ -26,5 +27,5 @@ export function Boton({ variante = 'primario', className = '', type = 'button', 
 type EnlaceBotonProps = LinkProps & { variante?: VarianteBoton }
 
 export function EnlaceBoton({ variante = 'primario', className = '', ...props }: EnlaceBotonProps) {
-  return <Link className={clasesBoton(variante, className)} {...props} />
+  return <Enlace className={clasesBoton(variante, className)} {...props} />
 }

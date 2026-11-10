@@ -1,4 +1,5 @@
-import { NavLink, Outlet } from 'react-router'
+import { Outlet } from 'react-router'
+import { EnlaceNav } from '../shared/ui/Enlace'
 import { ThemeToggle } from '../shared/theme/ThemeToggle'
 import { Icon } from '../shared/ui/Icon'
 
@@ -8,22 +9,26 @@ const claseEnlace = ({ isActive }: { isActive: boolean }) =>
 export function AppLayout() {
   return (
     <div className="min-h-dvh">
-      <header className="sticky top-0 z-10 border-b border-line bg-surface/90 backdrop-blur">
+      <header
+        className="sticky top-0 z-10 border-b border-line bg-surface/90 backdrop-blur"
+        // Its own transition layer: the app bar stays put while the page below cross-fades.
+        style={{ viewTransitionName: 'cabecera' }}
+      >
         <div className="mx-auto flex h-16 max-w-6xl items-center gap-6 px-4">
-          <NavLink to="/" className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+          <EnlaceNav to="/" className="flex items-center gap-2 text-lg font-semibold tracking-tight">
             <Icon name="anchor" className="size-6 text-accent-ink" />
             Nautic
-          </NavLink>
+          </EnlaceNav>
           <nav aria-label="Principal" className="flex flex-1 items-center gap-1">
-            <NavLink to="/vision" className={claseEnlace}>
+            <EnlaceNav to="/vision" className={claseEnlace}>
               Visión IA
-            </NavLink>
-            <NavLink to="/" end className={claseEnlace}>
+            </EnlaceNav>
+            <EnlaceNav to="/" end className={claseEnlace}>
               Inspecciones
-            </NavLink>
-            <NavLink to="/buques" className={claseEnlace}>
+            </EnlaceNav>
+            <EnlaceNav to="/buques" className={claseEnlace}>
               Buques
-            </NavLink>
+            </EnlaceNav>
           </nav>
           <ThemeToggle />
         </div>

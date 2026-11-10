@@ -1,5 +1,6 @@
 import { useMemo, useState, type DragEvent } from 'react'
-import { Link, useParams } from 'react-router'
+import { useParams } from 'react-router'
+import { Enlace } from '../../shared/ui/Enlace'
 import { ApiError } from '../../shared/http/apiClient'
 import { useDependencias } from '../../app/useDependencias'
 import { Boton, EnlaceBoton } from '../../shared/ui/Boton'
@@ -148,11 +149,11 @@ function CargaPorZona({ datos, aplicar }: { datos: DatosInspeccion; aplicar: (ev
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="animar-entrada flex flex-col gap-6">
       <header className="flex flex-wrap items-center gap-3">
-        <Link to="/" aria-label="Volver al listado" className="rounded p-1 text-ink-muted hover:text-ink">
+        <Enlace to="/" aria-label="Volver al listado" className="rounded p-1 text-ink-muted hover:text-ink">
           <Icon name="back" className="size-6" />
-        </Link>
+        </Enlace>
         <div className="min-w-0 flex-1">
           <p className="label-caps text-ink-dim">Carga por zona · INS-{String(detalle.id).padStart(4, '0')}</p>
           <h1 className="truncate text-2xl font-semibold tracking-tight md:text-3xl">{detalle.buqueNombre}</h1>

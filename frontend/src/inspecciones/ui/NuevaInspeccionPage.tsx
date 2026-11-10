@@ -1,5 +1,6 @@
 import { useCallback, useState, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router'
+import { useNavegar } from '../../shared/hooks/useNavegar'
+import { Enlace } from '../../shared/ui/Enlace'
 import { useDependencias } from '../../app/useDependencias'
 import { useRecurso } from '../../shared/hooks/useRecurso'
 import { Boton, EnlaceBoton } from '../../shared/ui/Boton'
@@ -12,7 +13,7 @@ import { mensajeDe } from '../../shared/ui/formato'
 
 export function NuevaInspeccionPage() {
   const { buques, inspecciones } = useDependencias()
-  const navegar = useNavigate()
+  const navegar = useNavegar()
   const cargarBuques = useCallback(() => buques.listar(), [buques])
   const { estado: flota } = useRecurso(cargarBuques)
 
@@ -49,16 +50,16 @@ export function NuevaInspeccionPage() {
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-6">
       <header className="flex items-center gap-3">
-        <Link to="/" aria-label="Volver al listado" className="rounded p-1 text-ink-muted hover:text-ink">
+        <Enlace to="/" aria-label="Volver al listado" className="rounded p-1 text-ink-muted hover:text-ink">
           <Icon name="back" className="size-6" />
-        </Link>
+        </Enlace>
         <h1 className="flex-1 text-2xl font-semibold tracking-tight md:text-3xl">Nueva inspección</h1>
         <span className="label-caps text-ink-dim">Borrador</span>
       </header>
 
       {flota.tipo === 'error' && <MensajeError mensaje={flota.mensaje} />}
 
-      <form onSubmit={enviar} noValidate className="flex flex-col gap-6">
+      <form onSubmit={enviar} noValidate className="animar-entrada flex flex-col gap-6">
         <Tarjeta titulo="Parámetros de la misión">
           <div className="flex flex-col gap-5">
             <Campo etiqueta="Buque" error={errorBuque}>

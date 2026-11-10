@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react'
-import { Link, useParams } from 'react-router'
+import { useParams } from 'react-router'
+import { Enlace } from '../../shared/ui/Enlace'
 import { useDependencias } from '../../app/useDependencias'
 import { ApiError } from '../../shared/http/apiClient'
 import { Boton, EnlaceBoton } from '../../shared/ui/Boton'
@@ -65,15 +66,15 @@ function Resultados({ datos }: { datos: DatosInspeccion }) {
     .sort((a, b) => a.orden - b.orden)
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="animar-entrada flex flex-col gap-6">
       <header className="flex flex-wrap items-center gap-3">
-        <Link
+        <Enlace
           to={`/vision/${detalle.id}`}
           aria-label="Volver a la carga"
           className="rounded p-1 text-ink-muted hover:text-ink"
         >
           <Icon name="back" className="size-6" />
-        </Link>
+        </Enlace>
         <div className="min-w-0 flex-1">
           <p className="label-caps text-ink-dim">Resultados del análisis · INS-{String(detalle.id).padStart(4, '0')}</p>
           <h1 className="truncate text-2xl font-semibold tracking-tight md:text-3xl">{nombre}</h1>
@@ -117,12 +118,12 @@ function Resultados({ datos }: { datos: DatosInspeccion }) {
       </section>
 
       {sinAnalizar > 0 && (
-        <Link
+        <Enlace
           to={`/vision/${detalle.id}`}
           className="label-caps self-start rounded border border-info/30 bg-info-bg px-3 py-2 text-info hover:border-accent"
         >
           {sinAnalizar} {sinAnalizar === 1 ? 'foto' : 'fotos'} sin analizar · ir a la carga
-        </Link>
+        </Enlace>
       )}
 
       {analizadas.length === 0 ? (

@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router'
+import { useNavegar } from '../../shared/hooks/useNavegar'
+import { Enlace } from '../../shared/ui/Enlace'
 import { useDependencias } from '../../app/useDependencias'
 import { ApiError } from '../../shared/http/apiClient'
 import { Boton, EnlaceBoton } from '../../shared/ui/Boton'
@@ -92,7 +93,7 @@ function repartirErroresDelServidor(campos: Record<string, string[]>) {
 
 export function NuevoBuquePage() {
   const { buques } = useDependencias()
-  const navegar = useNavigate()
+  const navegar = useNavegar()
 
   const [valores, setValores] = useState<Valores>(VALORES_INICIALES)
   const [errores, setErrores] = useState<Errores>({})
@@ -168,13 +169,13 @@ export function NuevoBuquePage() {
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-6">
       <header className="flex items-center gap-3">
-        <Link to="/buques" aria-label="Volver al listado" className="rounded p-1 text-ink-muted hover:text-ink">
+        <Enlace to="/buques" aria-label="Volver al listado" className="rounded p-1 text-ink-muted hover:text-ink">
           <Icon name="back" className="size-6" />
-        </Link>
+        </Enlace>
         <h1 className="flex-1 text-2xl font-semibold tracking-tight md:text-3xl">Nuevo buque</h1>
       </header>
 
-      <form onSubmit={enviar} noValidate className="flex flex-col gap-6">
+      <form onSubmit={enviar} noValidate className="animar-entrada flex flex-col gap-6">
         <Tarjeta titulo="Datos generales">
           <div className="flex flex-col gap-5">
             <Campo etiqueta="Nombre" error={errores.nombre}>

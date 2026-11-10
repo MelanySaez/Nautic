@@ -31,7 +31,7 @@ export function ColaFotos({
         const imagen = foto.imagenAnotada ?? foto.imagenOriginal
         const modelo = etiquetaModelo(foto.modelo, foto.modeloVersion, modelos)
         return (
-          <li key={foto.id} className="flex flex-col overflow-hidden rounded border border-line bg-surface">
+          <li key={foto.id} className="animar-entrada flex flex-col overflow-hidden rounded border border-line bg-surface">
             <div className="relative aspect-[4/3] bg-surface-2">
               {imagen ? (
                 <img src={imagen} alt={`Foto ${foto.id} de ${foto.seccion.codigo}`} loading="lazy" className="size-full object-cover" />

@@ -1,4 +1,4 @@
-import { Link } from 'react-router'
+import { Enlace } from '../../shared/ui/Enlace'
 import { Icon } from '../../shared/ui/Icon'
 import { formatearFecha } from '../../shared/ui/formato'
 import type { Inspeccion } from '../domain/inspeccion'
@@ -8,8 +8,10 @@ export function TarjetaInspeccion({
   inspeccion,
   eliminando,
   alEliminar,
+  className = '',
 }: {
   inspeccion: Inspeccion
+  className?: string
   eliminando: boolean
   alEliminar: () => void
 }) {
@@ -18,18 +20,18 @@ export function TarjetaInspeccion({
   return (
     <article
       aria-label={nombre}
-      className="group relative flex flex-col gap-4 rounded-lg border border-line bg-surface p-4 transition-colors hover:border-accent"
+      className={`group relative flex flex-col gap-4 rounded-lg border border-line bg-surface p-4 transition-colors hover:border-accent ${className}`}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 className="truncate text-xl font-semibold tracking-tight">
-            <Link
+            <Enlace
               to={`/inspecciones/${id}/resultados`}
               aria-label={`Abrir inspección ${nombre}`}
               className="after:absolute after:inset-0 focus-visible:outline-none"
             >
               {nombre}
-            </Link>
+            </Enlace>
           </h3>
           <p className="label-caps text-ink-dim">INS-{String(id).padStart(4, '0')}</p>
         </div>
