@@ -3,7 +3,8 @@ import { BuqueDetalleRuta } from '../buques/ui/BuqueDetallePage'
 import { ListaBuquesPage } from '../buques/ui/ListaBuquesPage'
 import { NuevoBuquePage } from '../buques/ui/NuevoBuquePage'
 import { CargaPorZonaRuta } from '../inspecciones/ui/CargaPorZonaPage'
-import { ListaInspeccionesPage } from '../inspecciones/ui/ListaInspeccionesPage'
+import { BuquesConInspeccionesPage } from '../inspecciones/ui/BuquesConInspeccionesPage'
+import { ListaInspeccionesRuta } from '../inspecciones/ui/ListaInspeccionesPage'
 import { NuevaInspeccionPage } from '../inspecciones/ui/NuevaInspeccionPage'
 import { ResultadosRuta } from '../inspecciones/ui/ResultadosPage'
 import { AppLayout } from './AppLayout'
@@ -13,7 +14,8 @@ export const rutas: RouteObject[] = [
   {
     element: <AppLayout />,
     children: [
-      { path: '/', element: <ListaInspeccionesPage /> },
+      { path: '/', element: <BuquesConInspeccionesPage /> },
+      { path: '/inspecciones/buque/:id', element: <ListaInspeccionesRuta /> },
       { path: '/vision', element: <NuevaInspeccionPage /> },
       { path: '/vision/:id', element: <CargaPorZonaRuta /> },
       { path: '/vision/:id/resultados', element: <ResultadosRuta /> },

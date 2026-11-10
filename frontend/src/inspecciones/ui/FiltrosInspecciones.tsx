@@ -1,13 +1,11 @@
-import type { Buque } from '../../buques/domain/buque'
 import { Boton } from '../../shared/ui/Boton'
 import { Campo } from '../../shared/ui/Campo'
 import { CLASES_CONTROL } from '../../shared/ui/clasesControl'
 import { MIN_CARACTERES_BUSQUEDA } from './filtroUrl'
 
-export type CampoFiltro = 'buque' | 'desde' | 'hasta' | 'severidad_min'
+export type CampoFiltro = 'desde' | 'hasta' | 'severidad_min'
 
 export interface ValoresFiltros {
-  buque: string
   desde: string
   hasta: string
   severidadMin: string
@@ -23,7 +21,6 @@ const NIVELES = [
 
 export function FiltrosInspecciones({
   valores,
-  buques,
   errores,
   hayFiltros,
   alCambiar,
@@ -31,7 +28,6 @@ export function FiltrosInspecciones({
   alLimpiar,
 }: {
   valores: ValoresFiltros
-  buques: Buque[]
   /** First server message per control, keyed by the API field name. */
   errores: Partial<Record<CampoFiltro | 'q', string>>
   hayFiltros: boolean
@@ -63,16 +59,6 @@ export function FiltrosInspecciones({
           />
         </Campo>
       </div>
-      <Campo etiqueta="Buque" error={errores.buque}>
-        <select value={valores.buque} onChange={(e) => alCambiar('buque', e.target.value)} className={CLASES_CONTROL}>
-          <option value="">Todos los buques</option>
-          {buques.map((b) => (
-            <option key={b.id} value={b.id}>
-              {b.nombre}
-            </option>
-          ))}
-        </select>
-      </Campo>
       <Campo etiqueta="Desde" error={errores.desde}>
         <input type="date" value={valores.desde} onChange={(e) => alCambiar('desde', e.target.value)} className={CLASES_CONTROL} />
       </Campo>

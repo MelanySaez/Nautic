@@ -72,6 +72,23 @@ describe('HttpBuquesRepository', () => {
     return { url: String(url), init: init ?? {} }
   }
 
+  describe('listarConInspecciones', () => {
+    it('asks only for vessels with inspections, walks every page and maps the count', async () => {
+      fetchMock
+        .mockResolvedValueOnce(respuesta(200, pagina(2, 0, [{ ...resumenDto, total_inspecciones: 3 }])))
+        .mockResolvedValueOnce(respuesta(200, pagina(2, 1, [{ ...resumenDto, id: 2, total_inspecciones: 1 }])))
+
+      const buques = await repo.listarConInspecciones()
+
+      expect(llamada(0).url).toBe('http://api.test/api/buques/?con_inspecciones=1&offset=0&limit=200')
+      expect(llamada(1).url).toBe('http://api.test/api/buques/?con_inspecciones=1&offset=1&limit=200')
+      expect(buques).toEqual([
+        expect.objectContaining({ id: 1, nombre: 'ARC Caribe', totalInspecciones: 3 }),
+        expect.objectContaining({ id: 2, totalInspecciones: 1 }),
+      ])
+    })
+  })
+
   describe('listar', () => {
     it('requests the first page with the maximum limit and maps summaries to the domain model', async () => {
       fetchMock.mockResolvedValue(respuesta(200, pagina(2, 0, [resumenDto, { ...resumenDto, id: 2, imagen: null }])))

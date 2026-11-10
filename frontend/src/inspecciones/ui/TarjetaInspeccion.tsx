@@ -13,7 +13,7 @@ export function TarjetaInspeccion({
   eliminando: boolean
   alEliminar: () => void
 }) {
-  const { id, nombre, buqueNombre, severidadMax, descripcion, tomadoPor, fechaCreacion, totalFotos } = inspeccion
+  const { id, nombre, severidadMax, descripcion, tomadoPor, fechaCreacion, totalFotos } = inspeccion
 
   return (
     <article
@@ -22,10 +22,6 @@ export function TarjetaInspeccion({
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="flex min-w-0 items-center gap-1.5 text-sm text-ink-muted">
-            <Icon name="ship" className="size-4 shrink-0 text-ink-dim" />
-            <span className="truncate">{buqueNombre}</span>
-          </p>
           <h3 className="truncate text-xl font-semibold tracking-tight">
             <Link
               to={`/inspecciones/${id}/resultados`}

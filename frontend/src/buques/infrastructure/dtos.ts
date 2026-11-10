@@ -1,5 +1,5 @@
 import { aSeccion, type SeccionDto } from '../../inspecciones/infrastructure/dtos'
-import type { Buque, BuqueDetalle, NuevaSeccion, NuevoBuque } from '../domain/buque'
+import type { Buque, BuqueConInspecciones, BuqueDetalle, NuevaSeccion, NuevoBuque } from '../domain/buque'
 
 export interface BuqueResumenDto {
   id: number
@@ -39,11 +39,19 @@ export interface BuqueDetalleDto extends BuqueResumenDto {
   secciones: SeccionDto[]
 }
 
-export interface ListaBuquesDto {
+export interface ListaBuquesDto<D extends BuqueResumenDto = BuqueResumenDto> {
   total: number
   offset: number
   limit: number
-  resultados: BuqueResumenDto[]
+  resultados: D[]
+}
+
+export interface BuqueConInspeccionesDto extends BuqueResumenDto {
+  total_inspecciones: number
+}
+
+export function aBuqueConInspecciones(dto: BuqueConInspeccionesDto): BuqueConInspecciones {
+  return { ...aBuque(dto), totalInspecciones: dto.total_inspecciones }
 }
 
 export function aBuque(dto: BuqueResumenDto): Buque {

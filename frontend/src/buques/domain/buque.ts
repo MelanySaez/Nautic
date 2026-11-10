@@ -12,6 +12,11 @@ export interface Buque {
   updatedAt: string
 }
 
+/** Vessel summary plus how many inspections it has, for the inspections history. */
+export interface BuqueConInspecciones extends Buque {
+  totalInspecciones: number
+}
+
 /** Technical-sheet measures. Every measure is optional on the backend, hence `null`. */
 export interface DatosTecnicosBuque {
   autonomiaHoras: number | null
@@ -70,6 +75,8 @@ export type NuevoBuque = Pick<Buque, 'nombre' | 'tipo'> &
 export interface BuquesRepository {
   /** Returns the complete fleet in the order the API provides. */
   listar(): Promise<Buque[]>
+  /** Returns every vessel with at least one inspection, by name, with its inspection count. */
+  listarConInspecciones(): Promise<BuqueConInspecciones[]>
   obtener(id: number): Promise<BuqueDetalle>
   crear(datos: NuevoBuque): Promise<BuqueDetalle>
 }
