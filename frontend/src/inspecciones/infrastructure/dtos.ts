@@ -10,6 +10,7 @@ import type {
   Severidad,
   TipoClase,
 } from '../domain/inspeccion'
+import type { BorradorReporte, CambiosReporte, TextosReporte } from '../domain/reporte'
 import type { DetallePorInstancia } from '../domain/detecciones'
 import type { ModeloIA } from '../domain/modelo'
 
@@ -235,4 +236,77 @@ export function aDetallePorInstancia(dto: DetallePorInstanciaDto): DetallePorIns
       mascara: d.mascara ? { alto: d.mascara.size[0], ancho: d.mascara.size[1], conteos: d.mascara.counts } : null,
     })),
   }
+}
+
+export interface HallazgoRevisableDto {
+  clase: string
+  etiqueta: string
+  severidad: Severidad | null
+  total: number
+  confianza_max: number | null
+  descartado: boolean
+}
+
+export interface BorradorReporteDto {
+  conclusion: string
+  observaciones: string
+  recomendaciones: string
+  inspector_nombre: string
+  inspector_cargo: string
+  actualizado: string | null
+  fotos: {
+    foto_id: number
+    seccion: { codigo: string; nombre: string }
+    imagen: string | null
+    severidad: Severidad | null
+    nota: string
+    hallazgos: HallazgoRevisableDto[]
+  }[]
+}
+
+export function aBorradorReporte(dto: BorradorReporteDto): BorradorReporte {
+  return {
+    conclusion: dto.conclusion,
+    observaciones: dto.observaciones,
+    recomendaciones: dto.recomendaciones,
+    inspectorNombre: dto.inspector_nombre,
+    inspectorCargo: dto.inspector_cargo,
+    actualizado: dto.actualizado,
+    fotos: dto.fotos.map((f) => ({
+      fotoId: f.foto_id,
+      seccion: f.seccion,
+      imagen: f.imagen,
+      severidad: f.severidad,
+      nota: f.nota,
+      hallazgos: f.hallazgos.map((h) => ({
+        clase: h.clase,
+        etiqueta: h.etiqueta,
+        severidad: h.severidad,
+        total: h.total,
+        confianzaMaxima: h.confianza_max,
+        descartado: h.descartado,
+      })),
+    })),
+  }
+}
+
+const TEXTOS_REPORTE = {
+  conclusion: 'conclusion',
+  observaciones: 'observaciones',
+  recomendaciones: 'recomendaciones',
+  inspectorNombre: 'inspector_nombre',
+  inspectorCargo: 'inspector_cargo',
+} as const satisfies Record<keyof TextosReporte, string>
+
+/** PATCH body: only the given texts and photo reviews, in snake_case. */
+export function aCambiosReporteDto(cambios: CambiosReporte): Record<string, unknown> {
+  const dto: Record<string, unknown> = {}
+  for (const [clave, campo] of Object.entries(TEXTOS_REPORTE)) {
+    const valor = cambios[clave as keyof TextosReporte]
+    if (valor !== undefined) dto[campo] = valor
+  }
+  if (cambios.fotos !== undefined) {
+    dto.fotos = cambios.fotos.map((f) => ({ foto_id: f.fotoId, descartadas: f.descartadas, nota: f.nota }))
+  }
+  return dto
 }

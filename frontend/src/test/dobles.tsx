@@ -6,6 +6,7 @@ import { DependenciasProvider } from '../app/DependenciasProvider'
 import type { Buque, BuqueConInspecciones, BuqueDetalle, CambiosBuque, NuevoBuque } from '../buques/domain/buque'
 import type { DetallePorInstancia } from '../inspecciones/domain/detecciones'
 import type { ModeloIA } from '../inspecciones/domain/modelo'
+import type { BorradorReporte, CambiosReporte } from '../inspecciones/domain/reporte'
 import type {
   EventoInspeccion,
   FiltroInspecciones,
@@ -17,6 +18,32 @@ import type {
 } from '../inspecciones/domain/inspeccion'
 
 export const SECCION_QUILLA: SeccionCasco = { id: 3, codigo: 'KEEL', nombre: 'Quilla', descripcion: '', orden: 9 }
+
+/** Report draft never saved, with one photo to review (corrosion + paint peel). */
+export function unBorradorReporte(overrides: Partial<BorradorReporte> = {}): BorradorReporte {
+  return {
+    conclusion: '',
+    observaciones: '',
+    recomendaciones: '',
+    inspectorNombre: '',
+    inspectorCargo: '',
+    actualizado: null,
+    fotos: [
+      {
+        fotoId: 4,
+        seccion: { codigo: 'KEEL', nombre: 'Quilla' },
+        imagen: '/media/inspecciones/anotadas/4.jpg',
+        severidad: 'critical',
+        nota: '',
+        hallazgos: [
+          { clase: 'corrosion', etiqueta: 'Corrosión', severidad: 'critical', total: 2, confianzaMaxima: 0.9, descartado: false },
+          { clase: 'paint_peel', etiqueta: 'Descascaramiento de pintura', severidad: 'low', total: 1, confianzaMaxima: 0.3, descartado: false },
+        ],
+      },
+    ],
+    ...overrides,
+  }
+}
 
 export function unBuque(overrides: Partial<Buque> = {}): Buque {
   return {
@@ -140,7 +167,9 @@ export function crearDependenciasFalsas() {
       reintentarFoto: vi.fn(async (_fotoId: number, _modeloId?: string) => unaFoto()),
       eliminarFoto: vi.fn(async () => {}),
       obtenerDetecciones: vi.fn(async (_fotoId: number): Promise<DetallePorInstancia> => ({ ancho: 1, alto: 1, instancias: [] })),
-      urlReporte: vi.fn((inspeccionId: number) => `/api/vision/inspecciones/${inspeccionId}/reporte/`),
+      urlReporte: vi.fn((inspeccionId: number) => `/api/vision/inspecciones/${inspeccionId}/reporte/pdf/`),
+      obtenerReporte: vi.fn(async (_inspeccionId: number) => unBorradorReporte()),
+      guardarReporte: vi.fn(async (_inspeccionId: number, _cambios: CambiosReporte) => unBorradorReporte()),
     },
     modelos: {
       listar: vi.fn(async () => [unModelo()]),

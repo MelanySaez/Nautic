@@ -55,6 +55,7 @@ function renderizar(fotos: Foto[]) {
     [
       { path: '/vision/:id/resultados', element: <ResultadosRuta /> },
       { path: '/vision/:id', element: <p>Carga de fotos</p> },
+      { path: '/inspecciones/:id/reporte', element: <p>Editor del reporte</p> },
     ],
     falsas.dependencias,
     '/vision/7/resultados',
@@ -286,14 +287,11 @@ describe('ResultadosPage', () => {
     expect(screen.getByRole('article', { name: 'KEEL · Foto #25' })).toHaveTextContent('Media')
   })
 
-  it('offers the PDF report of the inspection as a download', async () => {
-    const { dependencias } = renderizar([CORROIDA])
-    dependencias.inspecciones.urlReporte.mockReturnValue('/api/vision/inspecciones/7/reporte/')
+  it('links to the report editor of the inspection', async () => {
+    const { router } = renderizar([CORROIDA])
 
-    const enlace = await screen.findByRole('link', { name: 'Descargar reporte' })
+    await userEvent.click(await screen.findByRole('link', { name: 'Reporte' }))
 
-    expect(enlace).toHaveAttribute('href', '/api/vision/inspecciones/7/reporte/')
-    expect(enlace).toHaveAttribute('download')
-    expect(dependencias.inspecciones.urlReporte).toHaveBeenCalledWith(7)
+    expect(router.state.location.pathname).toBe('/inspecciones/7/reporte')
   })
 })

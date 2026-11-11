@@ -10,7 +10,10 @@ import type {
   SeccionCasco,
 } from '../domain/inspeccion'
 import type { DetallePorInstancia } from '../domain/detecciones'
+import type { BorradorReporte, CambiosReporte } from '../domain/reporte'
 import {
+  aBorradorReporte,
+  aCambiosReporteDto,
   aDetallePorInstancia,
   aFoto,
   aInspeccion,
@@ -23,6 +26,7 @@ import {
   type InspeccionDto,
   type ListaInspeccionesDto,
   type SeccionDto,
+  type BorradorReporteDto,
 } from './dtos'
 
 // Divisible by the 2- and 3-column card grids; the backend accepts 1-100.
@@ -38,7 +42,20 @@ export class HttpInspeccionesRepository implements InspeccionesRepository {
   }
 
   urlReporte(inspeccionId: number): string {
-    return `${this.baseUrl}/api/vision/inspecciones/${inspeccionId}/reporte/`
+    return `${this.baseUrl}/api/vision/inspecciones/${inspeccionId}/reporte/pdf/`
+  }
+
+  async obtenerReporte(inspeccionId: number): Promise<BorradorReporte> {
+    return aBorradorReporte(await this.api.get<BorradorReporteDto>(`/api/vision/inspecciones/${inspeccionId}/reporte/`))
+  }
+
+  async guardarReporte(inspeccionId: number, cambios: CambiosReporte): Promise<BorradorReporte> {
+    return aBorradorReporte(
+      await this.api.patch<BorradorReporteDto>(
+        `/api/vision/inspecciones/${inspeccionId}/reporte/`,
+        aCambiosReporteDto(cambios),
+      ),
+    )
   }
 
   async buscar(filtro: FiltroInspecciones, cursor?: string): Promise<PaginaInspecciones> {
