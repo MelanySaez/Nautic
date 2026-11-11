@@ -15,7 +15,7 @@ The product has three sections, each with its API and its screens:
 
 | Section | Purpose | Status |
 |---|---|---|
-| **Buques** | Vessel entity with a technical sheet and its own hull sections | API create / list / detail (`vision/views_buques.py`, no update/delete); screens `/buques`, `/buques/nuevo`, `/buques/:id` |
+| **Buques** | Vessel entity with a technical sheet and its own hull sections | API create / list / detail / partial update (`vision/views_buques.py`, no delete); screens `/buques`, `/buques/nuevo`, `/buques/:id`, `/buques/:id/editar` |
 | **Inspecciones** | History of the inspections already created | API search, detail, rename, delete; screens `/` (vessels with inspections), `/inspecciones/buque/:id` (that vessel's inspections, with filters) and `/inspecciones/:id/resultados` |
 | **Visión IA** | Create an inspection and analyze its photos; every analysis belongs to an inspection | API photos → Celery → SSE with model selection; screens `/vision`, `/vision/:id`, `/vision/:id/resultados` |
 
@@ -187,7 +187,7 @@ pnpm add <pkg>     # add a dependency (pnpm add -D <pkg> for dev)
 - **Detections**: `Deteccion` carries the backend taxonomy (`etiqueta`, `tipo` `anomalia` | `componente` | null, `severidad`); the DTO mapper falls back to the de-snaked class name when a server omits it. `esAnomalia` / `tieneAnomalias` (`domain/reglas.ts`) treat only components as non-anomalies, so an unknown class is never hidden. Result cards list anomalies (with a severity badge) apart from components, and "Con anomalías" counts photos with at least one anomaly.
 - **Boxes and masks**: `Foto.detalleDisponible` says the server kept the instances of the last analysis; `InspeccionesRepository.obtenerDetecciones(fotoId)` loads them (`domain/detecciones.ts`: `DetallePorInstancia`, `decodificarRle` for the column-major COCO RLE). On `/vision/:id/resultados` the "Mostrar contornos" switch shows the original image with `CapaDetecciones` (a canvas in the image's pixel space: translucent masks plus boxes in the taxonomy color) and a per-class filter ("Clases visibles"); the annotated switch is disabled meanwhile.
 - **Hull sections**: the create form (`NuevoBuquePage` + `SeccionesCascoForm`) offers standard or custom sections; standard mode omits `secciones` from the POST (the backend default), custom sends `{nombre, codigo?, descripcion?}[]` in row order. `BuqueDetalle.secciones` feeds the vessel sheet, and `InspeccionesRepository.listarSecciones(buqueId)` requests `?buque=<id>` (the upload page uses the inspection's vessel).
-- **Vessels**: `HttpBuquesRepository` (`buques/infrastructure/`) implements `BuquesRepository` (`listar` walks every page of `GET /api/buques/`, `listarConInspecciones` walks `?con_inspecciones=1`, `obtener`, `crear`) and is wired in `composicion.ts`; DTO mapping lives in `buques/infrastructure/dtos.ts`. Field-level 400 errors arrive in `ApiError.campos` (snake_case keys). Screens live in `buques/ui/`: list with client-side search (`/buques`), create form (`/buques/nuevo`, server `campos` errors shown per field) and technical sheet (`/buques/:id`); the main nav has a "Buques" link. There is no edit/delete.
+- **Vessels**: `HttpBuquesRepository` (`buques/infrastructure/`) implements `BuquesRepository` (`listar` walks every page of `GET /api/buques/`, `listarConInspecciones` walks `?con_inspecciones=1`, `obtener`, `crear`, `actualizar` → `PATCH`) and is wired in `composicion.ts`; DTO mapping lives in `buques/infrastructure/dtos.ts`. Field-level 400 errors arrive in `ApiError.campos` (snake_case keys). Screens live in `buques/ui/`: list with client-side search (`/buques`), create form (`/buques/nuevo`, server `campos` errors shown per field) technical sheet (`/buques/:id`, with an "Editar buque" button) and edit form (`/buques/:id/editar`, `EditarBuquePage`: prefilled, sends only the changed fields, sections read-only). Create and edit share `CamposBuque` + `formularioBuque.ts`. The main nav has a "Buques" link. There is no delete.
 
 ---
 
@@ -217,7 +217,7 @@ pnpm add <pkg>     # add a dependency (pnpm add -D <pkg> for dev)
 - `POST /api/buques/` takes an optional `secciones`: absent or `"estandar"` creates the 20 sections of `SECCIONES_ESTANDAR`; a non-empty list of `{nombre, codigo?, descripcion?}` creates exactly those, in order (`orden` = position; a blank `codigo` becomes `SEC-01`, `SEC-02`, ...). Invalid lists return 400 `{"error": "Datos inválidos.", "campos": {"secciones": [...]}}` and nothing is created (vessel and sections are saved in one transaction).
 - The vessel sheet (`GET /api/buques/<id>/` and the 201 response) returns `secciones: [{id, codigo, nombre, descripcion, orden}]`. `GET /api/vision/secciones/?buque=<id>` lists them (`buque` required: 400 when missing or invalid, 404 when the vessel does not exist).
 - `POST /api/vision/inspecciones/<id>/fotos/` rejects (400) a `seccion_id` that belongs to another vessel than the inspection's.
-- Sections cannot be edited after creation (no vessel update endpoint yet).
+- Sections cannot be edited after creation: `PATCH /api/buques/<id>/` edits the technical sheet only (same validation as create, only the sent fields change, `null` clears a measure; nothing is saved on any error) and rejects `secciones` with 400.
 
 ### Vision module (async pipeline)
 
@@ -246,7 +246,7 @@ pnpm add <pkg>     # add a dependency (pnpm add -D <pkg> for dev)
 | `backend/vision/views.py` | Vision REST endpoints + SSE stream |
 | `backend/vision/busqueda.py` | Inspection search: declarative filter registry (`FILTROS`) + cursor pagination (`buscar_inspecciones`) |
 | `backend/vision/secciones.py` | `SECCIONES_ESTANDAR` + per-vessel section creation and validation |
-| `backend/vision/views_buques.py` | Buques REST endpoints (`/api/buques/`): list, create, detail |
+| `backend/vision/views_buques.py` | Buques REST endpoints (`/api/buques/`): list, create, detail, `PATCH` edit |
 | `backend/vision/urls.py` | URL routing for the vision app |
 | `backend/vision/tasks.py` | Celery task `procesar_foto` + dead-letter task |
 | `backend/vision/taxonomia.py` | Class taxonomy of `core_engine`: read-time enrichment of detections + `/api/vision/taxonomia/` payload |

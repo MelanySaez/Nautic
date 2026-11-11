@@ -140,10 +140,11 @@ def _validar_valor(nombre, valor):
     return valor, None
 
 
-def _validar_buque(data):
+def _validar_buque(data, instancia=None):
     """
-    Validate a creation payload.
-    Returns (campos_limpios, errores) where errores maps field -> [messages].
+    Validate a creation payload, or a partial update when ``instancia`` is given
+    (absent fields keep their current value, so none is required).
+    Returns (instancia_sin_guardar, errores) where errores maps field -> [messages].
     """
     errores = {}
 
@@ -154,7 +155,7 @@ def _validar_buque(data):
     limpios = {}
     for nombre in _CAMPOS_ESCRITURA:
         if nombre not in data:
-            if nombre in _CAMPOS_REQUERIDOS:
+            if instancia is None and nombre in _CAMPOS_REQUERIDOS:
                 errores[nombre] = ['Este campo es requerido.']
             continue
         valor, error = _validar_valor(nombre, data[nombre])
@@ -165,7 +166,11 @@ def _validar_buque(data):
 
     # Model-level validation (max_length, blank, integer range, ...) only on
     # fields that passed the type checks, to avoid duplicate messages.
-    instancia = Buque(**limpios)
+    if instancia is None:
+        instancia = Buque(**limpios)
+    else:
+        for nombre, valor in limpios.items():
+            setattr(instancia, nombre, valor)
     excluir = [n for n in _CAMPOS_ESCRITURA if n not in limpios and n in errores]
     try:
         instancia.full_clean(exclude=excluir)
@@ -332,15 +337,43 @@ def api_buques(request):
 
 
 @extend_schema(
+    methods=['GET'],
     tags=['Buques'],
     summary='Detalle de un buque',
     description='Devuelve la ficha técnica completa del buque, incluidas sus `secciones` del casco.',
     responses={200: OpenApiTypes.OBJECT, 404: OpenApiTypes.OBJECT},
 )
-@api_view(['GET'])
+@extend_schema(
+    methods=['PATCH'],
+    tags=['Buques'],
+    summary='Editar buque',
+    description=(
+        'Actualiza parcialmente la ficha técnica: solo cambian los campos enviados, con las '
+        'mismas reglas que al crear (`nombre` y `tipo` no pueden quedar vacíos; las medidas '
+        'aceptan `null` para borrarlas). Las `secciones` del casco no se editan. '
+        'Ante cualquier error no se guarda nada.'
+    ),
+    request={'application/json': {'type': 'object', 'additionalProperties': True}},
+    responses={200: OpenApiTypes.OBJECT, 400: OpenApiTypes.OBJECT, 404: OpenApiTypes.OBJECT},
+)
+@api_view(['GET', 'PATCH'])
 def api_buque_detalle(request, buque_id):
     """
-    GET /api/buques/<id>/  → ficha técnica completa
+    GET   /api/buques/<id>/  → ficha técnica completa
+    PATCH /api/buques/<id>/  → edita la ficha técnica (sin secciones)
     """
     buque = get_object_or_404(Buque, pk=buque_id)
+    if request.method == 'GET':
+        return Response(_buque_to_dict(buque))
+
+    data = request.data
+    if not hasattr(data, 'keys'):
+        return Response({'error': 'Se esperaba un objeto JSON.'}, status=400)
+    buque, errores = _validar_buque(data, instancia=buque)
+    if 'secciones' in data:
+        errores['secciones'] = ['Las secciones del casco no se pueden editar.']
+    if errores:
+        return Response({'error': 'Datos inválidos.', 'campos': errores}, status=400)
+
+    buque.save()
     return Response(_buque_to_dict(buque))

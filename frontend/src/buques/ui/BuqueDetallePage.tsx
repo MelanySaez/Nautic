@@ -1,5 +1,6 @@
 import { useCallback, type ReactNode } from 'react'
 import { useParams } from 'react-router'
+import { EnlaceBoton } from '../../shared/ui/Boton'
 import { Enlace } from '../../shared/ui/Enlace'
 import { transicionNombreBuque } from '../../shared/ui/transiciones'
 import { useDependencias } from '../../app/useDependencias'
@@ -74,6 +75,10 @@ function FichaTecnica({ buque }: { buque: BuqueDetalle }) {
             <span style={{ viewTransitionName: transicionNombreBuque(buque.id) }}>{buque.nombre}</span>
           </h1>
         </div>
+        <EnlaceBoton to={`/buques/${buque.id}/editar`} variante="secundario" className="shrink-0">
+          <Icon name="edit" className="size-4" />
+          Editar buque
+        </EnlaceBoton>
       </header>
 
       <div className="grid gap-4 lg:grid-cols-2">

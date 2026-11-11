@@ -3,7 +3,7 @@ import { createMemoryRouter, RouterProvider, type RouteObject } from 'react-rout
 import { vi } from 'vitest'
 import type { Dependencias } from '../app/composicion'
 import { DependenciasProvider } from '../app/DependenciasProvider'
-import type { Buque, BuqueConInspecciones, BuqueDetalle, NuevoBuque } from '../buques/domain/buque'
+import type { Buque, BuqueConInspecciones, BuqueDetalle, CambiosBuque, NuevoBuque } from '../buques/domain/buque'
 import type { DetallePorInstancia } from '../inspecciones/domain/detecciones'
 import type { ModeloIA } from '../inspecciones/domain/modelo'
 import type {
@@ -158,6 +158,7 @@ export function crearDependenciasFalsas() {
       listarConInspecciones: vi.fn(async (): Promise<BuqueConInspecciones[]> => []),
       obtener: vi.fn(async (_id: number) => unDetalleBuque()),
       crear: vi.fn(async (_datos: NuevoBuque) => unDetalleBuque()),
+      actualizar: vi.fn(async (_id: number, _cambios: CambiosBuque) => unDetalleBuque()),
     },
   } satisfies Dependencias
   return { dependencias, emitirEvento: (evento: EventoInspeccion) => emitir(evento), cancelarSuscripcion: cancelar }

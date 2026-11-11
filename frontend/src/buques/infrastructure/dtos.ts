@@ -1,5 +1,5 @@
 import { aSeccion, type SeccionDto } from '../../inspecciones/infrastructure/dtos'
-import type { Buque, BuqueConInspecciones, BuqueDetalle, NuevaSeccion, NuevoBuque } from '../domain/buque'
+import type { Buque, BuqueConInspecciones, BuqueDetalle, CambiosBuque, NuevaSeccion, NuevoBuque } from '../domain/buque'
 
 export interface BuqueResumenDto {
   id: number
@@ -149,6 +149,26 @@ export function aNuevoBuqueDto(datos: NuevoBuque): Record<string, unknown> {
   }
   if (datos.secciones !== undefined) {
     dto.secciones = datos.secciones === 'estandar' ? datos.secciones : datos.secciones.map(aNuevaSeccionDto)
+  }
+  return dto
+}
+
+/** Wire key of every editable field, for the PATCH body. */
+const CAMPOS_EDITABLES = {
+  nombre: 'nombre',
+  tipo: 'tipo',
+  ...CAMPOS_OPCIONALES,
+} as const satisfies Record<keyof CambiosBuque, string>
+
+/**
+ * Builds the PATCH body: every defined field is sent as is. Unlike creation, blanks and `null`
+ * are meaningful here (they clear the stored value), so only `undefined` is dropped.
+ */
+export function aCambiosBuqueDto(cambios: CambiosBuque): Record<string, unknown> {
+  const dto: Record<string, unknown> = {}
+  for (const [clave, campo] of Object.entries(CAMPOS_EDITABLES)) {
+    const valor = cambios[clave as keyof CambiosBuque]
+    if (valor !== undefined) dto[campo] = valor
   }
   return dto
 }

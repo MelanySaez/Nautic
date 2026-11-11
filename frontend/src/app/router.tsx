@@ -1,5 +1,6 @@
 import { createBrowserRouter, Navigate, type RouteObject } from 'react-router'
 import { BuqueDetalleRuta } from '../buques/ui/BuqueDetallePage'
+import { EditarBuqueRuta } from '../buques/ui/EditarBuquePage'
 import { ListaBuquesPage } from '../buques/ui/ListaBuquesPage'
 import { NuevoBuquePage } from '../buques/ui/NuevoBuquePage'
 import { CargaPorZonaRuta } from '../inspecciones/ui/CargaPorZonaPage'
@@ -25,6 +26,7 @@ export const rutas: RouteObject[] = [
       { path: '/buques', element: <ListaBuquesPage /> },
       { path: '/buques/nuevo', element: <NuevoBuquePage /> },
       { path: '/buques/:id', element: <BuqueDetalleRuta /> },
+      { path: '/buques/:id/editar', element: <EditarBuqueRuta /> },
     ],
   },
 ]
