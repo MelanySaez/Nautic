@@ -335,4 +335,10 @@ describe('HttpInspeccionesRepository', () => {
       message: 'No se pudo conectar con el servidor.',
     })
   })
+
+  describe('urlReporte', () => {
+    it('points at the PDF report of the inspection under the API base', () => {
+      expect(repo.urlReporte(7)).toBe(`${BASE}/api/vision/inspecciones/7/reporte/`)
+    })
+  })
 })

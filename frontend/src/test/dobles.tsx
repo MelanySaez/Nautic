@@ -140,6 +140,7 @@ export function crearDependenciasFalsas() {
       reintentarFoto: vi.fn(async (_fotoId: number, _modeloId?: string) => unaFoto()),
       eliminarFoto: vi.fn(async () => {}),
       obtenerDetecciones: vi.fn(async (_fotoId: number): Promise<DetallePorInstancia> => ({ ancho: 1, alto: 1, instancias: [] })),
+      urlReporte: vi.fn((inspeccionId: number) => `/api/vision/inspecciones/${inspeccionId}/reporte/`),
     },
     modelos: {
       listar: vi.fn(async () => [unModelo()]),

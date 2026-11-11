@@ -31,6 +31,7 @@ from .models import (
     nombre_por_defecto, recalcular_severidad_max,
 )
 from .pubsub import publicar_evento, suscribirse
+from .reporte import generar_pdf
 from .ratelimit import check_upload_rate, get_client_ip, track_concurrent_start
 from .secciones import seccion_to_dict
 from .taxonomia import color_clase, enriquecer_detecciones, info_clase, listar_taxonomia
@@ -667,6 +668,33 @@ def api_vision_inspeccion_detalle(request, inspeccion_id):
 # ─────────────────────────────────────────────────────────────────────────────
 # Endpoints — Fotos
 # ─────────────────────────────────────────────────────────────────────────────
+
+
+@extend_schema(
+    tags=['Visión IA'],
+    summary='Reporte PDF de una inspección',
+    description=(
+        'Genera el reporte de la inspección en PDF (adjunto `reporte-inspeccion-<id>.pdf`): '
+        'resumen ejecutivo, datos del buque, hallazgos por sección, evidencia fotográfica de las '
+        'fotos con anomalías, secciones no inspeccionadas, metodología y espacio para observaciones '
+        'y firma del inspector. Se genera aunque haya fotos pendientes; el resumen lo indica.'
+    ),
+    responses={(200, 'application/pdf'): OpenApiTypes.BINARY, 404: OpenApiTypes.OBJECT},
+)
+@api_view(['GET'])
+def api_vision_inspeccion_reporte(request, inspeccion_id):
+    """
+    GET /api/vision/inspecciones/<id>/reporte/  → PDF adjunto
+    """
+    inspeccion = get_object_or_404(InspeccionCasco.objects.select_related('buque'), pk=inspeccion_id)
+    try:
+        pdf = generar_pdf(inspeccion)
+    except Exception:
+        logger.exception("No se pudo generar el reporte de la inspección %s", inspeccion_id)
+        return Response({'error': 'No se pudo generar el reporte.'}, status=500)
+    respuesta = HttpResponse(pdf, content_type='application/pdf')
+    respuesta['Content-Disposition'] = f'attachment; filename="reporte-inspeccion-{inspeccion.id}.pdf"'
+    return respuesta
 
 @extend_schema(
     tags=['Inspección IA'],

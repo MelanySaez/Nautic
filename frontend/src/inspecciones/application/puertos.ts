@@ -34,6 +34,8 @@ export interface InspeccionesRepository {
   eliminarFoto(fotoId: number): Promise<void>
   /** Boxes and masks of the last analysis of a photo; rejects when the photo has none (`detalleDisponible` false). */
   obtenerDetecciones(fotoId: number): Promise<DetallePorInstancia>
+  /** URL of the inspection's PDF report, for a plain download link (the browser fetches it). */
+  urlReporte(inspeccionId: number): string
 }
 
 /** Catalog of AI models the backend can analyze with. */

@@ -30,9 +30,15 @@ const TAMANO_PAGINA = 24
 
 export class HttpInspeccionesRepository implements InspeccionesRepository {
   private readonly api: ApiClient
+  private readonly baseUrl: string
 
   constructor(baseUrl: string, fetcher?: Fetcher) {
     this.api = new ApiClient(baseUrl, fetcher)
+    this.baseUrl = baseUrl.replace(/\/+$/, '')
+  }
+
+  urlReporte(inspeccionId: number): string {
+    return `${this.baseUrl}/api/vision/inspecciones/${inspeccionId}/reporte/`
   }
 
   async buscar(filtro: FiltroInspecciones, cursor?: string): Promise<PaginaInspecciones> {

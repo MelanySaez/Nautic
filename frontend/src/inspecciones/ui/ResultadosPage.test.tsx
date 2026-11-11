@@ -285,4 +285,15 @@ describe('ResultadosPage', () => {
 
     expect(screen.getByRole('article', { name: 'KEEL · Foto #25' })).toHaveTextContent('Media')
   })
+
+  it('offers the PDF report of the inspection as a download', async () => {
+    const { dependencias } = renderizar([CORROIDA])
+    dependencias.inspecciones.urlReporte.mockReturnValue('/api/vision/inspecciones/7/reporte/')
+
+    const enlace = await screen.findByRole('link', { name: 'Descargar reporte' })
+
+    expect(enlace).toHaveAttribute('href', '/api/vision/inspecciones/7/reporte/')
+    expect(enlace).toHaveAttribute('download')
+    expect(dependencias.inspecciones.urlReporte).toHaveBeenCalledWith(7)
+  })
 })

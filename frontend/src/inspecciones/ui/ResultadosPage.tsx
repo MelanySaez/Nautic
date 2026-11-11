@@ -3,7 +3,7 @@ import { useParams } from 'react-router'
 import { Enlace } from '../../shared/ui/Enlace'
 import { useDependencias } from '../../app/useDependencias'
 import { ApiError } from '../../shared/http/apiClient'
-import { Boton, EnlaceBoton } from '../../shared/ui/Boton'
+import { AnclaBoton, Boton, EnlaceBoton } from '../../shared/ui/Boton'
 import { Cargando, MensajeError, Vacio } from '../../shared/ui/Estados'
 import { Icon } from '../../shared/ui/Icon'
 import { Modal } from '../../shared/ui/Modal'
@@ -90,6 +90,9 @@ function Resultados({ datos }: { datos: DatosInspeccion }) {
           >
             Renombrar inspección
           </Boton>
+          <AnclaBoton variante="secundario" href={inspecciones.urlReporte(detalle.id)} download>
+            Descargar reporte
+          </AnclaBoton>
           <EnlaceBoton to={`/vision/${detalle.id}`}>Editar inspección</EnlaceBoton>
         </div>
       </header>

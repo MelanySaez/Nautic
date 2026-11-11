@@ -21,6 +21,9 @@ urlpatterns = [
     path('api/vision/inspecciones/<int:inspeccion_id>/', views.api_vision_inspeccion_detalle, name='api_vision_inspeccion_detalle'),
 
     # Subir foto a una inspección (solo guarda; el análisis se dispara aparte)
+    # Reporte PDF de la inspección
+    path('api/vision/inspecciones/<int:inspeccion_id>/reporte/', views.api_vision_inspeccion_reporte, name='api_vision_inspeccion_reporte'),
+
     path('api/vision/inspecciones/<int:inspeccion_id>/fotos/', views.api_vision_subir_foto, name='api_vision_subir_foto'),
 
     # Estado de una foto individual (consulta puntual) + análisis manual + eliminación
