@@ -131,6 +131,12 @@ class DescargarReporteTests(TestCase):
         )
         self.assertTrue(res.content.startswith(b'%PDF'))
 
+    def test_acepta_clientes_que_solo_piden_pdf(self):
+        res = self.client.get(self._url(self.insp.id), HTTP_ACCEPT='application/pdf')
+
+        self.assertEqual(res.status_code, 200)
+        self.assertTrue(res.content.startswith(b'%PDF'))
+
     def test_inspeccion_sin_fotos(self):
         res = self.client.get(self._url(self.insp.id))
 

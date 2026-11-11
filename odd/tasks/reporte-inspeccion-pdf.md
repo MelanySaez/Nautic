@@ -33,3 +33,4 @@ Branch: `feat/reporte-inspeccion-pdf` · Delivery: single PR · Runners: `uv run
 - L4: library choice ReportLab (pure Python wheels, no system packages in WSL or the Docker image) over WeasyPrint (needs Pango/cairo via apt). Risk: item 5 (new dependency).
 - L5: `USE_TZ=False` makes `timezone.localtime()` raise on naive datetimes; added `_fecha()`.
 - L6: visual review of a real inspection (INS-0001): signature lines merged into one and the 22 unseen sections were a hard-to-read run-on list; fixed with a spacer column and a two-column table.
+- L7: independent verifier: PASS on S1-S10, no blockers; reportlab 4.2.5 (BSD) and chardet 7.7.0 (0BSD) ship wheels, no apt packages. Advisory reproduced: `Accept: application/pdf` alone returned 406 (DRF JSON-only negotiation); fixed with a PDF renderer and pinned by `test_acepta_clientes_que_solo_piden_pdf`. Suite 242 OK.

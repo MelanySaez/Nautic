@@ -11,8 +11,9 @@ from django.http import HttpResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
-from rest_framework.decorators import api_view, parser_classes
+from rest_framework.decorators import api_view, parser_classes, renderer_classes
 from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.renderers import BaseRenderer, JSONRenderer
 from rest_framework.response import Response
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample
 from drf_spectacular.types import OpenApiTypes
@@ -670,6 +671,20 @@ def api_vision_inspeccion_detalle(request, inspeccion_id):
 # ─────────────────────────────────────────────────────────────────────────────
 
 
+
+class _PdfRenderer(BaseRenderer):
+    """Lets clients that accept only ``application/pdf`` pass content negotiation.
+
+    The report itself is a plain ``HttpResponse``; this renderer only formats the
+    JSON error bodies (404, 500) when it is the negotiated one.
+    """
+    media_type = 'application/pdf'
+    format = 'pdf'
+    charset = None
+
+    def render(self, data, accepted_media_type=None, renderer_context=None):
+        return data if isinstance(data, bytes) else json.dumps(data).encode('utf-8')
+
 @extend_schema(
     tags=['Visión IA'],
     summary='Reporte PDF de una inspección',
@@ -682,6 +697,7 @@ def api_vision_inspeccion_detalle(request, inspeccion_id):
     responses={(200, 'application/pdf'): OpenApiTypes.BINARY, 404: OpenApiTypes.OBJECT},
 )
 @api_view(['GET'])
+@renderer_classes([JSONRenderer, _PdfRenderer])
 def api_vision_inspeccion_reporte(request, inspeccion_id):
     """
     GET /api/vision/inspecciones/<id>/reporte/  → PDF adjunto
