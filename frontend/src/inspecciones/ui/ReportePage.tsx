@@ -138,82 +138,85 @@ function Editor({ inspeccionId, inicial }: { inspeccionId: number; inicial: Borr
 
   return (
     <Marco inspeccionId={inspeccionId}>
-      <form onSubmit={guardar} noValidate className="animar-entrada flex flex-col gap-6">
-        <Tarjeta titulo="Inspector">
-          <div className="grid gap-5 sm:grid-cols-2">
-            {(
-              [
-                ['inspectorNombre', 'Nombre del inspector'],
-                ['inspectorCargo', 'Cargo'],
-              ] as const
-            ).map(([clave, etiqueta]) => (
-              <Campo key={clave} etiqueta={etiqueta} error={errores[clave]}>
-                <input
-                  value={edicion.textos[clave]}
-                  onChange={(e) => cambiarTexto(clave, e.target.value)}
-                  maxLength={255}
-                  className={CLASES_CONTROL}
-                />
-              </Campo>
-            ))}
-          </div>
-        </Tarjeta>
+      <form onSubmit={guardar} noValidate className="animar-entrada">
+        {/* Locked while saving: the response replaces the edit state, so nothing typed meanwhile may be lost. */}
+        <fieldset disabled={guardando} className="m-0 flex min-w-0 flex-col gap-6 border-0 p-0">
+          <Tarjeta titulo="Inspector">
+            <div className="grid gap-5 sm:grid-cols-2">
+              {(
+                [
+                  ['inspectorNombre', 'Nombre del inspector'],
+                  ['inspectorCargo', 'Cargo'],
+                ] as const
+              ).map(([clave, etiqueta]) => (
+                <Campo key={clave} etiqueta={etiqueta} error={errores[clave]}>
+                  <input
+                    value={edicion.textos[clave]}
+                    onChange={(e) => cambiarTexto(clave, e.target.value)}
+                    maxLength={255}
+                    className={CLASES_CONTROL}
+                  />
+                </Campo>
+              ))}
+            </div>
+          </Tarjeta>
 
-        <Tarjeta titulo="Conclusiones">
-          <div className="flex flex-col gap-5">
-            {area('conclusion', 'Conclusión', 'Aparece en el resumen ejecutivo, al inicio del PDF.')}
-            {area('observaciones', 'Observaciones')}
-            {area('recomendaciones', 'Recomendaciones')}
-          </div>
-        </Tarjeta>
+          <Tarjeta titulo="Conclusiones">
+            <div className="flex flex-col gap-5">
+              {area('conclusion', 'Conclusión', 'Aparece en el resumen ejecutivo, al inicio del PDF.')}
+              {area('observaciones', 'Observaciones')}
+              {area('recomendaciones', 'Recomendaciones')}
+            </div>
+          </Tarjeta>
 
-        <section className="flex flex-col gap-3">
-          <h2 className="label-caps text-ink-muted">Validación de hallazgos</h2>
-          {guardado.fotos.length === 0 ? (
-            <Vacio>No hay fotos con anomalías para revisar.</Vacio>
-          ) : (
-            guardado.fotos.map((foto) => {
-              const validacion = edicion.fotos.find((f) => f.fotoId === foto.fotoId)!
-              return (
-                <FotoRevision
-                  key={foto.fotoId}
-                  foto={foto}
-                  validacion={validacion}
-                  alAlternar={(clase) =>
-                    cambiarFoto(foto.fotoId, (descartadas) => ({
-                      descartadas: descartadas.includes(clase)
-                        ? descartadas.filter((c) => c !== clase)
-                        : [...descartadas, clase],
-                    }))
-                  }
-                  alCambiarNota={(nota) => cambiarFoto(foto.fotoId, () => ({ nota }))}
-                />
-              )
-            })
-          )}
-        </section>
+          <section className="flex flex-col gap-3">
+            <h2 className="label-caps text-ink-muted">Validación de hallazgos</h2>
+            {guardado.fotos.length === 0 ? (
+              <Vacio>No hay fotos con anomalías para revisar.</Vacio>
+            ) : (
+              guardado.fotos.map((foto) => {
+                const validacion = edicion.fotos.find((f) => f.fotoId === foto.fotoId)!
+                return (
+                  <FotoRevision
+                    key={foto.fotoId}
+                    foto={foto}
+                    validacion={validacion}
+                    alAlternar={(clase) =>
+                      cambiarFoto(foto.fotoId, (descartadas) => ({
+                        descartadas: descartadas.includes(clase)
+                          ? descartadas.filter((c) => c !== clase)
+                          : [...descartadas, clase],
+                      }))
+                    }
+                    alCambiarNota={(nota) => cambiarFoto(foto.fotoId, () => ({ nota }))}
+                  />
+                )
+              })
+            )}
+          </section>
 
-        {errorEnvio && <MensajeError mensaje={errorEnvio} />}
+          {errorEnvio && <MensajeError mensaje={errorEnvio} />}
 
-        <div className="flex flex-col gap-3 border-t border-line pt-6 sm:flex-row-reverse sm:items-center">
-          <Boton type="submit" disabled={!hayCambios || guardando} className="sm:min-w-40">
-            {guardando ? 'Guardando…' : 'Guardar'}
-          </Boton>
-          {hayCambios ? (
-            <>
-              <Boton variante="secundario" disabled>
+          <div className="flex flex-col gap-3 border-t border-line pt-6 sm:flex-row-reverse sm:items-center">
+            <Boton type="submit" disabled={!hayCambios || guardando} className="sm:min-w-40">
+              {guardando ? 'Guardando…' : 'Guardar'}
+            </Boton>
+            {hayCambios ? (
+              <>
+                <Boton variante="secundario" disabled>
+                  <Icon name="upload" className="size-4 rotate-180" />
+                  Descargar PDF
+                </Boton>
+                <p className="text-sm text-ink-dim sm:mr-auto">Guarda los cambios para incluirlos en el PDF.</p>
+              </>
+            ) : (
+              <AnclaBoton variante="secundario" href={inspecciones.urlReporte(inspeccionId)} download>
                 <Icon name="upload" className="size-4 rotate-180" />
                 Descargar PDF
-              </Boton>
-              <p className="text-sm text-ink-dim sm:mr-auto">Guarda los cambios para incluirlos en el PDF.</p>
-            </>
-          ) : (
-            <AnclaBoton variante="secundario" href={inspecciones.urlReporte(inspeccionId)} download>
-              <Icon name="upload" className="size-4 rotate-180" />
-              Descargar PDF
-            </AnclaBoton>
-          )}
-        </div>
+              </AnclaBoton>
+            )}
+          </div>
+        </fieldset>
       </form>
     </Marco>
   )

@@ -133,6 +133,16 @@ class EditarBorradorTests(BaseReporte):
         self.assertEqual(len(res.json()['campos']['fotos']), 1)
         self.assertFalse(ValidacionFoto.objects.exists())
 
+    def test_foto_id_que_no_es_entero(self):
+        res = self._patch({'fotos': [
+            {'foto_id': [self.corroida.id], 'descartadas': []},
+            {'foto_id': True, 'descartadas': []},
+            {'foto_id': {'id': 1}},
+        ]})
+
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(len(res.json()['campos']['fotos']), 3)
+
     def test_cuerpo_que_no_es_objeto(self):
         self.assertEqual(self._patch(['x']).status_code, 400)
 

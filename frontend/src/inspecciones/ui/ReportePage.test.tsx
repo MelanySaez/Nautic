@@ -92,4 +92,16 @@ describe('ReportePage', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('No encontrado.')
   })
+
+  it('locks the form while saving so no edit is lost when the response arrives', async () => {
+    const { dependencias } = renderizar()
+    dependencias.inspecciones.guardarReporte.mockReturnValue(new Promise<BorradorReporte>(() => {}))
+
+    await userEvent.type(await screen.findByLabelText('Conclusión'), 'Regular')
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar' }))
+
+    expect(screen.getByRole('button', { name: 'Guardando…' })).toBeDisabled()
+    expect(screen.getByLabelText('Conclusión')).toBeDisabled()
+    expect(screen.getByRole('checkbox', { name: /Corrosión/ })).toBeDisabled()
+  })
 })

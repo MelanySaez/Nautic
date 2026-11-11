@@ -61,6 +61,11 @@ def _validar_texto(valor, maximo):
     return valor, None
 
 
+def _id_entero(valor):
+    """A photo id only when it is a real integer (``True`` is an int in Python, but not an id)."""
+    return valor if isinstance(valor, int) and not isinstance(valor, bool) else None
+
+
 def _validar_fotos(inspeccion, valor):
     """
     Validate the ``fotos`` list of a PATCH.
@@ -68,9 +73,8 @@ def _validar_fotos(inspeccion, valor):
     """
     if not isinstance(valor, list):
         return [], ['Debe ser una lista.']
-    ids = [item.get('foto_id') for item in valor if isinstance(item, dict)]
-    fotos = {f.id: f for f in FotoInspeccion.objects.filter(
-        pk__in=[i for i in ids if isinstance(i, int) and not isinstance(i, bool)])}
+    ids = [_id_entero(item.get('foto_id')) for item in valor if isinstance(item, dict)]
+    fotos = {f.id: f for f in FotoInspeccion.objects.filter(pk__in=[i for i in ids if i is not None])}
 
     limpias, errores, vistas = [], [], set()
     for posicion, item in enumerate(valor, start=1):
@@ -78,7 +82,7 @@ def _validar_fotos(inspeccion, valor):
             errores.append(f'Elemento {posicion}: debe ser un objeto.')
             continue
         desconocidos = sorted(set(item) - _CAMPOS_FOTO)
-        foto = fotos.get(item.get('foto_id'))
+        foto = fotos.get(_id_entero(item.get('foto_id')))
         if desconocidos:
             errores.append(f"Elemento {posicion}: campos desconocidos: {', '.join(desconocidos)}.")
             continue
