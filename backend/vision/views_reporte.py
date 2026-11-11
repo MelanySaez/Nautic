@@ -72,7 +72,7 @@ def _validar_fotos(inspeccion, valor):
     fotos = {f.id: f for f in FotoInspeccion.objects.filter(
         pk__in=[i for i in ids if isinstance(i, int) and not isinstance(i, bool)])}
 
-    limpias, errores = [], []
+    limpias, errores, vistas = [], [], set()
     for posicion, item in enumerate(valor, start=1):
         if not isinstance(item, dict):
             errores.append(f'Elemento {posicion}: debe ser un objeto.')
@@ -85,6 +85,10 @@ def _validar_fotos(inspeccion, valor):
         if foto is None or foto.inspeccion_id != inspeccion.id:
             errores.append(f'Elemento {posicion}: la foto no pertenece a esta inspección.')
             continue
+        if foto.id in vistas:
+            errores.append(f'Elemento {posicion}: la foto {foto.id} está repetida.')
+            continue
+        vistas.add(foto.id)
         if foto.estado != FotoInspeccion.Estado.COMPLETADA:
             errores.append(f'Foto {foto.id}: todavía no está analizada.')
             continue
