@@ -8,12 +8,10 @@ export const MIN_CARACTERES_BUSQUEDA = 2
 /**
  * Reads the search criteria from the URL query string. Dates are passed through untouched so the
  * server reports a malformed one next to its control; values that cannot even be typed
- * (a non-numeric vessel, an unknown severity) are ignored.
+ * (an unknown severity) are ignored. The vessel comes from the route, not the query.
  */
 export function filtroDesdeParametros(parametros: URLSearchParams): FiltroInspecciones {
   const filtro: FiltroInspecciones = {}
-  const buque = Number(parametros.get('buque'))
-  if (Number.isInteger(buque) && buque > 0) filtro.buqueId = buque
   const desde = parametros.get('desde')
   if (desde) filtro.desde = desde
   const hasta = parametros.get('hasta')
