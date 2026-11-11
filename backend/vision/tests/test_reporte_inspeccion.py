@@ -137,6 +137,13 @@ class DescargarReporteTests(TestCase):
         self.assertEqual(res.status_code, 200)
         self.assertTrue(res.content.startswith(b'%PDF'))
 
+    def test_error_pedido_como_pdf_se_sirve_como_json(self):
+        res = self.client.get(self._url(999999), HTTP_ACCEPT='application/pdf')
+
+        self.assertEqual(res.status_code, 404)
+        self.assertEqual(res['Content-Type'], 'application/json')
+        self.assertIn('detail', res.json())
+
     def test_inspeccion_sin_fotos(self):
         res = self.client.get(self._url(self.insp.id))
 

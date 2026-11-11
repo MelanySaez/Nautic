@@ -675,15 +675,21 @@ def api_vision_inspeccion_detalle(request, inspeccion_id):
 class _PdfRenderer(BaseRenderer):
     """Lets clients that accept only ``application/pdf`` pass content negotiation.
 
-    The report itself is a plain ``HttpResponse``; this renderer only formats the
-    JSON error bodies (404, 500) when it is the negotiated one.
+    The report itself is a plain ``HttpResponse``; this renderer only serves the
+    JSON error bodies (404, 500), as ``application/json``, when it is the negotiated one.
     """
     media_type = 'application/pdf'
     format = 'pdf'
     charset = None
 
     def render(self, data, accepted_media_type=None, renderer_context=None):
-        return data if isinstance(data, bytes) else json.dumps(data).encode('utf-8')
+        if isinstance(data, bytes):
+            return data
+        # An error body (404, 500) is JSON: label it as such instead of as a corrupt PDF.
+        respuesta = (renderer_context or {}).get('response')
+        if respuesta is not None:
+            respuesta['Content-Type'] = 'application/json'
+        return json.dumps(data).encode('utf-8')
 
 @extend_schema(
     tags=['Visión IA'],

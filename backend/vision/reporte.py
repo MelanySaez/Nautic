@@ -257,8 +257,11 @@ def _imagen(clave):
     """Downscaled JPEG flowable for a stored photo, or None when it cannot be read."""
     try:
         with ImagenPil.open(io.BytesIO(leer_archivo(clave))) as original:
+            # Downscale before converting: JPEGs decode straight at a reduced scale
+            # (draft), so a 24 MP photo never allocates its full-resolution RGB copy.
+            original.draft('RGB', (_LADO_IMAGEN_PX, _LADO_IMAGEN_PX))
+            original.thumbnail((_LADO_IMAGEN_PX, _LADO_IMAGEN_PX))
             imagen = original.convert('RGB')
-        imagen.thumbnail((_LADO_IMAGEN_PX, _LADO_IMAGEN_PX))
         salida = io.BytesIO()
         imagen.save(salida, format='JPEG', quality=72, optimize=True)
         salida.seek(0)
