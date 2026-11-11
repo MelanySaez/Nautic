@@ -16,6 +16,7 @@ const PATHS = {
   refresh: 'M20 11a8 8 0 0 0-14.9-3M4 4v4h4m-4 5a8 8 0 0 0 14.9 3M20 20v-4h-4',
   results: 'M4 20V10m6 10V4m6 16v-7m4 7H2',
   ship: 'M3 17l2 4h14l2-4-9-3-9 3Zm4-4V7h10v6M12 3v4',
+  edit: 'M4 20h4L19 9l-4-4L4 16v4Zm9-13 4 4',
 } as const
 
 export type IconName = keyof typeof PATHS

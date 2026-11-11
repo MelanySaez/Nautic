@@ -393,3 +393,57 @@ class SeccionesDelBuqueTests(TestCase):
         self.assertEqual(self.client.get('/api/vision/secciones/').status_code, 400)
         self.assertEqual(self.client.get('/api/vision/secciones/', {'buque': 'abc'}).status_code, 400)
         self.assertEqual(self.client.get('/api/vision/secciones/', {'buque': 999999}).status_code, 404)
+
+
+class EditarBuqueTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.buque = Buque.objects.create(
+            nombre='ARC Caribe', tipo='Fragata', eslora_total_m=110.5, puntal_m=8.0,
+        )
+        SeccionCasco.objects.create(buque=self.buque, codigo='PRW', nombre='Proa', orden=0)
+
+    def _patch(self, payload, buque_id=None):
+        return self.client.patch(
+            _url_detalle(buque_id or self.buque.id), payload, format='json',
+        )
+
+    def test_actualiza_solo_los_campos_enviados(self):
+        res = self._patch({'nombre': '  ARC Pacífico ', 'eslora_total_m': 120, 'puntal_m': None})
+
+        self.assertEqual(res.status_code, 200)
+        self.buque.refresh_from_db()
+        self.assertEqual(self.buque.nombre, 'ARC Pacífico')
+        self.assertEqual(self.buque.tipo, 'Fragata')
+        self.assertEqual(self.buque.eslora_total_m, 120.0)
+        self.assertIsNone(self.buque.puntal_m)
+        body = res.json()
+        self.assertEqual(body['nombre'], 'ARC Pacífico')
+        self.assertEqual([s['codigo'] for s in body['secciones']], ['PRW'])
+
+    def test_errores_de_validacion_no_guardan_nada(self):
+        res = self._patch({'nombre': '   ', 'puntal_m': -1, 'etapa': '', 'id': 5})
+
+        self.assertEqual(res.status_code, 400)
+        campos = res.json()['campos']
+        self.assertEqual(set(campos), {'nombre', 'puntal_m', 'etapa', 'id'})
+        self.buque.refresh_from_db()
+        self.assertEqual(self.buque.nombre, 'ARC Caribe')
+        self.assertEqual(self.buque.puntal_m, 8.0)
+
+    def test_las_secciones_no_se_editan(self):
+        res = self._patch({'secciones': 'estandar'})
+
+        self.assertEqual(res.status_code, 400)
+        self.assertIn('secciones', res.json()['campos'])
+        self.assertEqual(self.buque.secciones.count(), 1)
+
+    def test_cuerpo_que_no_es_objeto(self):
+        res = self._patch(['nombre'])
+
+        self.assertEqual(res.status_code, 400)
+
+    def test_buque_inexistente(self):
+        res = self._patch({'nombre': 'X'}, buque_id=999999)
+
+        self.assertEqual(res.status_code, 404)

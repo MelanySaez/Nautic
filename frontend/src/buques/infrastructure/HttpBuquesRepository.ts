@@ -1,9 +1,17 @@
 import { ApiClient, type Fetcher } from '../../shared/http/apiClient'
-import type { Buque, BuqueConInspecciones, BuqueDetalle, BuquesRepository, NuevoBuque } from '../domain/buque'
+import type {
+  Buque,
+  BuqueConInspecciones,
+  BuqueDetalle,
+  BuquesRepository,
+  CambiosBuque,
+  NuevoBuque,
+} from '../domain/buque'
 import {
   aBuque,
   aBuqueConInspecciones,
   aBuqueDetalle,
+  aCambiosBuqueDto,
   aNuevoBuqueDto,
   type BuqueConInspeccionesDto,
   type BuqueDetalleDto,
@@ -50,5 +58,9 @@ export class HttpBuquesRepository implements BuquesRepository {
 
   async crear(datos: NuevoBuque): Promise<BuqueDetalle> {
     return aBuqueDetalle(await this.api.post<BuqueDetalleDto>('/api/buques/', aNuevoBuqueDto(datos)))
+  }
+
+  async actualizar(id: number, cambios: CambiosBuque): Promise<BuqueDetalle> {
+    return aBuqueDetalle(await this.api.patch<BuqueDetalleDto>(`/api/buques/${id}/`, aCambiosBuqueDto(cambios)))
   }
 }

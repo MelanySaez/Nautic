@@ -72,6 +72,12 @@ export type NuevoBuque = Pick<Buque, 'nombre' | 'tipo'> &
     secciones?: 'estandar' | NuevaSeccion[]
   }
 
+/**
+ * Partial update of the technical sheet: only the given fields change. `null` clears a measure
+ * or the image. Hull sections cannot be edited.
+ */
+export type CambiosBuque = Partial<Omit<BuqueDetalle, 'id' | 'createdAt' | 'updatedAt' | 'secciones'>>
+
 export interface BuquesRepository {
   /** Returns the complete fleet in the order the API provides. */
   listar(): Promise<Buque[]>
@@ -79,4 +85,5 @@ export interface BuquesRepository {
   listarConInspecciones(): Promise<BuqueConInspecciones[]>
   obtener(id: number): Promise<BuqueDetalle>
   crear(datos: NuevoBuque): Promise<BuqueDetalle>
+  actualizar(id: number, cambios: CambiosBuque): Promise<BuqueDetalle>
 }

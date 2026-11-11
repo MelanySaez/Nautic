@@ -293,4 +293,32 @@ describe('HttpBuquesRepository', () => {
       })
     })
   })
+
+  describe('actualizar', () => {
+    it('patches only the given fields in snake_case, keeping nulls and blanks, and returns the sheet', async () => {
+      fetchMock.mockResolvedValue(respuesta(200, detalleDto))
+
+      const actualizado = await repo.actualizar(1, { nombre: 'ARC Caribe', descripcion: '', puntalM: null, imagen: null })
+
+      const { url, init } = llamada(0)
+      expect(url).toBe('http://api.test/api/buques/1/')
+      expect(init.method).toBe('PATCH')
+      expect(JSON.parse(String(init.body))).toEqual({
+        nombre: 'ARC Caribe',
+        descripcion: '',
+        puntal_m: null,
+        imagen: null,
+      })
+      expect(actualizado.esloraTotalM).toBe(110.5)
+    })
+
+    it('rejects with ApiError carrying the field errors of a 400', async () => {
+      fetchMock.mockResolvedValue(respuesta(400, { error: 'Datos inválidos.', campos: { etapa: ['Requerido.'] } }))
+
+      await expect(repo.actualizar(1, { etapa: '' })).rejects.toMatchObject({
+        status: 400,
+        campos: { etapa: ['Requerido.'] },
+      })
+    })
+  })
 })

@@ -10,6 +10,7 @@ function renderizar(ruta: string, dependencias = crearDependenciasFalsas().depen
     [
       { path: '/buques', element: <p>Listado</p> },
       { path: '/buques/:id', element: <BuqueDetalleRuta /> },
+      { path: '/buques/:id/editar', element: <p>Edición</p> },
     ],
     dependencias,
     ruta,
@@ -87,5 +88,15 @@ describe('BuqueDetallePage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('El identificador del buque no es válido.')
     expect(dependencias.buques.obtener).not.toHaveBeenCalled()
     expect(screen.getByRole('link', { name: 'Volver a buques' })).toBeInTheDocument()
+  })
+
+  it('links to the edit screen of the vessel', async () => {
+    const { dependencias } = crearDependenciasFalsas()
+    dependencias.buques.obtener.mockResolvedValue(unDetalleBuque({ id: 7 }))
+    const { router } = renderizar('/buques/7', dependencias)
+
+    await userEvent.click(await screen.findByRole('link', { name: 'Editar buque' }))
+
+    expect(router.state.location.pathname).toBe('/buques/7/editar')
   })
 })
