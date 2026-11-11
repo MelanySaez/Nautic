@@ -1,5 +1,6 @@
 import { useCallback } from 'react'
-import { Link, useSearchParams } from 'react-router'
+import { useSearchParams } from 'react-router'
+import { Enlace } from '../../shared/ui/Enlace'
 import { useDependencias } from '../../app/useDependencias'
 import { useRecurso } from '../../shared/hooks/useRecurso'
 import { EnlaceBoton } from '../../shared/ui/Boton'
@@ -7,6 +8,7 @@ import { Cargando, MensajeError, Vacio } from '../../shared/ui/Estados'
 import { Campo } from '../../shared/ui/Campo'
 import { CLASES_CONTROL } from '../../shared/ui/clasesControl'
 import { Icon } from '../../shared/ui/Icon'
+import { transicionNombreBuque } from '../../shared/ui/transiciones'
 
 /** Case- and accent-insensitive form of a text, for client-side matching. */
 function normalizar(texto: string): string {
@@ -71,8 +73,8 @@ export function BuquesConInspeccionesPage() {
       {visibles.length > 0 && (
         <ul aria-label="Embarcaciones con inspecciones" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {visibles.map((buque) => (
-            <li key={buque.id}>
-              <Link
+            <li key={buque.id} className="animar-entrada">
+              <Enlace
                 to={`/inspecciones/buque/${buque.id}`}
                 state={{ buqueNombre: buque.nombre, volverA: texto ? `/?q=${encodeURIComponent(texto)}` : '/' }}
                 className="flex items-center gap-4 rounded-lg border border-line bg-surface p-4 transition-colors hover:border-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
@@ -81,13 +83,18 @@ export function BuquesConInspeccionesPage() {
                   <Icon name="ship" className="size-6" />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-lg font-semibold tracking-tight">{buque.nombre}</span>
+                  <span
+                    className="block truncate text-lg font-semibold tracking-tight"
+                    style={{ viewTransitionName: transicionNombreBuque(buque.id) }}
+                  >
+                    {buque.nombre}
+                  </span>
                   <span className="label-caps text-ink-dim">
                     {buque.totalInspecciones} {buque.totalInspecciones === 1 ? 'inspección' : 'inspecciones'}
                   </span>
                 </span>
                 <Icon name="back" className="size-5 shrink-0 rotate-180 text-ink-dim" />
-              </Link>
+              </Enlace>
             </li>
           ))}
         </ul>

@@ -105,3 +105,42 @@
     @apply font-mono text-xs font-medium tracking-wider uppercase;
   }
 }
+
+/* Entry animation for list items (vessel rows, inspection cards). */
+@keyframes entrada {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.animar-entrada {
+  animation: entrada 240ms ease-out both;
+}
+
+/* Every route change (see `shared/ui/Enlace.tsx`): a short cross-fade plus shared elements that morph. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 200ms;
+}
+
+::view-transition-group(*) {
+  animation-duration: 320ms;
+  animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* The app bar does not animate between pages. */
+::view-transition-group(cabecera),
+::view-transition-old(cabecera),
+::view-transition-new(cabecera) {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animar-entrada,
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}

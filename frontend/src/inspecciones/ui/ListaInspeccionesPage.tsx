@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useLocation, useParams, useSearchParams } from 'react-router'
+import { useLocation, useParams, useSearchParams } from 'react-router'
+import { Enlace } from '../../shared/ui/Enlace'
 import { useDependencias } from '../../app/useDependencias'
 import { useRecurso } from '../../shared/hooks/useRecurso'
 import { Boton, EnlaceBoton } from '../../shared/ui/Boton'
@@ -10,6 +11,7 @@ import type { Inspeccion } from '../domain/inspeccion'
 import { FiltrosInspecciones, type CampoFiltro } from './FiltrosInspecciones'
 import { filtroDesdeParametros, MIN_CARACTERES_BUSQUEDA } from './filtroUrl'
 import { TarjetaInspeccion } from './TarjetaInspeccion'
+import { transicionNombreBuque } from '../../shared/ui/transiciones'
 import { useBusquedaInspecciones } from './useBusquedaInspecciones'
 
 const RETARDO_TEXTO_MS = 300
@@ -112,17 +114,19 @@ export function ListaInspeccionesPage({ buqueId }: { buqueId: number }) {
     <div className="flex flex-col gap-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div className="flex min-w-0 items-start gap-3">
-          <Link
+          <Enlace
             to={desdeLista?.volverA ?? '/'}
             aria-label="Volver a las embarcaciones"
             className="mt-1 rounded p-1 text-ink-muted hover:text-ink">
             <Icon name="back" className="size-6" />
-          </Link>
+          </Enlace>
           <div className="min-w-0">
             <p className="label-caps text-ink-dim">Inspecciones</p>
             <h1 className="flex items-center gap-2 text-3xl font-semibold tracking-tight md:text-4xl">
               <Icon name="ship" className="size-7 shrink-0 text-ink-dim" />
-              <span className="truncate">{nombreBuque}</span>
+              <span className="truncate" style={{ viewTransitionName: transicionNombreBuque(buqueId) }}>
+                {nombreBuque}
+              </span>
             </h1>
           </div>
         </div>
@@ -167,6 +171,7 @@ export function ListaInspeccionesPage({ buqueId }: { buqueId: number }) {
           {estado.resultados.map((inspeccion) => (
             <TarjetaInspeccion
               key={inspeccion.id}
+              className="animar-entrada"
               inspeccion={inspeccion}
               eliminando={eliminandoId === inspeccion.id}
               alEliminar={() => eliminar(inspeccion)}
