@@ -30,8 +30,8 @@ Branch: `feat/reporte-inspeccion-pdf` · Delivery: single PR · Runners: `uv run
 | T2 | S10 | inline | done | RED: 2 failing (urlReporte, link); GREEN: pnpm test 163/163, lint and build clean |
 | T3 | docs | inline | done | AGENTS.md (API, key files, tests, frontend) |
 | T4 | S11-S13, S15, S1 | inline | done | RED: ImportError ReporteInspeccion; GREEN: test_reporte_edicion 9/9, suite 252 OK; PDF reviewed with a rolled-back draft |
-| T5 | S14, S10 | inline | pending | — |
-| T6 | docs | inline | pending | — |
+| T5 | S14, S10 | inline | done | RED: 4 failing + ReportePage missing; GREEN: pnpm test 170/170, lint and build clean |
+| T6 | docs | inline | done | AGENTS.md (draft models/API, PDF rules, editor screen) |
 
 ## Log
 
