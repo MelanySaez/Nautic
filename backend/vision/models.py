@@ -255,3 +255,48 @@ class FotoInspeccion(models.Model):
 
     def __str__(self):
         return f"Foto #{self.pk} [{self.estado}] — {self.seccion.codigo} / Insp.{self.inspeccion_id}"
+
+
+class ReporteInspeccion(models.Model):
+    """
+    Editable draft of an inspection's report: the inspector's texts.
+    Created on the first save; the PDF is generated from it (see ``vision/reporte.py``).
+    """
+    inspeccion = models.OneToOneField(
+        InspeccionCasco,
+        on_delete=models.CASCADE,
+        related_name='reporte',
+    )
+    conclusion = models.TextField(blank=True, default='')
+    observaciones = models.TextField(blank=True, default='')
+    recomendaciones = models.TextField(blank=True, default='')
+    inspector_nombre = models.CharField(max_length=255, blank=True, default='')
+    inspector_cargo = models.CharField(max_length=255, blank=True, default='')
+    fecha_modificacion = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'reporte_inspeccion'
+
+    def __str__(self):
+        return f"Reporte de la inspección #{self.inspeccion_id}"
+
+
+class ValidacionFoto(models.Model):
+    """
+    Inspector's review of one photo's findings for the report: the anomaly
+    classes discarded as false positives and a free note.
+    """
+    foto = models.OneToOneField(
+        FotoInspeccion,
+        on_delete=models.CASCADE,
+        related_name='validacion',
+    )
+    descartadas = models.JSONField(default=list, blank=True)  # class names, e.g. ["paint_peel"]
+    nota = models.TextField(blank=True, default='')
+    fecha_modificacion = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'validacion_foto'
+
+    def __str__(self):
+        return f"Validación de la foto #{self.foto_id}"

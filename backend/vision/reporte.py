@@ -22,7 +22,7 @@ from reportlab.platypus import (
 )
 
 from .almacenamiento import leer_archivo
-from .models import FotoInspeccion, NivelSeveridad
+from .models import FotoInspeccion, NivelSeveridad, ReporteInspeccion, ValidacionFoto
 from .taxonomia import TIPO_COMPONENTE, info_clase
 
 logger = logging.getLogger(__name__)
@@ -49,8 +49,11 @@ def _peor(*severidades):
     return peor if _nivel(peor) else None
 
 
-def _hallazgos(detecciones):
-    """Anomalies of one photo (everything except known components), with taxonomy."""
+def _hallazgos(detecciones, descartadas=()):
+    """Anomalies of one photo (everything except known components), with taxonomy.
+
+    ``descartado`` marks the classes the inspector dismissed as false positives.
+    """
     hallazgos = []
     for det in detecciones or []:
         clase = det.get('class_name', '')
@@ -63,8 +66,14 @@ def _hallazgos(detecciones):
             'severidad': info['severidad'],
             'total': det.get('count') or 0,
             'confianza_max': det.get('max_confidence'),
+            'descartado': clase in descartadas,
         })
     return hallazgos
+
+
+def clases_anomalia(foto):
+    """Class names of a photo's anomalies: the only ones the inspector can discard."""
+    return {h['clase'] for h in _hallazgos(foto.detecciones)}
 
 
 def _acumular(acumulado, hallazgos):
@@ -72,7 +81,7 @@ def _acumular(acumulado, hallazgos):
     for h in hallazgos:
         actual = acumulado.get(h['clase'])
         if actual is None:
-            acumulado[h['clase']] = dict(h)
+            acumulado[h['clase']] = {k: v for k, v in h.items() if k != 'descartado'}
             continue
         actual['total'] += h['total']
         confianzas = [c for c in (actual['confianza_max'], h['confianza_max']) if c is not None]
@@ -87,32 +96,77 @@ def _seccion_ref(seccion):
     return {'codigo': seccion.codigo, 'nombre': seccion.nombre}
 
 
+def validacion_de(foto):
+    """The photo's ``ValidacionFoto`` or None (reverse one-to-one raises when missing)."""
+    try:
+        return foto.validacion
+    except ValidacionFoto.DoesNotExist:
+        return None
+
+
+def borrador_de(inspeccion):
+    """The inspection's ``ReporteInspeccion`` or None when it was never saved."""
+    try:
+        return inspeccion.reporte
+    except ReporteInspeccion.DoesNotExist:
+        return None
+
+
+def fotos_revisables(inspeccion):
+    """Analyzed photos with at least one anomaly, each with its findings and the inspector's review."""
+    fotos = (inspeccion.fotos.filter(estado=FotoInspeccion.Estado.COMPLETADA)
+             .select_related('seccion', 'validacion').order_by('fecha_creacion', 'id'))
+    revisables = []
+    for foto in fotos:
+        validacion = validacion_de(foto)
+        hallazgos = _hallazgos(foto.detecciones, validacion.descartadas if validacion else ())
+        if hallazgos:
+            revisables.append((foto, validacion, sorted(
+                hallazgos, key=lambda h: (-_nivel(h['severidad']), -h['total'], h['etiqueta']))))
+    return revisables
+
+
+_CAMPOS_BORRADOR = ('conclusion', 'observaciones', 'recomendaciones', 'inspector_nombre', 'inspector_cargo')
+
+
 def datos_reporte(inspeccion):
-    """Everything the report shows, computed from the inspection's stored data."""
+    """Everything the report shows, from the stored data plus the inspector's draft.
+
+    Findings the inspector discarded are left out of every count, severity and
+    of the photo evidence.
+    """
     buque = inspeccion.buque
-    fotos = list(inspeccion.fotos.select_related('seccion').order_by('fecha_creacion', 'id'))
+    borrador = borrador_de(inspeccion)
+    fotos = list(inspeccion.fotos.select_related('seccion', 'validacion').order_by('fecha_creacion', 'id'))
     analizadas = [f for f in fotos if f.estado == FotoInspeccion.Estado.COMPLETADA]
 
     anomalias = {}
     por_seccion = {}
     evidencia = []
+    descartados = 0
     for foto in analizadas:
-        hallazgos = _hallazgos(foto.detecciones)
+        validacion = validacion_de(foto)
+        todos = _hallazgos(foto.detecciones, validacion.descartadas if validacion else ())
+        descartados += sum(h['descartado'] for h in todos)
+        hallazgos = [h for h in todos if not h['descartado']]
+        severidad = _peor(*(h['severidad'] for h in hallazgos))
         _acumular(anomalias, hallazgos)
         fila = por_seccion.setdefault(foto.seccion_id, {
             **_seccion_ref(foto.seccion), 'orden': foto.seccion.orden,
             'fotos': 0, 'severidad': None, 'por_clase': {},
         })
         fila['fotos'] += 1
-        fila['severidad'] = _peor(fila['severidad'], foto.severidad)
+        fila['severidad'] = _peor(fila['severidad'], severidad)
         _acumular(fila['por_clase'], hallazgos)
         if hallazgos:
             evidencia.append({
                 'foto_id': foto.id,
                 'seccion': _seccion_ref(foto.seccion),
-                'severidad': foto.severidad,
+                'severidad': severidad,
                 'clave_imagen': foto.imagen_anotada or foto.imagen_original,
                 'hallazgos': _ordenar_hallazgos({h['clase']: h for h in hallazgos}),
+                'nota': validacion.nota if validacion else '',
+                'con_descartes': any(h['descartado'] for h in todos),
             })
 
     secciones = sorted(por_seccion.values(), key=lambda s: (-_nivel(s['severidad']), s['orden'], s['codigo']))
@@ -125,6 +179,7 @@ def datos_reporte(inspeccion):
 
     modelos = sorted({(f.modelo_id, f.modelo_version) for f in analizadas if f.modelo_id},
                      key=lambda m: (m[0], m[1] or ''))
+    textos = {campo: getattr(borrador, campo) if borrador else '' for campo in _CAMPOS_BORRADOR}
 
     return {
         'inspeccion': {
@@ -132,7 +187,8 @@ def datos_reporte(inspeccion):
             'codigo': 'INS-%04d' % inspeccion.id,
             'nombre': inspeccion.nombre,
             'descripcion': inspeccion.descripcion,
-            'tomado_por': inspeccion.tomado_por,
+            'tomado_por': textos['inspector_nombre'] or inspeccion.tomado_por,
+            'cargo': textos['inspector_cargo'],
             'fecha': inspeccion.fecha_creacion,
         },
         'buque': {
@@ -142,7 +198,7 @@ def datos_reporte(inspeccion):
             'ficha': [(etiqueta, getattr(buque, campo), unidad) for etiqueta, campo, unidad in _FICHA_BUQUE],
         },
         'resumen': {
-            'severidad_max': NivelSeveridad.a_texto(inspeccion.severidad_max),
+            'severidad_max': _peor(*(a['severidad'] for a in anomalias.values())),
             'fotos_total': len(fotos),
             'fotos_analizadas': len(analizadas),
             'fotos_error': sum(f.estado == FotoInspeccion.Estado.ERROR for f in fotos),
@@ -162,7 +218,9 @@ def datos_reporte(inspeccion):
         'metodologia': {
             'modelos': [{'modelo': m, 'version': v} for m, v in modelos],
             'taxonomias': sorted({f.taxonomia_version for f in analizadas if f.taxonomia_version}),
+            'revision': {'revisado': borrador is not None, 'descartados': descartados},
         },
+        'borrador': textos,
     }
 
 
@@ -209,6 +267,11 @@ def _txt(valor):
     """Escape user text for Paragraph markup; blank becomes a dash."""
     texto = (valor or '').strip() if isinstance(valor, str) else valor
     return escape(str(texto)) if texto not in (None, '') else '—'
+
+
+def _multilinea(valor):
+    """Escaped user text keeping its line breaks."""
+    return '<br/>'.join(escape(linea) for linea in valor.strip().splitlines())
 
 
 def _fecha(valor):
@@ -280,7 +343,8 @@ def _encabezado(datos, e):
         [Paragraph('<b>Buque</b>', e['celda']),
          Paragraph(f"{_txt(buque['nombre'])} · {_txt(buque['tipo'])} · {_txt(buque['etapa'])}", e['celda'])],
         [Paragraph('<b>Fecha</b>', e['celda']), Paragraph(fecha, e['celda'])],
-        [Paragraph('<b>Inspector</b>', e['celda']), Paragraph(_txt(insp['tomado_por']), e['celda'])],
+        [Paragraph('<b>Inspector</b>', e['celda']),
+         Paragraph(_txt(insp['tomado_por']) + (f" · {_txt(insp['cargo'])}" if insp['cargo'] else ''), e['celda'])],
         [Paragraph('<b>Descripción</b>', e['celda']), Paragraph(_txt(insp['descripcion']), e['celda'])],
     ]
     return [
@@ -335,6 +399,11 @@ def _resumen(datos, e):
         peores = ', '.join(f"{_txt(s['codigo'])} · {_txt(s['nombre'])} ({_severidad(s['severidad'], False)})"
                            for s in r['peores_secciones'])
         bloque += [Spacer(1, 6), Paragraph(f'<b>Secciones más comprometidas:</b> {peores}', e['texto'])]
+
+    conclusion = datos['borrador']['conclusion']
+    if conclusion:
+        bloque += [Spacer(1, 6), Paragraph('<b>Conclusión del inspector</b>', e['texto']),
+                   Paragraph(_multilinea(conclusion), e['texto'])]
     return bloque
 
 
@@ -369,10 +438,13 @@ def _por_seccion(datos, e):
 
 
 def _evidencia(datos, e):
-    bloque = [Paragraph('4. Evidencia fotográfica', e['h2'])]
+    titulo = Paragraph('4. Evidencia fotográfica', e['h2'])
     if not datos['evidencia']:
-        return bloque + [Paragraph('No hay fotos con anomalías.', e['texto'])]
-    bloque.append(Paragraph('Fotos analizadas con al menos una anomalía, con las detecciones del modelo.', e['tenue']))
+        return [titulo, Paragraph('No hay fotos con anomalías.', e['texto'])]
+    bloque = []
+    origen = ('confirmadas por el inspector' if datos['metodologia']['revision']['revisado']
+              else 'detectadas por el modelo')
+    intro = Paragraph(f'Fotos analizadas con al menos una anomalía, con las anomalías {origen}.', e['tenue'])
     for item in datos['evidencia']:
         imagen = _imagen(item['clave_imagen']) or Paragraph('Imagen no disponible.', e['tenue'])
         detalle = [
@@ -383,6 +455,12 @@ def _evidencia(datos, e):
             Spacer(1, 3),
             Paragraph(_lista_hallazgos(item['hallazgos']), e['celda']),
         ]
+        if item['nota']:
+            detalle += [Spacer(1, 4), Paragraph(f"<b>Nota del inspector:</b> {_multilinea(item['nota'])}", e['celda'])]
+        if item['con_descartes']:
+            # The annotated image was drawn by the model and still shows every detection.
+            detalle += [Spacer(1, 4), Paragraph('La imagen muestra todas las detecciones del modelo, incluidas las '
+                                                'que el inspector descartó.', e['tenue'])]
         fila = Table([[imagen, detalle]], colWidths=[_ANCHO_IMAGEN + 4 * mm, _ANCHO_UTIL - _ANCHO_IMAGEN - 4 * mm])
         fila.setStyle(TableStyle([
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
@@ -390,8 +468,9 @@ def _evidencia(datos, e):
             ('TOPPADDING', (0, 0), (-1, -1), 6),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
         ]))
-        bloque.append(KeepTogether(fila))
-    return bloque
+        bloque.append(fila)
+    # The heading travels with the first photo, so it never ends a page alone.
+    return [KeepTogether([titulo, intro, bloque[0]])] + [KeepTogether(f) for f in bloque[1:]]
 
 
 def _no_inspeccionadas(datos, e):
@@ -422,28 +501,58 @@ def _metodologia(datos, e):
         Paragraph(f'<b>Modelos de visión:</b> {modelos}', e['texto']),
         Paragraph(f'<b>Versión de la taxonomía:</b> {taxonomias}', e['texto']),
         Spacer(1, 4),
-        Paragraph('Las anomalías de este reporte fueron detectadas automáticamente por un modelo de visión '
-                  'artificial y no han sido validadas por una persona. La confianza indica la certeza del '
-                  'modelo, no la gravedad del daño. Un inspector calificado debe confirmar los hallazgos '
-                  'antes de tomar decisiones de mantenimiento.', e['tenue']),
+        Paragraph(_aviso_revision(m['revision']), e['tenue']),
     ]
 
 
-def _firma(e):
-    lineas = Table([[''] for _ in range(5)], colWidths=[_ANCHO_UTIL], rowHeights=[8 * mm] * 5)
+def _aviso_revision(revision):
+    base = ('Las anomalías fueron detectadas automáticamente por un modelo de visión artificial. '
+            'La confianza indica la certeza del modelo, no la gravedad del daño. ')
+    if not revision['revisado']:
+        return base + ('Los hallazgos no han sido revisados por una persona: un inspector calificado debe '
+                       'confirmarlos antes de tomar decisiones de mantenimiento.')
+    descartados = revision['descartados']
+    detalle = (f'descartó {descartados} hallazgo(s) como falsos positivos, que no se incluyen en este reporte.'
+               if descartados else 'no descartó ningún hallazgo.')
+    return base + f'El inspector revisó los hallazgos y {detalle}'
+
+
+
+def _lineas_en_blanco(cantidad):
+    lineas = Table([[''] for _ in range(cantidad)], colWidths=[_ANCHO_UTIL], rowHeights=[8 * mm] * cantidad)
     lineas.setStyle(TableStyle([('LINEBELOW', (0, 0), (-1, -1), 0.4, _LINEA)]))
+    return lineas
+
+
+def _texto_o_lineas(titulo, texto, e):
+    """A titled block with the inspector's text, or blank lines to write by hand."""
+    cuerpo = Paragraph(_multilinea(texto), e['texto']) if texto else _lineas_en_blanco(3)
+    return [Paragraph(f'<b>{titulo}</b>', e['texto']), Spacer(1, 2), cuerpo, Spacer(1, 8)]
+
+
+def _firma(datos, e):
+    borrador = datos['borrador']
+    nombre = borrador['inspector_nombre']
+    firmante = (f"{_txt(nombre)}" + (f" · {_txt(borrador['inspector_cargo'])}" if borrador['inspector_cargo'] else '')
+                if nombre else '')
     # A blank middle column separates the two signature lines.
     firma = Table(
-        [['', '', ''], [Paragraph('Nombre y firma del inspector', e['tenue']), '', Paragraph('Fecha', e['tenue'])]],
+        [[Paragraph(firmante, e['texto']), '', ''],
+         [Paragraph('Nombre y firma del inspector', e['tenue']), '', Paragraph('Fecha', e['tenue'])]],
         colWidths=[_ANCHO_UTIL * 0.55, _ANCHO_UTIL * 0.1, _ANCHO_UTIL * 0.35], rowHeights=[16 * mm, None],
     )
     firma.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, 0), 'BOTTOM'),
         ('LINEBELOW', (0, 0), (0, 0), 0.6, _TINTA),
         ('LINEBELOW', (2, 0), (2, 0), 0.6, _TINTA),
     ]))
+    # Kept together so the signature never lands alone on a page (KeepTogether still
+    # splits the block when long texts make it taller than a page).
     return [KeepTogether([
         Paragraph('7. Observaciones y recomendaciones del inspector', e['h2']),
-        lineas, Spacer(1, 6), firma,
+        *_texto_o_lineas('Observaciones', borrador['observaciones'], e),
+        *_texto_o_lineas('Recomendaciones', borrador['recomendaciones'], e),
+        Spacer(1, 6), firma,
     ])]
 
 
@@ -468,7 +577,7 @@ def generar_pdf(inspeccion):
     )
     historia = (
         _encabezado(datos, e) + _resumen(datos, e) + _ficha(datos, e) + _por_seccion(datos, e)
-        + _evidencia(datos, e) + _no_inspeccionadas(datos, e) + _metodologia(datos, e) + _firma(e)
+        + _evidencia(datos, e) + _no_inspeccionadas(datos, e) + _metodologia(datos, e) + _firma(datos, e)
     )
     doc.build(historia, onFirstPage=numerar, onLaterPages=numerar)
     return salida.getvalue()

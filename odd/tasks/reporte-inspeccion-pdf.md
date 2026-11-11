@@ -5,7 +5,7 @@ Branch: `feat/reporte-inspeccion-pdf` · Delivery: single PR · Runners: `uv run
 
 ## Specs
 
-- S1 — Format: "pdf descargable" generated in the backend. `GET /api/vision/inspecciones/<id>/reporte/` returns `application/pdf` as an attachment named `reporte-inspeccion-<id>.pdf`; 404 when the inspection does not exist.
+- S1 — Format: "pdf descargable" generated in the backend. `GET /api/vision/inspecciones/<id>/reporte/pdf/` returns `application/pdf` as an attachment named `reporte-inspeccion-<id>.pdf`; 404 when the inspection does not exist.
 - S2 — Header: inspection name and code (`INS-<id>`), vessel (name, type, stage), creation date, inspector (`tomado_por`, "—" when blank) and description.
 - S3 — Executive summary: maximum severity; photos analyzed / failed / pending; anomaly count per class with its severity; the 3 worst sections; coverage "X de Y secciones" (sections with at least one analyzed photo over the vessel's sections).
 - S4 — Vessel data: short technical sheet (eslora, manga, calado, desplazamiento; "—" when unset).
@@ -14,7 +14,12 @@ Branch: `feat/reporte-inspeccion-pdf` · Delivery: single PR · Runners: `uv run
 - S7 — Sections not inspected: vessel sections with no analyzed photo.
 - S8 — Methodology: models and versions used, taxonomy version, and a notice that detections are automatic and must be validated by an inspector.
 - S9 — Inspector observations and signature: blank space to fill by hand (no new data; assumption from the approved proposal).
-- S10 — Frontend: a "Descargar reporte" action on the inspection results page downloads the PDF.
+- S10 — Frontend: the results page links to the report editor (S14); the PDF is downloaded from there.
+- S11 — "primero se pueda editar el reporte y ya de ahi generarlo en un pdf": the report has a stored editable draft per inspection (one per inspection, created on first save): conclusion, observations, recommendations, inspector name and position (texts, all optional).
+- S12 — Validate findings ("Textos + validar hallazgos"): per analyzed photo with anomalies, the inspector can discard anomaly classes as false positives and add a note. Validation is stored per photo and survives until the photo is deleted.
+- S13 — API: `GET /api/vision/inspecciones/<id>/reporte/` returns the draft (texts, `actualizado`) and the reviewable photos with their anomalies and `descartado` flag; `PATCH` updates only the sent texts and photo validations. Unknown fields, photos of another inspection, non-analyzed photos or classes the photo does not have return 400 with `campos`, and nothing is saved.
+- S14 — Frontend: `/inspecciones/:id/reporte` editor: texts, inspector data, photo list with a confirm/discard toggle per anomaly and a note; "Guardar"; "Descargar PDF" reflects the saved draft (disabled while there are unsaved changes).
+- S15 — PDF uses the draft: discarded anomalies are excluded from every count, section severity, max severity and evidence (a photo with all anomalies discarded leaves the evidence); photo notes appear in the evidence; section 7 prints conclusion, observations, recommendations and the inspector name/position above the signature (blank lines when empty); the methodology notice states whether findings were reviewed and how many were discarded; the header inspector uses the draft name when set, else `tomado_por`.
 - Assumption: the report is generated even while photos are pending; the summary states how many are not analyzed.
 
 ## Tasks
@@ -24,6 +29,9 @@ Branch: `feat/reporte-inspeccion-pdf` · Delivery: single PR · Runners: `uv run
 | T1 | S1-S9 | inline | done | RED: ModuleNotFoundError vision.reporte; GREEN: 8/8, suite 241 OK; sample PDF rendered and reviewed |
 | T2 | S10 | inline | done | RED: 2 failing (urlReporte, link); GREEN: pnpm test 163/163, lint and build clean |
 | T3 | docs | inline | done | AGENTS.md (API, key files, tests, frontend) |
+| T4 | S11-S13, S15, S1 | inline | done | RED: ImportError ReporteInspeccion; GREEN: test_reporte_edicion 9/9, suite 252 OK; PDF reviewed with a rolled-back draft |
+| T5 | S14, S10 | inline | pending | — |
+| T6 | docs | inline | pending | — |
 
 ## Log
 
@@ -36,3 +44,7 @@ Branch: `feat/reporte-inspeccion-pdf` · Delivery: single PR · Runners: `uv run
 - L7: independent verifier: PASS on S1-S10, no blockers; reportlab 4.2.5 (BSD) and chardet 7.7.0 (0BSD) ship wheels, no apt packages. Advisory reproduced: `Accept: application/pdf` alone returned 406 (DRF JSON-only negotiation); fixed with a PDF renderer and pinned by `test_acepta_clientes_que_solo_piden_pdf`. Suite 242 OK.
 - L8: gentle-ai review (risk, resilience, reliability) on main..4d59a45: approved and acknowledged (lineage review-229136c212c801d7). Informational advisories: synchronous generation with no rate limit or cache (R1-001, R3, R4); full-resolution decode before thumbnail (R4); with Accept: application/pdf only, 404/500 bodies are JSON labeled as PDF (R3); render paths beyond magic bytes untested (R3, suggestion).
 - L9 (2026-11-10, user): "si, corrige 1 y 2 y abre el PR". Fixed: downscale before RGB convert with JPEG draft (peak RSS for a 24 MP JPEG: 117 MB -> ~0 MB extra); PDF-negotiated error bodies now served as application/json (RED: 'application/pdf' != 'application/json'; pinned by test_error_pedido_como_pdf_se_sirve_como_json). Suite 243 OK. Rate limit / async generation left as follow-up.
+- L10 (2026-11-10, user): "por ahora me gusta la idea, pero me gustaria q primero se pueda editar el reporte y ya de ahi generarlo en un pdf, ademas eso cobra mas sentiod ya q all final hay una parte que dice observaciones del inspector entonces si o si debe existir algo para editar"
+- L11 (2026-11-10, user choice): "Textos + validar hallazgos (Recomendado)" — conclusion, observations, recommendations, inspector name/position; discard AI false positives and add a note per photo; the PDF includes only confirmed findings. No draft/issued state.
+- L12: design: `ReporteInspeccion` (1:1 inspection) + `ValidacionFoto` (1:1 photo, cascade; `descartadas` list of class names, `nota`). PDF moves to `/reporte/pdf/` (PR #39 not merged yet, no client depends on the old path). Risk: item 1 (migration 0010 adds two tables; no existing data changed).
+- L13: T4 visual review: evidence heading orphaned at a page end and the signature alone on the last page; fixed with KeepTogether. The annotated image still shows discarded detections (drawn by the model); the evidence states it. Applied migration 0010 to the dev DB (additive: two new tables).

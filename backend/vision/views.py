@@ -11,9 +11,8 @@ from django.http import HttpResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
-from rest_framework.decorators import api_view, parser_classes, renderer_classes
+from rest_framework.decorators import api_view, parser_classes
 from rest_framework.parsers import MultiPartParser, FormParser
-from rest_framework.renderers import BaseRenderer, JSONRenderer
 from rest_framework.response import Response
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample
 from drf_spectacular.types import OpenApiTypes
@@ -32,7 +31,6 @@ from .models import (
     nombre_por_defecto, recalcular_severidad_max,
 )
 from .pubsub import publicar_evento, suscribirse
-from .reporte import generar_pdf
 from .ratelimit import check_upload_rate, get_client_ip, track_concurrent_start
 from .secciones import seccion_to_dict
 from .taxonomia import color_clase, enriquecer_detecciones, info_clase, listar_taxonomia
@@ -669,54 +667,6 @@ def api_vision_inspeccion_detalle(request, inspeccion_id):
 # ─────────────────────────────────────────────────────────────────────────────
 # Endpoints — Fotos
 # ─────────────────────────────────────────────────────────────────────────────
-
-
-
-class _PdfRenderer(BaseRenderer):
-    """Lets clients that accept only ``application/pdf`` pass content negotiation.
-
-    The report itself is a plain ``HttpResponse``; this renderer only serves the
-    JSON error bodies (404, 500), as ``application/json``, when it is the negotiated one.
-    """
-    media_type = 'application/pdf'
-    format = 'pdf'
-    charset = None
-
-    def render(self, data, accepted_media_type=None, renderer_context=None):
-        if isinstance(data, bytes):
-            return data
-        # An error body (404, 500) is JSON: label it as such instead of as a corrupt PDF.
-        respuesta = (renderer_context or {}).get('response')
-        if respuesta is not None:
-            respuesta['Content-Type'] = 'application/json'
-        return json.dumps(data).encode('utf-8')
-
-@extend_schema(
-    tags=['Visión IA'],
-    summary='Reporte PDF de una inspección',
-    description=(
-        'Genera el reporte de la inspección en PDF (adjunto `reporte-inspeccion-<id>.pdf`): '
-        'resumen ejecutivo, datos del buque, hallazgos por sección, evidencia fotográfica de las '
-        'fotos con anomalías, secciones no inspeccionadas, metodología y espacio para observaciones '
-        'y firma del inspector. Se genera aunque haya fotos pendientes; el resumen lo indica.'
-    ),
-    responses={(200, 'application/pdf'): OpenApiTypes.BINARY, 404: OpenApiTypes.OBJECT},
-)
-@api_view(['GET'])
-@renderer_classes([JSONRenderer, _PdfRenderer])
-def api_vision_inspeccion_reporte(request, inspeccion_id):
-    """
-    GET /api/vision/inspecciones/<id>/reporte/  → PDF adjunto
-    """
-    inspeccion = get_object_or_404(InspeccionCasco.objects.select_related('buque'), pk=inspeccion_id)
-    try:
-        pdf = generar_pdf(inspeccion)
-    except Exception:
-        logger.exception("No se pudo generar el reporte de la inspección %s", inspeccion_id)
-        return Response({'error': 'No se pudo generar el reporte.'}, status=500)
-    respuesta = HttpResponse(pdf, content_type='application/pdf')
-    respuesta['Content-Disposition'] = f'attachment; filename="reporte-inspeccion-{inspeccion.id}.pdf"'
-    return respuesta
 
 @extend_schema(
     tags=['Inspección IA'],

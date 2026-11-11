@@ -112,7 +112,7 @@ class DescargarReporteTests(TestCase):
         self.insp = InspeccionCasco.objects.create(buque=buque, nombre='Dique 2026')
 
     def _url(self, inspeccion_id):
-        return f'/api/vision/inspecciones/{inspeccion_id}/reporte/'
+        return f'/api/vision/inspecciones/{inspeccion_id}/reporte/pdf/'
 
     def test_descarga_un_pdf_adjunto(self):
         clave = default_storage.save('inspecciones/originales/a.png', ContentFile(png_bytes(64)))
