@@ -83,6 +83,13 @@ def _parse_param_entero(valor, defecto, minimo, maximo=None):
     return numero
 
 
+def _parse_booleano(valor):
+    """Parse an optional boolean query flag: absent means False, unknown text means None."""
+    if valor is None:
+        return False
+    return {'true': True, '1': True, 'false': False, '0': False}.get(valor.strip().lower())
+
+
 def _validar_valor(nombre, valor):
     """
     Type-check one incoming value against its model field.
@@ -194,6 +201,8 @@ def _validar_secciones_buque(data):
                          description='Posición inicial (>= 0, por defecto 0)'),
         OpenApiParameter('limit', int, OpenApiParameter.QUERY, required=False,
                          description=f'Cantidad de resultados (1-{_LIMIT_MAXIMO}, por defecto {_LIMIT_POR_DEFECTO})'),
+        OpenApiParameter('con_inspecciones', bool, OpenApiParameter.QUERY, required=False,
+                         description='true/1: solo buques con al menos una inspección; false/0 o ausente: todos'),
     ],
     responses={200: OpenApiTypes.OBJECT, 400: OpenApiTypes.OBJECT},
 )
@@ -283,12 +292,21 @@ def api_buques(request):
                 {'error': f'offset debe ser un entero >= 0 y limit un entero entre 1 y {_LIMIT_MAXIMO}.'},
                 status=400,
             )
-        qs = Buque.objects.order_by('nombre', 'id')
+        con_inspecciones = _parse_booleano(request.query_params.get('con_inspecciones'))
+        if con_inspecciones is None:
+            return Response({'error': 'con_inspecciones debe ser true, false, 1 o 0.'}, status=400)
+        qs = Buque.objects.annotate(total_inspecciones=models.Count('inspecciones_casco'))
+        if con_inspecciones:
+            qs = qs.filter(total_inspecciones__gt=0)
+        qs = qs.order_by('nombre', 'id')
         return Response({
             'total': qs.count(),
             'offset': offset,
             'limit': limit,
-            'resultados': [_buque_resumen(b) for b in qs[offset:offset + limit]],
+            'resultados': [
+                {**_buque_resumen(b), 'total_inspecciones': b.total_inspecciones}
+                for b in qs[offset:offset + limit]
+            ],
         })
 
     # POST: create
