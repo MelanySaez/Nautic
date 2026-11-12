@@ -5,6 +5,7 @@ import {
   crearDependenciasFalsas,
   renderizarRutas,
   SECCION_QUILLA,
+  SOLO_LECTURA,
   unaFoto,
   unDetalle,
   unModelo,
@@ -317,5 +318,61 @@ describe('CargaPorZonaPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Reintentar' }))
 
     expect(await screen.findByRole('heading', { name: 'ARA Libertad' })).toBeInTheDocument()
+  })
+})
+
+describe('CargaPorZonaPage permissions', () => {
+  function conPermisos(permisos: Partial<typeof SOLO_LECTURA>, extra: Parameters<typeof unDetalle>[0] = {}) {
+    const falsas = preparar()
+    falsas.dependencias.inspecciones.obtener.mockResolvedValue(
+      unDetalle({
+        id: 7,
+        buqueId: 4,
+        buqueNombre: 'ARA Libertad',
+        fotos: [unaFoto({ id: 31, estado: 'pendiente' }), unaFoto({ id: 32, estado: 'error', errorDetalle: 'Falló' })],
+        misPermisos: { ...SOLO_LECTURA, ...permisos },
+        ...extra,
+      }),
+    )
+    return falsas.dependencias
+  }
+
+  it('lets a read-only member see the photos but not upload, delete, analyze or retry', async () => {
+    renderizar(conPermisos({}))
+
+    await elegirZona('KEEL')
+
+    expect(screen.getByLabelText('Subir fotos')).toBeDisabled()
+    expect(screen.getByLabelText('Tomar foto')).toBeDisabled()
+    expect(screen.getByText('No tienes permiso para subir fotos en esta inspección.')).toBeInTheDocument()
+    expect(screen.getAllByRole('listitem')).toHaveLength(2)
+    expect(screen.queryByRole('button', { name: 'Eliminar foto' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Reintentar análisis' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Iniciar análisis/ })).not.toBeInTheDocument()
+  })
+
+  it('lets a member who uploads but does not analyze delete photos without analyzing', async () => {
+    renderizar(conPermisos({ subirFotos: true }))
+
+    await elegirZona('KEEL')
+
+    expect(screen.getByLabelText('Subir fotos')).toBeEnabled()
+    expect(screen.getAllByRole('button', { name: 'Eliminar foto' })).toHaveLength(2)
+    expect(screen.queryByRole('button', { name: /Iniciar análisis/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Reintentar análisis' })).not.toBeInTheDocument()
+  })
+
+  it('lets a member who analyzes start the analysis and retry without deleting', async () => {
+    renderizar(conPermisos({ analizar: true }))
+
+    expect(await screen.findByRole('button', { name: /Iniciar análisis/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Reintentar análisis' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Eliminar foto' })).not.toBeInTheDocument()
+  })
+
+  it('marks a private inspection', async () => {
+    renderizar(conPermisos({}, { privada: true }))
+
+    expect(await screen.findByText('Privada')).toBeInTheDocument()
   })
 })

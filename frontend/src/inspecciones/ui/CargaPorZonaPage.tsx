@@ -12,6 +12,7 @@ import type { EventoInspeccion, Foto, SeccionCasco } from '../domain/inspeccion'
 import { modeloInicial } from '../domain/modelo'
 import { resumirProgreso } from '../domain/reglas'
 import { ColaFotos } from './ColaFotos'
+import { InsigniaPrivada } from './Insignias'
 import { MapaZonas } from './MapaZonas'
 import { SelectorModelo } from './SelectorModelo'
 import { useInspeccionEnVivo, type DatosInspeccion } from './useInspeccionEnVivo'
@@ -45,6 +46,7 @@ function mensajeAnalisis(error: unknown): string {
 function CargaPorZona({ datos, aplicar }: { datos: DatosInspeccion; aplicar: (evento: EventoInspeccion) => void }) {
   const { inspecciones } = useDependencias()
   const { detalle, secciones } = datos
+  const { subirFotos: puedeSubir, analizar: puedeAnalizar } = detalle.misPermisos
   const [zona, setZona] = useState<SeccionCasco | null>(null)
   const [subiendo, setSubiendo] = useState(0)
   const [errores, setErrores] = useState<string[]>([])
@@ -157,6 +159,7 @@ function CargaPorZona({ datos, aplicar }: { datos: DatosInspeccion; aplicar: (ev
         <div className="min-w-0 flex-1">
           <p className="label-caps text-ink-dim">Carga por zona · INS-{String(detalle.id).padStart(4, '0')}</p>
           <h1 className="truncate text-2xl font-semibold tracking-tight md:text-3xl">{detalle.buqueNombre}</h1>
+          {detalle.privada && <InsigniaPrivada />}
         </div>
       </header>
 
@@ -208,7 +211,7 @@ function CargaPorZona({ datos, aplicar }: { datos: DatosInspeccion; aplicar: (ev
                 type="file"
                 accept="image/*"
                 multiple
-                disabled={!zona}
+                disabled={!zona || !puedeSubir}
                 aria-label="Subir fotos"
                 className="sr-only"
                 onChange={(e) => {
@@ -225,7 +228,7 @@ function CargaPorZona({ datos, aplicar }: { datos: DatosInspeccion; aplicar: (ev
                 type="file"
                 accept="image/*"
                 capture="environment"
-                disabled={!zona}
+                disabled={!zona || !puedeSubir}
                 aria-label="Tomar foto"
                 className="sr-only"
                 onChange={(e) => {
@@ -235,6 +238,9 @@ function CargaPorZona({ datos, aplicar }: { datos: DatosInspeccion; aplicar: (ev
               />
             </label>
           </div>
+          {!puedeSubir && (
+            <p className="text-sm text-ink-muted">No tienes permiso para subir fotos en esta inspección.</p>
+          )}
           {subiendo > 0 && (
             <p className="label-caps text-info">
               Subiendo {subiendo} {subiendo === 1 ? 'foto' : 'fotos'}…
@@ -276,7 +282,7 @@ function CargaPorZona({ datos, aplicar }: { datos: DatosInspeccion; aplicar: (ev
             <p>Esta inspección todavía no tiene fotos.</p>
           </Vacio>
         ) : (
-          <ColaFotos fotos={detalle.fotos} modelos={modelos} ocupadas={ocupadas} alReintentar={reintentarFoto} reintentoBloqueado={catalogo.tipo === 'cargando' || sinModeloUsable} alEliminar={eliminarFoto} />
+          <ColaFotos fotos={detalle.fotos} modelos={modelos} ocupadas={ocupadas} alReintentar={reintentarFoto} reintentoBloqueado={catalogo.tipo === 'cargando' || sinModeloUsable} alEliminar={eliminarFoto} puedeReintentar={puedeAnalizar} puedeEliminar={puedeSubir} />
         )}
       </Tarjeta>
 
@@ -298,14 +304,16 @@ function CargaPorZona({ datos, aplicar }: { datos: DatosInspeccion; aplicar: (ev
           <EnlaceBoton to={`/vision/${detalle.id}/resultados`} variante="secundario" className="flex-1 sm:flex-none">
             Ver resultados
           </EnlaceBoton>
-          <Boton
-            onClick={analizar}
-            disabled={analizando || progreso.pendientes === 0 || catalogo.tipo === 'cargando' || sinModeloUsable}
-            className="flex-1 sm:flex-none"
-          >
-            <Icon name="search" className="size-4" />
-            Iniciar análisis
-          </Boton>
+          {puedeAnalizar && (
+            <Boton
+              onClick={analizar}
+              disabled={analizando || progreso.pendientes === 0 || catalogo.tipo === 'cargando' || sinModeloUsable}
+              className="flex-1 sm:flex-none"
+            >
+              <Icon name="search" className="size-4" />
+              Iniciar análisis
+            </Boton>
+          )}
         </div>
       </div>
     </div>

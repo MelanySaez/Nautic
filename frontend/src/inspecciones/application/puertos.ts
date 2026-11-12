@@ -10,6 +10,7 @@ import type {
   SeccionCasco,
 } from '../domain/inspeccion'
 import type { DetallePorInstancia } from '../domain/detecciones'
+import type { CambiosMiembro, Miembro, NuevoMiembro } from '../domain/miembros'
 import type { ModeloIA } from '../domain/modelo'
 
 export interface ResultadoAnalisis {
@@ -25,6 +26,8 @@ export interface InspeccionesRepository {
   /** Renames an inspection; a blank name makes the backend regenerate the default one. */
   renombrar(id: number, nombre: string): Promise<Inspeccion>
   eliminar(id: number): Promise<void>
+  /** Leader only: makes the inspection private (only leader and members see it) or public again. */
+  cambiarPrivacidad(id: number, privada: boolean): Promise<InspeccionDetalle>
   /** Hull sections declared by one vessel, in display order. */
   listarSecciones(buqueId: number): Promise<SeccionCasco[]>
   subirFoto(inspeccionId: number, seccionId: number, imagen: File): Promise<Foto>
@@ -41,6 +44,14 @@ export interface InspeccionesRepository {
   obtenerReporte(inspeccionId: number): Promise<BorradorReporte>
   /** Saves only the given texts and photo reviews; returns the updated draft. */
   guardarReporte(inspeccionId: number, cambios: CambiosReporte): Promise<BorradorReporte>
+}
+
+/** People the leader invited to an inspection, with their role and permissions. */
+export interface MiembrosInspeccion {
+  listar(inspeccionId: number): Promise<Miembro[]>
+  invitar(inspeccionId: number, datos: NuevoMiembro): Promise<Miembro>
+  actualizar(inspeccionId: number, miembroId: number, cambios: CambiosMiembro): Promise<Miembro>
+  quitar(inspeccionId: number, miembroId: number): Promise<void>
 }
 
 /** Catalog of AI models the backend can analyze with. */

@@ -10,8 +10,10 @@ import { Modal } from '../../shared/ui/Modal'
 import { clasesControlCompacto } from '../../shared/ui/clasesControl'
 import { mensajeDe } from '../../shared/ui/formato'
 import { resumirProgreso, severidadMaxima, tieneAnomalias } from '../domain/reglas'
+import type { InspeccionDetalle } from '../domain/inspeccion'
+import { EquipoInspeccion } from './EquipoInspeccion'
 import { FormularioNombre } from './FormularioNombre'
-import { InsigniaSeveridad } from './Insignias'
+import { InsigniaPrivada, InsigniaSeveridad } from './Insignias'
 import { TarjetaResultado } from './TarjetaResultado'
 import { useModelos } from './useModelos'
 import { useInspeccionEnVivo, type DatosInspeccion } from './useInspeccionEnVivo'
@@ -23,14 +25,20 @@ export function ResultadosRuta() {
 }
 
 export function ResultadosPage({ inspeccionId }: { inspeccionId: number }) {
-  const { estado, reintentar } = useInspeccionEnVivo(inspeccionId)
+  const { estado, reintentar, actualizarDetalle } = useInspeccionEnVivo(inspeccionId)
 
   if (estado.tipo === 'cargando') return <Cargando texto="Cargando resultados…" />
   if (estado.tipo === 'error') return <MensajeError mensaje={estado.mensaje} alReintentar={reintentar} />
-  return <Resultados datos={estado.datos} />
+  return <Resultados datos={estado.datos} alActualizarDetalle={actualizarDetalle} />
 }
 
-function Resultados({ datos }: { datos: DatosInspeccion }) {
+function Resultados({
+  datos,
+  alActualizarDetalle,
+}: {
+  datos: DatosInspeccion
+  alActualizarDetalle: (cambio: Partial<Omit<InspeccionDetalle, 'fotos'>>) => void
+}) {
   const { detalle, secciones } = datos
   const { inspecciones } = useDependencias()
   const [zonaId, setZonaId] = useState('')
@@ -78,18 +86,23 @@ function Resultados({ datos }: { datos: DatosInspeccion }) {
         <div className="min-w-0 flex-1">
           <p className="label-caps text-ink-dim">Resultados del análisis · INS-{String(detalle.id).padStart(4, '0')}</p>
           <h1 className="truncate text-2xl font-semibold tracking-tight md:text-3xl">{nombre}</h1>
-          <p className="truncate text-sm text-ink-muted">{detalle.buqueNombre}</p>
+          <p className="flex items-center gap-2 text-sm text-ink-muted">
+            <span className="truncate">{detalle.buqueNombre}</span>
+            {detalle.privada && <InsigniaPrivada />}
+          </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Boton
-            variante="secundario"
-            onClick={() => {
-              setErrorNombre(null)
-              setRenombrando(true)
-            }}
-          >
-            Renombrar inspección
-          </Boton>
+          {detalle.misPermisos.editarInspeccion && (
+            <Boton
+              variante="secundario"
+              onClick={() => {
+                setErrorNombre(null)
+                setRenombrando(true)
+              }}
+            >
+              Renombrar inspección
+            </Boton>
+          )}
           <EnlaceBoton variante="secundario" to={`/inspecciones/${detalle.id}/reporte`}>
             Reporte
           </EnlaceBoton>
@@ -158,6 +171,8 @@ function Resultados({ datos }: { datos: DatosInspeccion }) {
           </div>
         </>
       )}
+
+      <EquipoInspeccion detalle={detalle} alCambiarDetalle={alActualizarDetalle} />
     </div>
   )
 }

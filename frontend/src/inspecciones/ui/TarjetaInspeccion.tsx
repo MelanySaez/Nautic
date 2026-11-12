@@ -2,20 +2,23 @@ import { Enlace } from '../../shared/ui/Enlace'
 import { Icon } from '../../shared/ui/Icon'
 import { formatearFecha } from '../../shared/ui/formato'
 import type { Inspeccion } from '../domain/inspeccion'
-import { InsigniaSeveridad } from './Insignias'
+import { InsigniaPrivada, InsigniaSeveridad } from './Insignias'
 
 export function TarjetaInspeccion({
   inspeccion,
+  puedeEliminar,
   eliminando,
   alEliminar,
   className = '',
 }: {
   inspeccion: Inspeccion
   className?: string
+  /** Only the leader (or an admin) may delete it. */
+  puedeEliminar: boolean
   eliminando: boolean
   alEliminar: () => void
 }) {
-  const { id, nombre, severidadMax, descripcion, tomadoPor, fechaCreacion, totalFotos } = inspeccion
+  const { id, nombre, severidadMax, descripcion, tomadoPor, fechaCreacion, totalFotos, privada } = inspeccion
 
   return (
     <article
@@ -33,17 +36,22 @@ export function TarjetaInspeccion({
               {nombre}
             </Enlace>
           </h3>
-          <p className="label-caps text-ink-dim">INS-{String(id).padStart(4, '0')}</p>
+          <p className="label-caps flex items-center gap-2 text-ink-dim">
+            INS-{String(id).padStart(4, '0')}
+            {privada && <InsigniaPrivada />}
+          </p>
         </div>
-        <button
-          type="button"
-          onClick={alEliminar}
-          disabled={eliminando}
-          aria-label="Eliminar inspección"
-          className="relative z-10 rounded p-2 text-ink-dim hover:bg-critical-bg hover:text-critical disabled:opacity-50"
-        >
-          <Icon name="trash" />
-        </button>
+        {puedeEliminar && (
+          <button
+            type="button"
+            onClick={alEliminar}
+            disabled={eliminando}
+            aria-label="Eliminar inspección"
+            className="relative z-10 rounded p-2 text-ink-dim hover:bg-critical-bg hover:text-critical disabled:opacity-50"
+          >
+            <Icon name="trash" />
+          </button>
+        )}
       </div>
 
       <p className="line-clamp-2 min-h-10 text-sm text-ink-muted">{descripcion || 'Sin descripción.'}</p>

@@ -37,7 +37,11 @@ export function ReporteRuta() {
 
 export function ReportePage({ inspeccionId }: { inspeccionId: number }) {
   const { inspecciones } = useDependencias()
-  const cargar = useCallback(() => inspecciones.obtenerReporte(inspeccionId), [inspecciones, inspeccionId])
+  const cargar = useCallback(async () => {
+    // The draft does not say what the user may do; the inspection detail does.
+    const [borrador, detalle] = await Promise.all([inspecciones.obtenerReporte(inspeccionId), inspecciones.obtener(inspeccionId)])
+    return { borrador, puedeEditar: detalle.misPermisos.editarReporte }
+  }, [inspecciones, inspeccionId])
   const { estado, reintentar } = useRecurso(cargar)
 
   if (estado.tipo === 'cargando') return <Cargando texto="Cargando reporte…" />
@@ -48,7 +52,7 @@ export function ReportePage({ inspeccionId }: { inspeccionId: number }) {
       </Marco>
     )
   }
-  return <Editor inspeccionId={inspeccionId} inicial={estado.datos} />
+  return <Editor inspeccionId={inspeccionId} inicial={estado.datos.borrador} puedeEditar={estado.datos.puedeEditar} />
 }
 
 function Marco({ inspeccionId, children }: { inspeccionId: number; children: ReactNode }) {
@@ -72,7 +76,15 @@ function Marco({ inspeccionId, children }: { inspeccionId: number; children: Rea
   )
 }
 
-function Editor({ inspeccionId, inicial }: { inspeccionId: number; inicial: BorradorReporte }) {
+function Editor({
+  inspeccionId,
+  inicial,
+  puedeEditar,
+}: {
+  inspeccionId: number
+  inicial: BorradorReporte
+  puedeEditar: boolean
+}) {
   const { inspecciones } = useDependencias()
   const [guardado, setGuardado] = useState(inicial)
   const [edicion, setEdicion] = useState<EdicionReporte>(() => edicionDesde(inicial))
@@ -140,7 +152,12 @@ function Editor({ inspeccionId, inicial }: { inspeccionId: number; inicial: Borr
     <Marco inspeccionId={inspeccionId}>
       <form onSubmit={guardar} noValidate className="animar-entrada">
         {/* Locked while saving: the response replaces the edit state, so nothing typed meanwhile may be lost. */}
-        <fieldset disabled={guardando} className="m-0 flex min-w-0 flex-col gap-6 border-0 p-0">
+        {!puedeEditar && (
+          <p role="note" className="mb-6 rounded border border-info/30 bg-info-bg px-4 py-3 text-sm text-info">
+            Solo lectura: no tienes permiso para editar este reporte.
+          </p>
+        )}
+        <fieldset disabled={guardando || !puedeEditar} className="m-0 flex min-w-0 flex-col gap-6 border-0 p-0">
           <Tarjeta titulo="Inspector">
             <div className="grid gap-5 sm:grid-cols-2">
               {(
@@ -198,9 +215,11 @@ function Editor({ inspeccionId, inicial }: { inspeccionId: number; inicial: Borr
           {errorEnvio && <MensajeError mensaje={errorEnvio} />}
 
           <div className="flex flex-col gap-3 border-t border-line pt-6 sm:flex-row-reverse sm:items-center">
-            <Boton type="submit" disabled={!hayCambios || guardando} className="sm:min-w-40">
-              {guardando ? 'Guardando…' : 'Guardar'}
-            </Boton>
+            {puedeEditar && (
+              <Boton type="submit" disabled={!hayCambios || guardando} className="sm:min-w-40">
+                {guardando ? 'Guardando…' : 'Guardar'}
+              </Boton>
+            )}
             {hayCambios ? (
               <>
                 <Boton variante="secundario" disabled>

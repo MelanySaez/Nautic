@@ -33,7 +33,14 @@ export function useInspeccionEnVivo(inspeccionId: number) {
     [actualizar],
   )
 
+  /** Replaces the inspection fields a PATCH answered with (privacy, leader, permissions), keeping the live photos. */
+  const actualizarDetalle = useCallback(
+    (cambio: Partial<Omit<InspeccionDetalle, 'fotos'>>) =>
+      actualizar((datos) => ({ ...datos, detalle: { ...datos.detalle, ...cambio } })),
+    [actualizar],
+  )
+
   useEffect(() => eventos.suscribir(inspeccionId, aplicar), [eventos, inspeccionId, aplicar])
 
-  return { estado, reintentar, aplicar }
+  return { estado, reintentar, aplicar, actualizarDetalle }
 }

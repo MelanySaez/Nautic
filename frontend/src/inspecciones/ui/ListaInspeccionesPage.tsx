@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useParams, useSearchParams } from 'react-router'
 import { Enlace } from '../../shared/ui/Enlace'
 import { useDependencias } from '../../app/useDependencias'
+import { useUsuarioActual } from '../../cuentas/ui/sesion'
 import { useRecurso } from '../../shared/hooks/useRecurso'
 import { Boton, EnlaceBoton } from '../../shared/ui/Boton'
 import { Cargando, MensajeError, Vacio } from '../../shared/ui/Estados'
@@ -26,6 +27,7 @@ export function ListaInspeccionesRuta() {
 /** Inspections of one vessel, with the date, severity and name filters kept in the URL query. */
 export function ListaInspeccionesPage({ buqueId }: { buqueId: number }) {
   const { inspecciones: repo, buques } = useDependencias()
+  const usuario = useUsuarioActual()
   const [parametros, setParametros] = useSearchParams()
   const filtroUrl = useMemo(() => filtroDesdeParametros(parametros), [parametros])
   const filtro = useMemo(() => ({ ...filtroUrl, buqueId }), [filtroUrl, buqueId])
@@ -173,6 +175,7 @@ export function ListaInspeccionesPage({ buqueId }: { buqueId: number }) {
               key={inspeccion.id}
               className="animar-entrada"
               inspeccion={inspeccion}
+              puedeEliminar={!!usuario && (usuario.esAdmin || inspeccion.lider?.id === usuario.id)}
               eliminando={eliminandoId === inspeccion.id}
               alEliminar={() => eliminar(inspeccion)}
             />

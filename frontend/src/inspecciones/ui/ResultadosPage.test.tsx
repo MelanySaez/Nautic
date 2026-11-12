@@ -1,9 +1,20 @@
 import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { Foto } from '../domain/inspeccion'
 import { ApiError } from '../../shared/http/apiClient'
-import { crearDependenciasFalsas, renderizarRutas, SECCION_QUILLA, unaFoto, unaInspeccion, unDetalle, unModelo } from '../../test/dobles'
+import {
+  crearDependenciasFalsas,
+  renderizarRutas,
+  SECCION_QUILLA,
+  SOLO_LECTURA,
+  unaFoto,
+  unaInspeccion,
+  unDetalle,
+  unMiembro,
+  unModelo,
+} from '../../test/dobles'
+import type { InspeccionDetalle } from '../domain/inspeccion'
 import { ResultadosRuta } from './ResultadosPage'
 
 const SECCION_PROA = { id: 1, codigo: 'FWD-BTM', nombre: 'Fondo - Proa', descripcion: '', orden: 1 }
@@ -46,9 +57,9 @@ const SOLO_CASCO = unaFoto({
   ],
 })
 
-function renderizar(fotos: Foto[]) {
+function renderizar(fotos: Foto[], extra: Partial<InspeccionDetalle> = {}) {
   const falsas = crearDependenciasFalsas()
-  falsas.dependencias.inspecciones.obtener.mockResolvedValue(unDetalle({ id: 7, buqueNombre: 'ARA Libertad', fotos }))
+  falsas.dependencias.inspecciones.obtener.mockResolvedValue(unDetalle({ id: 7, buqueNombre: 'ARA Libertad', fotos, ...extra }))
   falsas.dependencias.inspecciones.listarSecciones.mockResolvedValue([SECCION_QUILLA, SECCION_PROA])
   falsas.dependencias.modelos.listar.mockResolvedValue([unModelo({ id: 'rtdetr', label: 'RT-DETR' })])
   const router = renderizarRutas(
@@ -293,5 +304,125 @@ describe('ResultadosPage', () => {
     await userEvent.click(await screen.findByRole('link', { name: 'Reporte' }))
 
     expect(router.state.location.pathname).toBe('/inspecciones/7/reporte')
+  })
+})
+
+describe('ResultadosPage permissions', () => {
+  it('hides the rename to a user who cannot edit the inspection', async () => {
+    renderizar([CORROIDA], { misPermisos: SOLO_LECTURA })
+
+    expect(await screen.findByRole('heading', { name: 'Inspección #1 — ARA Almirante Brown' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Renombrar inspección' })).not.toBeInTheDocument()
+  })
+
+  it('marks a private inspection next to its name', async () => {
+    renderizar([CORROIDA], { privada: true })
+
+    const cabecera = (await screen.findByRole('heading', { name: 'Inspección #1 — ARA Almirante Brown' })).closest('header')!
+    expect(within(cabecera).getByText('Privada')).toBeInTheDocument()
+  })
+})
+
+describe('ResultadosPage team', () => {
+  async function equipo() {
+    return screen.findByRole('region', { name: 'Equipo' })
+  }
+
+  it('lists the leader and the members with their role', async () => {
+    const { dependencias } = renderizar([])
+    dependencias.miembros.listar.mockResolvedValue([unMiembro()])
+
+    const seccion = await equipo()
+
+    expect(within(seccion).getByText('Líder: María Pérez')).toBeInTheDocument()
+    const fila = await within(seccion).findByRole('listitem', { name: 'Ana Ruiz' })
+    expect(within(fila).getByText('ana@nautic.test')).toBeInTheDocument()
+    expect(within(fila).getByRole('combobox', { name: 'Rol de Ana Ruiz' })).toHaveValue('revisor')
+    expect(within(fila).getByRole('checkbox', { name: 'Editar reporte' })).toBeChecked()
+    expect(within(fila).getByRole('checkbox', { name: 'Subir fotos' })).not.toBeChecked()
+    expect(dependencias.miembros.listar).toHaveBeenCalledWith(7)
+  })
+
+  it('invites a member by email with a role template', async () => {
+    const { dependencias } = renderizar([])
+    const seccion = await equipo()
+
+    await userEvent.type(within(seccion).getByLabelText('Email del usuario'), 'luis@nautic.test')
+    await userEvent.selectOptions(within(seccion).getByRole('combobox', { name: 'Rol' }), 'observador')
+    await userEvent.click(within(seccion).getByRole('button', { name: 'Invitar' }))
+
+    expect(dependencias.miembros.invitar).toHaveBeenCalledWith(7, { email: 'luis@nautic.test', rol: 'observador' })
+    expect(await within(seccion).findByRole('listitem', { name: 'Luis Sosa' })).toBeInTheDocument()
+    expect(within(seccion).getByLabelText('Email del usuario')).toHaveValue('')
+  })
+
+  it('shows why an invitation was rejected under the email', async () => {
+    const { dependencias } = renderizar([])
+    dependencias.miembros.invitar.mockRejectedValue(
+      new ApiError(400, 'Datos inválidos.', { email: ['No existe una cuenta con ese email.'] }),
+    )
+    const seccion = await equipo()
+
+    await userEvent.type(within(seccion).getByLabelText('Email del usuario'), 'nadie@nautic.test')
+    await userEvent.click(within(seccion).getByRole('button', { name: 'Invitar' }))
+
+    expect(await within(seccion).findByLabelText('Email del usuario')).toHaveAccessibleDescription(
+      'No existe una cuenta con ese email.',
+    )
+  })
+
+  it('changes the role and single permissions of a member', async () => {
+    const { dependencias } = renderizar([])
+    dependencias.miembros.listar.mockResolvedValue([unMiembro()])
+    dependencias.miembros.actualizar
+      .mockResolvedValueOnce(unMiembro({ rol: 'colaborador', permisos: { subirFotos: true, analizar: true, editarReporte: true, editarInspeccion: true } }))
+      .mockResolvedValueOnce(unMiembro({ rol: 'personalizado', permisos: { subirFotos: false, analizar: true, editarReporte: true, editarInspeccion: true } }))
+    const fila = await within(await equipo()).findByRole('listitem', { name: 'Ana Ruiz' })
+
+    await userEvent.selectOptions(within(fila).getByRole('combobox', { name: 'Rol de Ana Ruiz' }), 'colaborador')
+    expect(dependencias.miembros.actualizar).toHaveBeenLastCalledWith(7, 9, { rol: 'colaborador' })
+    await waitFor(() => expect(within(fila).getByRole('checkbox', { name: 'Subir fotos' })).toBeChecked())
+
+    await userEvent.click(within(fila).getByRole('checkbox', { name: 'Subir fotos' }))
+    expect(dependencias.miembros.actualizar).toHaveBeenLastCalledWith(7, 9, { permisos: { subirFotos: false } })
+    await waitFor(() => expect(within(fila).getByRole('combobox', { name: 'Rol de Ana Ruiz' })).toHaveValue('personalizado'))
+  })
+
+  it('removes a member after confirmation', async () => {
+    const { dependencias } = renderizar([])
+    dependencias.miembros.listar.mockResolvedValue([unMiembro()])
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    const seccion = await equipo()
+    const fila = await within(seccion).findByRole('listitem', { name: 'Ana Ruiz' })
+
+    await userEvent.click(within(fila).getByRole('button', { name: 'Quitar a Ana Ruiz' }))
+
+    expect(window.confirm).toHaveBeenCalledWith('¿Quitar a Ana Ruiz de la inspección?')
+    expect(dependencias.miembros.quitar).toHaveBeenCalledWith(7, 9)
+    await waitFor(() => expect(within(seccion).queryByRole('listitem', { name: 'Ana Ruiz' })).not.toBeInTheDocument())
+  })
+
+  it('makes the inspection private and marks it', async () => {
+    const { dependencias } = renderizar([])
+    const seccion = await equipo()
+
+    await userEvent.click(within(seccion).getByRole('checkbox', { name: 'Inspección privada' }))
+
+    expect(dependencias.inspecciones.cambiarPrivacidad).toHaveBeenCalledWith(7, true)
+    await waitFor(() => expect(within(seccion).getByRole('checkbox', { name: 'Inspección privada' })).toBeChecked())
+    expect(within(screen.getAllByRole('banner')[0]).getByText('Privada')).toBeInTheDocument()
+  })
+
+  it('shows the team read-only to someone who does not lead the inspection', async () => {
+    const { dependencias } = renderizar([], { misPermisos: { ...SOLO_LECTURA, editarReporte: true } })
+    dependencias.miembros.listar.mockResolvedValue([unMiembro()])
+    const seccion = await equipo()
+    const fila = await within(seccion).findByRole('listitem', { name: 'Ana Ruiz' })
+
+    expect(within(fila).getByText('Revisor')).toBeInTheDocument()
+    expect(within(fila).getByText('Permisos: Editar reporte')).toBeInTheDocument()
+    expect(within(seccion).queryByRole('combobox')).not.toBeInTheDocument()
+    expect(within(seccion).queryByRole('checkbox')).not.toBeInTheDocument()
+    expect(within(seccion).queryByRole('button')).not.toBeInTheDocument()
   })
 })

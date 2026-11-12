@@ -89,6 +89,10 @@ export class HttpInspeccionesRepository implements InspeccionesRepository {
     return aInspeccion(await this.api.patch<InspeccionDto>(`/api/vision/inspecciones/${id}/`, { nombre: nombre.trim() }))
   }
 
+  async cambiarPrivacidad(id: number, privada: boolean): Promise<InspeccionDetalle> {
+    return aInspeccionDetalle(await this.api.patch<InspeccionDetalleDto>(`/api/vision/inspecciones/${id}/`, { privada }))
+  }
+
   eliminar(id: number): Promise<void> {
     return this.api.delete(`/api/vision/inspecciones/${id}/`)
   }

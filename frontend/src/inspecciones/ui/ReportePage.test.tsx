@@ -2,7 +2,7 @@ import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { ApiError } from '../../shared/http/apiClient'
-import { crearDependenciasFalsas, renderizarRutas, unBorradorReporte } from '../../test/dobles'
+import { crearDependenciasFalsas, renderizarRutas, SOLO_LECTURA, unBorradorReporte, unDetalle } from '../../test/dobles'
 import type { BorradorReporte } from '../domain/reporte'
 import { ReporteRuta } from './ReportePage'
 
@@ -106,5 +106,24 @@ describe('ReportePage', () => {
     expect(screen.getByRole('button', { name: 'Guardando…' })).toBeDisabled()
     expect(screen.getByLabelText('Conclusión')).toBeDisabled()
     expect(screen.getByRole('checkbox', { name: /Corrosión/ })).toBeDisabled()
+  })
+})
+
+describe('ReportePage permissions', () => {
+  it('shows the report read-only to a user who cannot edit it, keeping the PDF download', async () => {
+    const falsas = crearDependenciasFalsas()
+    falsas.dependencias.inspecciones.obtener.mockResolvedValue(unDetalle({ id: 7, misPermisos: SOLO_LECTURA }))
+    renderizarRutas(
+      [{ path: '/inspecciones/:id/reporte', element: <ReporteRuta /> }],
+      falsas.dependencias,
+      '/inspecciones/7/reporte',
+    )
+
+    expect(await screen.findByText('Solo lectura: no tienes permiso para editar este reporte.')).toBeInTheDocument()
+    expect(screen.getByLabelText('Conclusión')).toBeDisabled()
+    expect(screen.getByLabelText('Nombre del inspector')).toBeDisabled()
+    expect(screen.queryByRole('button', { name: 'Guardar' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Descargar PDF' })).toBeInTheDocument()
+    expect(falsas.dependencias.inspecciones.obtener).toHaveBeenCalledWith(7)
   })
 })
