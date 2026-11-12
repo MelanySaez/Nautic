@@ -68,6 +68,13 @@ class DeteccionesPorFilaTests(TestCase):
             'etiqueta': 'Corrosión', 'tipo': 'anomalia', 'severidad': 'critical',
         }])
 
+    def test_una_foto_ya_analizada_sin_hallazgos_sigue_en_lista_vacia_al_reencolarse(self):
+        self._procesar()
+        self.foto.estado = FotoInspeccion.Estado.PENDIENTE
+        self.foto.save(update_fields=['estado'])
+
+        self.assertEqual(APIClient().get(f'/api/vision/fotos/{self.foto.id}/').json()['detecciones'], [])
+
     def test_una_clase_por_foto(self):
         DeteccionFoto.objects.create(foto=self.foto, clase='corrosion', cantidad=1, confianza_max=0.5)
 
@@ -95,7 +102,7 @@ class MigracionDeteccionesTests(TransactionTestCase):
         foto = Foto.objects.create(
             inspeccion=Inspeccion.objects.create(buque=buque),
             seccion=Seccion.objects.create(buque=buque, codigo='PRW', nombre='Proa'),
-            imagen_original='x.jpg', estado='completada',
+            imagen_original='x.jpg', estado='completada', detecciones_archivo='d.json',
             detecciones=[
                 {'class_name': 'corrosion', 'count': 2, 'max_confidence': 0.9},
                 {'class_name': 'paint_peel', 'count': 1, 'max_confidence': 0.2},
@@ -104,6 +111,11 @@ class MigracionDeteccionesTests(TransactionTestCase):
         apps.get_model('vision', 'ValidacionFoto').objects.create(
             foto=foto, descartadas=['paint_peel'], nota='Reflejo',
         )
+        # Analyzed, nothing found: must stay `[]` both ways.
+        self.vacia = Foto.objects.create(
+            inspeccion=foto.inspeccion, seccion=foto.seccion, imagen_original='y.jpg',
+            estado='completada', detecciones_archivo='e.json', detecciones=[],
+        ).pk
         return foto.pk
 
     def test_copia_el_json_y_la_validacion_a_filas(self):
@@ -131,5 +143,6 @@ class MigracionDeteccionesTests(TransactionTestCase):
             [{'class_name': 'corrosion', 'count': 2, 'max_confidence': 0.9},
              {'class_name': 'paint_peel', 'count': 1, 'max_confidence': 0.2}],
         )
+        self.assertEqual(apps.get_model('vision', 'FotoInspeccion').objects.get(pk=self.vacia).detecciones, [])
         validacion = apps.get_model('vision', 'ValidacionFoto').objects.get(foto_id=foto_id)
         self.assertEqual((validacion.descartadas, validacion.nota), (['paint_peel'], 'Reflejo'))

@@ -45,6 +45,9 @@ def filas_a_json(apps, schema_editor):
         Foto.objects.filter(pk=foto_id).update(detecciones=[
             {'class_name': f.clase, 'count': f.cantidad, 'max_confidence': f.confianza_max} for f in filas
         ])
+    # Analyzed photos with nothing found had `[]`, not null.
+    analizadas = Foto.objects.filter(models.Q(estado='completada') | models.Q(detecciones_archivo__isnull=False))
+    analizadas.exclude(pk__in=list(por_foto)).update(detecciones=[])
     con_revision = {f_id for f_id, filas in por_foto.items() if any(f.descartada for f in filas)}
     con_revision |= set(Foto.objects.exclude(nota_inspector='').values_list('id', flat=True))
     for foto in Foto.objects.filter(pk__in=con_revision).only('id', 'nota_inspector'):

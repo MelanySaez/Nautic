@@ -316,11 +316,13 @@ def resumen_detecciones(foto):
     """
     The photo's detections in the API shape ``[{class_name, count, max_confidence}]``.
 
-    ``None`` while the photo has never been analyzed (no rows and not completed),
-    ``[]`` when it was analyzed and nothing was found. Uses prefetched rows when present.
+    ``None`` while the photo has never been analyzed, ``[]`` when it was analyzed
+    and nothing was found (also while it is re-queued: ``detecciones_archivo`` marks
+    a past analysis). Uses prefetched rows when present.
     """
     filas = list(foto.detecciones.all())
-    if not filas and foto.estado != FotoInspeccion.Estado.COMPLETADA:
+    analizada = foto.estado == FotoInspeccion.Estado.COMPLETADA or bool(foto.detecciones_archivo)
+    if not filas and not analizada:
         return None
     return [
         {'class_name': f.clase, 'count': f.cantidad, 'max_confidence': f.confianza_max}

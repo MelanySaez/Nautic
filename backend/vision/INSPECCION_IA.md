@@ -134,7 +134,7 @@ class FotoInspeccion(models.Model):
     seccion              = models.ForeignKey(SeccionCasco, on_delete=models.PROTECT, related_name='fotos')
     imagen_original      = models.CharField(max_length=500)
     imagen_anotada       = models.CharField(max_length=500, blank=True, null=True)
-    detecciones          = models.JSONField(null=True, blank=True)
+    nota_inspector       = models.TextField(blank=True, default='')            # nota para el reporte
     tiempo_inferencia_ms = models.FloatField(null=True, blank=True)
     severidad            = models.CharField(max_length=20, null=True, blank=True)
     estado               = models.CharField(choices=Estado.choices, default=Estado.PENDIENTE)
@@ -149,11 +149,11 @@ Los resultados del análisis YOLO se dividen en tres campos independientes:
 
 | Campo | Tipo | Contenido |
 |---|---|---|
-| `detecciones` | `JSONField` | Clases únicas detectadas (una entrada por clase) |
+| `DeteccionFoto` (tabla) | una fila por clase | Clases únicas detectadas (`clase`, `cantidad`, `confianza_max`, `descartada`) |
 | `tiempo_inferencia_ms` | `FloatField` | Tiempo de inferencia del modelo en milisegundos |
 | `severidad` | `CharField` | Severidad general de la foto (`critical`/`high`/`medium`/`low`/null) |
 
-Estructura de `detecciones` — una entrada por clase única, sin repeticiones:
+Formato de `detecciones` en la API (`resumen_detecciones()`): una entrada por clase única, sin repeticiones:
 
 ```json
 [
@@ -173,6 +173,8 @@ La API añade a cada entrada, al leer, la taxonomía de `core_engine` (`vision/t
 Las cajas y máscaras de cada instancia (que `detecciones` agrupa y descarta) se guardan en un JSON aparte en el storage de fotos (`detecciones_archivo`) y se sirven en `GET /api/vision/fotos/<id>/detecciones/`; `detalle_disponible` indica si la foto lo tiene.
 
 **Decisión de fragmentar los campos:** la versión inicial guardaba el resultado crudo completo del modelo YOLO como un solo JSON (bboxes, confidence, tiempos, metadatos de imagen). Esto producía un blob ilegible en la base de datos. Se dividió en tres campos con propósitos claros: `detecciones` para las clases, `tiempo_inferencia_ms` para el rendimiento, y `severidad` para la clasificación de riesgo. La agrupación por clase única se realiza en el backend con `_agrupar_detecciones()` al momento del procesamiento.
+
+**Normalización (migraciones `0011`/`0012`):** las clases agrupadas pasaron del campo JSON `detecciones` a la tabla `DeteccionFoto`, una fila por clase y foto con índice por clase, para poder filtrar y agregar por tipo de anomalía sin recorrer JSON. La validación del reporte vive en esas filas (`descartada`) y en `FotoInspeccion.nota_inspector`; la tabla `ValidacionFoto` se eliminó.
 
 **Otras decisiones:**
 - `imagen_original` y `imagen_anotada` son `CharField`, no `ImageField`. Esto es consistente con `Buque.imagen` (que también guarda una ruta como texto) y permite mayor control manual sobre las rutas de almacenamiento.
