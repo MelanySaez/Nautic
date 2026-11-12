@@ -31,6 +31,7 @@ INSTALLED_APPS = [
     "corsheaders",  # Para permitir llamadas desde React o cualquier origen
     "drf_spectacular",  # Documentación automática de API (OpenAPI 3)
     "vision",  # Módulo de visión artificial (nautic_core)
+    "cuentas",  # Usuarios y sesión (login)
 ]
 
 MIDDLEWARE = [
@@ -141,11 +142,14 @@ CSRF_COOKIE_SECURE = False
 # En producci n (HTTPS) cambia ambos a True
 
 # -----------------------------
-# DRF — sin autenticación por defecto
-# Evita CSRF derivado de SessionAuthentication
+# DRF — autenticación por sesión (cookie); el login está en la app `cuentas`
 # -----------------------------
+# Custom user (cuentas.Usuario, login by email). Must be set before the first migration.
+AUTH_USER_MODEL = "cuentas.Usuario"
+
 REST_FRAMEWORK = {
-    "DEFAULT_AUTHENTICATION_CLASSES": [],
+    # Session cookie: EventSource (live updates) cannot send an Authorization header.
+    "DEFAULT_AUTHENTICATION_CLASSES": ["rest_framework.authentication.SessionAuthentication"],
     "DEFAULT_PERMISSION_CLASSES": [],
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }

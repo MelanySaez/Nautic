@@ -9,6 +9,7 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, Sp
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('vision.urls')),  # Módulo de visión artificial
+    path('', include('cuentas.urls')),  # Login y sesión
 
     # Documentación automática (drf-spectacular)
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),                          # OpenAPI 3 YAML/JSON
