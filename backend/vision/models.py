@@ -73,6 +73,10 @@ class Buque(models.Model):
     # Grupos constructivos SWBS configurables
     grupos_constructivos = models.JSONField(default=list, blank=True)
 
+    # Who registered the vessel (null for vessels created before accounts existed).
+    creado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='buques_creados',
+    )
     created_at = models.DateTimeField(auto_now_add=True)  # ahora es timestamptz en PG
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -253,6 +257,10 @@ class FotoInspeccion(models.Model):
     taxonomia_version = models.CharField(max_length=32, blank=True, null=True)
     # Inspector's note for the report (see ``vision/reporte.py``).
     nota_inspector = models.TextField(blank=True, default='')
+    # Who uploaded the photo.
+    subida_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='fotos_subidas',
+    )
     fecha_creacion = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -282,6 +290,10 @@ class ReporteInspeccion(models.Model):
     recomendaciones = models.TextField(blank=True, default='')
     inspector_nombre = models.CharField(max_length=255, blank=True, default='')
     inspector_cargo = models.CharField(max_length=255, blank=True, default='')
+    # Who saved the draft last.
+    revisado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='+',
+    )
     fecha_modificacion = models.DateTimeField(auto_now=True)
 
     class Meta:
@@ -307,6 +319,10 @@ class DeteccionFoto(models.Model):
     cantidad = models.PositiveIntegerField()
     confianza_max = models.FloatField()
     descartada = models.BooleanField(default=False)
+    # Who last confirmed or discarded this finding in the report.
+    validado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='+',
+    )
 
     class Meta:
         db_table = 'deteccion_foto'

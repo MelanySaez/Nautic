@@ -250,6 +250,10 @@ def api_ai_anomalias(request):
 # Helpers de serialización
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _usuario_ref(usuario):
+    return {'id': usuario.id, 'nombre': usuario.nombre, 'email': usuario.email} if usuario else None
+
+
 def _foto_to_dict(f, request=None):
     return {
         'id': f.id,
@@ -266,11 +270,8 @@ def _foto_to_dict(f, request=None):
         'taxonomia_version': f.taxonomia_version,
         'detalle_disponible': bool(f.detecciones_archivo),
         'fecha_creacion': f.fecha_creacion.isoformat(),
+        'subida_por': _usuario_ref(f.subida_por),
     }
-
-
-def _usuario_ref(usuario):
-    return {'id': usuario.id, 'nombre': usuario.nombre, 'email': usuario.email} if usuario else None
 
 
 def _inspeccion_to_dict(insp, include_fotos=False, request=None, con_permisos=False):
@@ -293,7 +294,8 @@ def _inspeccion_to_dict(insp, include_fotos=False, request=None, con_permisos=Fa
         # What the current user may do, so the UI can hide or disable actions.
         d['mis_permisos'] = permisos_de(request.user, insp)
     if include_fotos:
-        fotos_qs = insp.fotos.select_related('seccion').prefetch_related('detecciones').order_by('fecha_creacion')
+        fotos_qs = (insp.fotos.select_related('seccion', 'subida_por').prefetch_related('detecciones')
+                    .order_by('fecha_creacion'))
         d['fotos'] = [_foto_to_dict(f, request) for f in fotos_qs]
     return d
 
@@ -798,6 +800,7 @@ def api_vision_subir_foto(request, inspeccion_id):
         inspeccion=insp,
         seccion=seccion,
         imagen_original=clave_original,
+        subida_por=request.user,
     )
 
     foto_dict = _foto_to_dict(foto, request)

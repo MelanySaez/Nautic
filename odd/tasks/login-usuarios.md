@@ -21,7 +21,7 @@ Branch: `feat/login-usuarios` (stacked on `feat/detecciones-normalizadas`, PR #2
 |---|---|---|---|---|
 | T1 | S1, S2 (backend) | inline | done | RED: User() got unexpected kwargs nombre/cargo; GREEN: cuentas 10/10, suite 272 OK |
 | T2 | S3-S5 | inline | done | RED: ImportError InspeccionMiembro; GREEN: test_permisos 15/15, suite 292 OK |
-| T3 | S6 | inline | pending | — |
+| T3 | S6 | inline | done | RED: 3 failing (creado_por, subida_por, validado_por/revisado_por); GREEN: test_trazabilidad 3/3, suite 295 OK |
 | T4 | S2 (frontend), S7 | inline | pending | — |
 | T5 | docs, dev DB reset | inline | pending | — |
 
@@ -38,3 +38,4 @@ Branch: `feat/login-usuarios` (stacked on `feat/detecciones-normalizadas`, PR #2
 - L9 (2026-11-11, user): "Registro abierto: cualquiera se registra desde la pantalla de login."
 - L10: registration done: `POST /api/auth/registro/` (CSRF, case-insensitive unique email, Django password validators added to settings — there were none, nombre required, privileges never taken from the request), per-IP throttle `cuentas` 10/min on login and registration (custom SimpleRateThrottle: ScopedRateThrottle passes everything when the view has no `throttle_scope`). Suite 277 OK.
 - L11: T2 done: `lider`/`privada` + `InspeccionMiembro` (migration 0013, generated with `DB_PORT=1` because the dev DB history is inconsistent until T5), `vision/permisos.py` (`exigir`, `visibles_para`, `permisos_de`), `views_miembros.py` (list/invite/patch/remove, roles derive `personalizado` when adjusted), leadership transfer via PATCH `lider_id` (previous leader stays as Colaborador), `mis_permisos` in detail/create responses, every endpoint requires a session (`cuentas.autenticacion.Sesion` answers 401), stream checks session + visibility. Unreadable -> 404, readable without permission -> 403. Assumption applied: any signed-in user manages vessels. Legacy tests authenticate as superuser (`cliente_admin`); passwordless test users keep the suite fast (10 s).
+- L12: T3 done: migration 0014 adds `Buque.creado_por` (read-only in the vessel API, exposed as a user ref), `FotoInspeccion.subida_por` (photo dict `subida_por`), `DeteccionFoto.validado_por` (set on the photo's anomaly rows when `descartadas` is sent), `ReporteInspeccion.revisado_por` (draft `revisado_por`). All SET_NULL.

@@ -38,6 +38,8 @@ def _borrador_to_dict(inspeccion, request=None):
     borrador = borrador_de(inspeccion)
     data = textos_reporte(inspeccion, borrador)
     data['actualizado'] = borrador.fecha_modificacion.isoformat() if borrador else None
+    revisor = borrador.revisado_por if borrador else None
+    data['revisado_por'] = {'id': revisor.id, 'nombre': revisor.nombre, 'email': revisor.email} if revisor else None
     data['fotos'] = [
         {
             'foto_id': foto.id,
@@ -201,12 +203,13 @@ def api_vision_inspeccion_reporte(request, inspeccion_id):
         borrador, _ = ReporteInspeccion.objects.get_or_create(inspeccion=inspeccion)
         for campo, valor in textos.items():
             setattr(borrador, campo, valor)
-        borrador.save()  # always: `actualizado` records the last review
+        borrador.revisado_por = request.user
+        borrador.save()  # always: `actualizado` and `revisado_por` record the last review
         for foto, cambios in fotos:
             if 'descartadas' in cambios:
                 # Only anomaly rows are listed in `descartadas`; components stay as they are.
                 anomalias = foto.detecciones.filter(clase__in=clases_anomalia(foto))
-                anomalias.update(descartada=False)
+                anomalias.update(descartada=False, validado_por=request.user)
                 anomalias.filter(clase__in=cambios['descartadas']).update(descartada=True)
             if 'nota' in cambios:
                 foto.nota_inspector = cambios['nota']
