@@ -1,0 +1,47 @@
+from django.urls import path
+from . import views, views_buques, views_reporte
+
+urlpatterns = [
+    # Endpoint original — inferencia directa sin persistencia
+    path('api/ai/anomalias/', views.api_ai_anomalias, name='api_ai_anomalias'),
+
+    # Catálogo de secciones del casco
+    path('api/vision/secciones/', views.api_vision_secciones, name='api_vision_secciones'),
+
+    # Catálogo de modelos de IA (con disponibilidad en este servidor)
+    path('api/vision/modelos/', views.api_vision_modelos, name='api_vision_modelos'),
+
+    # Taxonomía de clases de la librería de visión
+    path('api/vision/taxonomia/', views.api_vision_taxonomia, name='api_vision_taxonomia'),
+
+    # Inspecciones (lista + creación)
+    path('api/vision/inspecciones/', views.api_vision_inspecciones, name='api_vision_inspecciones'),
+
+    # Detalle de inspección + sus fotos
+    path('api/vision/inspecciones/<int:inspeccion_id>/', views.api_vision_inspeccion_detalle, name='api_vision_inspeccion_detalle'),
+
+    # Reporte de la inspección: borrador editable y PDF generado a partir de él
+    path('api/vision/inspecciones/<int:inspeccion_id>/reporte/', views_reporte.api_vision_inspeccion_reporte, name='api_vision_inspeccion_reporte'),
+    path('api/vision/inspecciones/<int:inspeccion_id>/reporte/pdf/', views_reporte.api_vision_inspeccion_reporte_pdf, name='api_vision_inspeccion_reporte_pdf'),
+
+    # Subir foto a una inspección (solo guarda; el análisis se dispara aparte)
+    path('api/vision/inspecciones/<int:inspeccion_id>/fotos/', views.api_vision_subir_foto, name='api_vision_subir_foto'),
+
+    # Estado de una foto individual (consulta puntual) + análisis manual + eliminación
+    path('api/vision/fotos/<int:foto_id>/', views.api_vision_foto_detalle, name='api_vision_foto_detalle'),
+
+    # Cajas y máscaras de cada detección del último análisis de una foto
+    path('api/vision/fotos/<int:foto_id>/detecciones/', views.api_vision_foto_detecciones, name='api_vision_foto_detecciones'),
+
+    # Disparar análisis YOLO para todas las fotos pendientes de una inspección
+    path('api/vision/inspecciones/<int:inspeccion_id>/analizar/', views.api_vision_analizar_inspeccion, name='api_vision_analizar_inspeccion'),
+
+    # Stream SSE de cambios de estado (reemplaza polling del frontend)
+    path('api/vision/inspecciones/<int:inspeccion_id>/stream/', views.api_vision_inspeccion_stream, name='api_vision_inspeccion_stream'),
+
+    # Buques (lista + creación)
+    path('api/buques/', views_buques.api_buques, name='api_buques'),
+
+    # Ficha técnica de un buque
+    path('api/buques/<int:buque_id>/', views_buques.api_buque_detalle, name='api_buque_detalle'),
+]

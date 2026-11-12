@@ -1,0 +1,1010 @@
+import base64
+import json
+import logging
+import os
+import time
+
+from PIL import Image
+from django.conf import settings
+from django.db import transaction
+from django.http import HttpResponse, StreamingHttpResponse
+from django.shortcuts import get_object_or_404
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
+from rest_framework.decorators import api_view, parser_classes
+from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.response import Response
+from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample
+from drf_spectacular.types import OpenApiTypes
+
+from .almacenamiento import borrar_archivo, guardar_original, leer_archivo, url_archivo
+from .busqueda import (
+    BusquedaInvalida, LIMIT_MAXIMO, LIMIT_POR_DEFECTO, ValorInvalido,
+    _parsear_entero_positivo, buscar_inspecciones,
+)
+from .inference import (
+    DEFAULT_CONFIDENCE, ids_modelos, listar_modelos, modelo_por_defecto,
+    motivo_no_disponible, run_inference,
+)
+from .models import (
+    Buque, SeccionCasco, InspeccionCasco, FotoInspeccion, NivelSeveridad,
+    nombre_por_defecto, recalcular_severidad_max,
+)
+from .pubsub import publicar_evento, suscribirse
+from .ratelimit import check_upload_rate, get_client_ip, track_concurrent_start
+from .secciones import seccion_to_dict
+from .taxonomia import color_clase, enriquecer_detecciones, info_clase, listar_taxonomia
+from .tasks import procesar_foto
+
+logger = logging.getLogger(__name__)
+
+# Extensiones y content-types de imagen aceptados
+_ALLOWED_IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.bmp', '.webp', '.tiff', '.tif'}
+_ALLOWED_IMAGE_CONTENT_TYPES = {
+    'image/jpeg', 'image/png', 'image/bmp', 'image/webp', 'image/tiff',
+}
+
+
+def _validar_imagen(archivo):
+    """
+    Valida que un archivo subido sea una imagen real.
+    Retorna (ok: bool, error_msg: str|None).
+    """
+    # 1. Verificar extensión
+    extension = os.path.splitext(archivo.name)[1].lower()
+    if extension not in _ALLOWED_IMAGE_EXTENSIONS:
+        return False, f'Extensión no permitida: {extension}. Aceptadas: {", ".join(sorted(_ALLOWED_IMAGE_EXTENSIONS))}'
+
+    # 2. Verificar content type del navegador
+    if archivo.content_type and archivo.content_type not in _ALLOWED_IMAGE_CONTENT_TYPES:
+        return False, f'Tipo de archivo no permitido: {archivo.content_type}'
+
+    # 3. Verificar que PIL pueda abrir la imagen (magic bytes)
+    try:
+        archivo.seek(0)
+        img = Image.open(archivo)
+        img.verify()  # Verifica integridad sin decodificar completamente
+        archivo.seek(0)  # Rebobinar para lectura posterior
+    except Exception:
+        return False, 'El archivo no es una imagen válida o está corrupto.'
+
+    return True, None
+
+
+@extend_schema(
+    tags=["Visión Artificial"],
+    summary="Detectar anomalías en una imagen",
+    description=(
+        "Recibe una imagen de casco naval y devuelve la detección de anomalías "
+        "usando el modelo YOLO de nautic_core. "
+        "Por defecto retorna directamente la imagen JPEG anotada con bounding boxes. "
+        "Con `retornar_imagen=true` devuelve un JSON con las detecciones y la imagen en base64.\n\n"
+        "**Clases detectables:** sea_chest_grating, paint_peel, over_board_valve, defect, "
+        "corrosion, propeller, anode, bilge_keel, marine_growth, ship_hull."
+    ),
+    request={
+        "multipart/form-data": {
+            "type": "object",
+            "required": ["imagen"],
+            "properties": {
+                "imagen": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "Imagen a analizar",
+                },
+                "confidence": {
+                    "type": "number",
+                    "default": 0.25,
+                    "description": "Umbral de confianza (0.01–1.0)",
+                },
+                "retornar_imagen": {
+                    "type": "string",
+                    "enum": ["true", "false"],
+                    "default": "false",
+                    "description": "Si true, responde JSON con detecciones e imagen en base64",
+                },
+            },
+        }
+    },
+    responses={
+        200: OpenApiTypes.BINARY,
+        400: OpenApiTypes.OBJECT,
+        500: OpenApiTypes.OBJECT,
+    },
+    examples=[
+        OpenApiExample(
+            name="Respuesta JSON (retornar_imagen=true)",
+            response_only=True,
+            value={
+                "detecciones": [
+                    {
+                        "class_id": 4,
+                        "class_name": "corrosion",
+                        "confidence": 0.87,
+                        "bbox": {
+                            "x1": 120.0,
+                            "y1": 80.0,
+                            "x2": 340.0,
+                            "y2": 210.0,
+                            "x_center": 230.0,
+                            "y_center": 145.0,
+                            "width": 220.0,
+                            "height": 130.0,
+                        },
+                    }
+                ],
+                "total_detecciones": 1,
+                "tiempo_inferencia_ms": 142.5,
+                "tamano_imagen": {"width": 640, "height": 480},
+                "parametros": {"confidence": 0.25},
+                "imagen_anotada_base64": "<base64_string>",
+            },
+        )
+    ],
+)
+@api_view(["POST"])
+@parser_classes([MultiPartParser, FormParser])
+def api_ai_anomalias(request):
+    """
+    Detecta anomalías en una imagen usando el modelo YOLO de nautic_core.
+
+    Parámetros (multipart/form-data):
+        imagen      (file, requerido)  — imagen a analizar
+        confidence  (float, opcional)  — umbral de confianza, por defecto 0.25
+        retornar_imagen (bool, opcional) — si 'true' devuelve la imagen anotada
+                                          como base64 en JSON; de lo contrario
+                                          devuelve directamente el archivo JPEG.
+                                          Por defecto false.
+
+    Respuesta (retornar_imagen=false — default):
+        Content-Type: image/jpeg
+        Body: imagen JPEG con bounding boxes y etiquetas de confianza dibujadas
+
+    Respuesta (retornar_imagen=true):
+        Content-Type: application/json
+        {
+            "detecciones": [...],
+            "total_detecciones": int,
+            "tiempo_inferencia_ms": float,
+            "parametros": {"confidence": float},
+            "imagen_anotada_base64": "..."
+        }
+    """
+    if "imagen" not in request.FILES:
+        return Response(
+            {"error": 'Se requiere el campo "imagen" en el formulario.'}, status=400
+        )
+
+    # --- Leer parámetros opcionales ---
+    try:
+        confidence = float(request.data.get("confidence", DEFAULT_CONFIDENCE))
+    except (ValueError, TypeError):
+        return Response(
+            {"error": 'El parámetro "confidence" debe ser un número decimal.'},
+            status=400,
+        )
+
+    if not (0.0 < confidence <= 1.0):
+        return Response(
+            {"error": 'El parámetro "confidence" debe estar entre 0.01 y 1.0.'},
+            status=400,
+        )
+
+    retornar_imagen = request.data.get("retornar_imagen", "false").lower() == "true"
+
+    # --- Leer bytes de la imagen ---
+    imagen_archivo = request.FILES["imagen"]
+    try:
+        imagen_bytes = imagen_archivo.read()
+    except Exception as e:
+        return Response(
+            {"error": f"Error al leer el archivo de imagen: {str(e)}"}, status=400
+        )
+
+    # --- Ejecutar inferencia + renderizado (delegado a nautic_core) ---
+    # El parámetro opcional "iou" ya no se usa (core_engine v3 fija su NMS);
+    # si el cliente lo envía simplemente se ignora.
+    try:
+        imagen_anotada_bytes, resultados = run_inference(
+            imagen_bytes, confidence=confidence
+        )
+    except FileNotFoundError:
+        # El detalle (rutas probadas del servidor) va solo al log.
+        logger.exception("[vision] Pesos del modelo no encontrados")
+        return Response(
+            {"error": "Modelo de visión no disponible en el servidor."}, status=500
+        )
+    except Exception:
+        logger.exception("[vision] Error durante la inferencia")
+        return Response({"error": "Error durante la inferencia."}, status=500)
+
+    # --- Devolver respuesta ---
+    if retornar_imagen:
+        imagen_b64 = base64.b64encode(imagen_anotada_bytes).decode("utf-8")
+        return Response(
+            {
+                "detecciones": resultados["detections"],
+                "total_detecciones": resultados["detection_count"],
+                "tiempo_inferencia_ms": round(resultados["inference_time_ms"], 2),
+                "tamano_imagen": resultados["image_size"],
+                "parametros": {"confidence": confidence},
+                "imagen_anotada_base64": imagen_b64,
+            }
+        )
+
+    # Respuesta por defecto: imagen JPEG directa
+    return HttpResponse(
+        imagen_anotada_bytes,
+        content_type="image/jpeg",
+        headers={
+            "X-Detecciones": str(resultados["detection_count"]),
+            "X-Inferencia-Ms": str(round(resultados["inference_time_ms"], 2)),
+            "X-Confidence": str(confidence),
+        },
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Helpers de serialización
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _foto_to_dict(f, request=None):
+    return {
+        'id': f.id,
+        'seccion': seccion_to_dict(f.seccion),
+        'imagen_original': url_archivo(f.imagen_original, request),
+        'imagen_anotada': url_archivo(f.imagen_anotada, request),
+        'detecciones': enriquecer_detecciones(f.detecciones),
+        'tiempo_inferencia_ms': f.tiempo_inferencia_ms,
+        'severidad': f.severidad,
+        'estado': f.estado,
+        'error_detalle': f.error_detalle,
+        'modelo': f.modelo_id,
+        'modelo_version': f.modelo_version,
+        'taxonomia_version': f.taxonomia_version,
+        'detalle_disponible': bool(f.detecciones_archivo),
+        'fecha_creacion': f.fecha_creacion.isoformat(),
+    }
+
+
+def _inspeccion_to_dict(insp, include_fotos=False, request=None):
+    d = {
+        'id': insp.id,
+        'buque_id': insp.buque_id,
+        'buque_nombre': insp.buque.nombre,
+        'nombre': insp.nombre,
+        'severidad_max': NivelSeveridad.a_texto(insp.severidad_max),
+        'descripcion': insp.descripcion,
+        'tomado_por': insp.tomado_por,
+        'fecha_creacion': insp.fecha_creacion.isoformat(),
+        'fecha_modificacion': insp.fecha_modificacion.isoformat(),
+        # `n_fotos` lo anota la búsqueda para evitar una consulta por inspección.
+        'total_fotos': insp.n_fotos if hasattr(insp, 'n_fotos') else insp.fotos.count(),
+    }
+    if include_fotos:
+        fotos_qs = insp.fotos.select_related('seccion').order_by('fecha_creacion')
+        d['fotos'] = [_foto_to_dict(f, request) for f in fotos_qs]
+    return d
+
+
+_NOMBRE_MAX = InspeccionCasco._meta.get_field('nombre').max_length
+_CAMPOS_EDITABLES_INSPECCION = ('nombre', 'descripcion')
+
+
+def _validar_nombre(valor):
+    """Returns (nombre_limpio, mensaje_error|None). Blank is valid (means "generate")."""
+    if not isinstance(valor, str):
+        return None, 'Debe ser texto.'
+    valor = valor.strip()
+    if '\x00' in valor:
+        return None, 'Contiene caracteres no permitidos.'
+    if len(valor) > _NOMBRE_MAX:
+        return None, f'No puede superar {_NOMBRE_MAX} caracteres.'
+    return valor, None
+
+
+def _validar_edicion_inspeccion(data):
+    """
+    Validate a PATCH payload. Returns (limpios, errores) where errores maps
+    field -> [messages].
+    """
+    errores = {}
+    limpios = {}
+    for clave in data:
+        if clave not in _CAMPOS_EDITABLES_INSPECCION:
+            errores[clave] = ['Campo desconocido o no editable.']
+    if 'nombre' in data:
+        nombre, error = _validar_nombre(data['nombre'])
+        if error:
+            errores['nombre'] = [error]
+        else:
+            limpios['nombre'] = nombre
+    if 'descripcion' in data:
+        if isinstance(data['descripcion'], str):
+            limpios['descripcion'] = data['descripcion']
+        else:
+            errores['descripcion'] = ['Debe ser texto.']
+    return limpios, errores
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Dispatch asíncrono — encolar tarea Celery (broker RabbitMQ)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _disparar_procesamiento(foto_id):
+    """Encola la tarea Celery ``vision.procesar_foto`` para la foto dada."""
+    procesar_foto.apply_async(kwargs={"foto_id": foto_id})
+
+
+_SCHEMA_MODELO = {
+    'application/json': {
+        'type': 'object',
+        'properties': {
+            'modelo': {
+                'type': 'string',
+                'description': 'Id del modelo (GET /api/vision/modelos/). Opcional.',
+            },
+        },
+    }
+}
+
+
+def _resolver_modelo(data, por_defecto=None):
+    """
+    Resolve and validate the optional ``modelo`` field of an analyze request.
+
+    Returns ``(modelo_id, respuesta_error)``; exactly one of them is ``None``.
+    ``por_defecto`` is used when the field is absent (``None`` → the configured
+    default model). The model must exist in the catalog and be available on this
+    server (weights + dependencies), so the worker never fails on a bad choice.
+    """
+    if not hasattr(data, 'get'):
+        return None, Response({'error': 'Se esperaba un objeto JSON.'}, status=400)
+
+    modelo = data.get('modelo')
+    if modelo is None:
+        modelo = por_defecto or modelo_por_defecto()
+    elif not isinstance(modelo, str):
+        return None, Response(
+            {'error': 'Datos inválidos.', 'campos': {'modelo': ['Debe ser texto.']}},
+            status=400,
+        )
+    else:
+        modelo = modelo.strip()
+
+    validos = ids_modelos()
+    if modelo not in validos:
+        return None, Response(
+            {
+                'error': 'Datos inválidos.',
+                'campos': {'modelo': [
+                    f'Modelo desconocido. Valores válidos: {", ".join(validos)}.'
+                ]},
+            },
+            status=400,
+        )
+
+    motivo = motivo_no_disponible(modelo)
+    if motivo:
+        return None, Response(
+            {
+                'error': 'Modelo no disponible.',
+                'campos': {'modelo': [f'El modelo "{modelo}" no está disponible. {motivo}']},
+            },
+            status=400,
+        )
+    return modelo, None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Endpoints — Secciones del casco
+# ─────────────────────────────────────────────────────────────────────────────
+
+@extend_schema(
+    tags=['Inspección IA'],
+    summary='Listar las secciones del casco de un buque',
+    description=(
+        'Devuelve las zonas físicas del casco que declaró el buque (FWD-BTM, MID-SS-P, etc.), '
+        'ordenadas por `orden` y `codigo`. El parámetro `buque` es requerido.'
+    ),
+    parameters=[
+        OpenApiParameter('buque', int, OpenApiParameter.QUERY, required=True,
+                         description='ID del buque'),
+    ],
+    responses={200: OpenApiTypes.OBJECT, 400: OpenApiTypes.OBJECT, 404: OpenApiTypes.OBJECT},
+)
+@api_view(['GET'])
+def api_vision_secciones(request):
+    """
+    GET /api/vision/secciones/?buque=<id>
+    Lista las secciones del casco del buque indicado.
+    """
+    raw = request.query_params.get('buque')
+    if raw is None:
+        return Response(
+            {'error': 'Datos inválidos.', 'campos': {'buque': ['Este parámetro es requerido.']}},
+            status=400,
+        )
+    try:
+        buque_id = _parsear_entero_positivo(raw)
+    except ValorInvalido as exc:
+        return Response({'error': 'Datos inválidos.', 'campos': {'buque': [str(exc)]}}, status=400)
+
+    buque = get_object_or_404(Buque, pk=buque_id)
+    return Response([seccion_to_dict(s) for s in buque.secciones.all()])
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Endpoints — Modelos de IA
+# ─────────────────────────────────────────────────────────────────────────────
+
+@extend_schema(
+    tags=['Inspección IA'],
+    summary='Listar modelos de IA',
+    description=(
+        'Catálogo de modelos de visión que se pueden elegir al analizar una inspección '
+        '(`modelo` en `POST /api/vision/inspecciones/<id>/analizar/`). `por_defecto` marca el '
+        'que se usa si no se elige ninguno; `disponible=false` indica que faltan los pesos o '
+        'las dependencias del modelo en el servidor y que elegirlo da 400.'
+    ),
+    responses={200: OpenApiTypes.OBJECT},
+    examples=[
+        OpenApiExample(
+            name='Respuesta',
+            response_only=True,
+            value={
+                'modelos': [
+                    {
+                        'id': 'yolo-seg',
+                        'label': 'YOLO segmentation',
+                        'descripcion': 'General-purpose detector with instance masks.',
+                        'arquitectura': 'yolo11s-seg',
+                        'version': '0.1.0',
+                        'produce_mascaras': True,
+                        'confianza_por_defecto': 0.15,
+                        'por_defecto': True,
+                        'disponible': True,
+                    }
+                ]
+            },
+        )
+    ],
+)
+@api_view(['GET'])
+def api_vision_modelos(request):
+    """
+    GET /api/vision/modelos/
+    Lista los modelos de IA del catálogo con su disponibilidad en este servidor.
+    """
+    return Response({'modelos': listar_modelos()})
+
+
+@extend_schema(
+    tags=['Inspección IA'],
+    summary='Taxonomía de clases',
+    description=(
+        'Clases que detectan los modelos, según la taxonomía de `core_engine`: etiqueta en '
+        'español, `tipo` (`anomalia` o `componente`), `severidad` (solo anomalías) y `color` '
+        '(`#rrggbb`, el mismo de la imagen anotada). `version` es la versión de la taxonomía.'
+    ),
+    responses={200: OpenApiTypes.OBJECT},
+)
+@api_view(['GET'])
+def api_vision_taxonomia(request):
+    """
+    GET /api/vision/taxonomia/
+    Lista las clases de la taxonomía de la librería de visión.
+    """
+    return Response(listar_taxonomia())
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Endpoints — Inspecciones
+# ─────────────────────────────────────────────────────────────────────────────
+
+@extend_schema(
+    methods=['GET'],
+    tags=['Inspección IA'],
+    summary='Listar inspecciones de casco',
+    description=(
+        'Busca inspecciones, de la más reciente a la más antigua (`-fecha_creacion, -id`). '
+        'Los filtros se combinan con AND. Paginación por cursor: la respuesta trae '
+        '`resultados`, `siguiente` (cursor opaco para la página siguiente, o null) y `hay_mas`; '
+        'no incluye total. Los parámetros desconocidos se ignoran. Un parámetro inválido '
+        'devuelve 400 con `{"error": "Datos inválidos.", "campos": {...}}`.'
+    ),
+    parameters=[
+        OpenApiParameter('buque', int, OpenApiParameter.QUERY, required=False,
+                         description='ID del buque (alias: `buque_id`)'),
+        OpenApiParameter('buque_id', int, OpenApiParameter.QUERY, required=False,
+                         description='Alias de `buque`'),
+        OpenApiParameter('desde', str, OpenApiParameter.QUERY, required=False,
+                         description='Creadas desde este día, inclusive (AAAA-MM-DD)'),
+        OpenApiParameter('hasta', str, OpenApiParameter.QUERY, required=False,
+                         description='Creadas hasta este día, inclusive (AAAA-MM-DD)'),
+        OpenApiParameter('severidad_min', str, OpenApiParameter.QUERY, required=False,
+                         enum=['low', 'medium', 'high', 'critical'],
+                         description='Severidad máxima mínima'),
+        OpenApiParameter('q', str, OpenApiParameter.QUERY, required=False,
+                         description='Texto contenido en el nombre (2-100 caracteres)'),
+        OpenApiParameter('limit', int, OpenApiParameter.QUERY, required=False,
+                         description=f'Resultados por página (1-{LIMIT_MAXIMO}, por defecto {LIMIT_POR_DEFECTO})'),
+        OpenApiParameter('cursor', str, OpenApiParameter.QUERY, required=False,
+                         description='Valor `siguiente` de la página anterior'),
+    ],
+    responses={200: OpenApiTypes.OBJECT, 400: OpenApiTypes.OBJECT},
+)
+@extend_schema(
+    methods=['POST'],
+    tags=['Inspección IA'],
+    summary='Crear inspección de casco',
+    description='Crea una nueva sesión de inspección para un buque.',
+    request={
+        'application/json': {
+            'type': 'object',
+            'required': ['buque_id'],
+            'properties': {
+                'buque_id': {'type': 'integer', 'description': 'ID del buque'},
+                'nombre': {
+                    'type': 'string', 'maxLength': 255,
+                    'description': 'Nombre de la inspección (opcional; si falta se genera "Inspección #<id> — <buque>")',
+                },
+                'descripcion': {'type': 'string', 'description': 'Descripción de la inspección (opcional)'},
+                'tomado_por': {'type': 'string', 'description': 'Nombre del inspector (opcional)'},
+            },
+        }
+    },
+    responses={201: OpenApiTypes.OBJECT, 400: OpenApiTypes.OBJECT},
+)
+@api_view(['GET', 'POST'])
+def api_vision_inspecciones(request):
+    """
+    GET  /api/vision/inspecciones/          → búsqueda paginada por cursor (ver vision/busqueda.py)
+    POST /api/vision/inspecciones/          → crea una nueva inspección
+    """
+    if request.method == 'GET':
+        try:
+            pagina, siguiente, hay_mas = buscar_inspecciones(request.query_params)
+        except BusquedaInvalida as exc:
+            return Response({'error': 'Datos inválidos.', 'campos': exc.errores}, status=400)
+        return Response({
+            'resultados': [_inspeccion_to_dict(i, request=request) for i in pagina],
+            'siguiente': siguiente,
+            'hay_mas': hay_mas,
+        })
+
+    # POST: crear inspección
+    buque_id = request.data.get('buque_id')
+    if not buque_id:
+        return Response({'error': 'El campo buque_id es requerido.'}, status=400)
+
+    nombre = ''
+    if request.data.get('nombre') is not None:
+        nombre, error = _validar_nombre(request.data['nombre'])
+        if error:
+            return Response(
+                {'error': 'Datos inválidos.', 'campos': {'nombre': [error]}}, status=400,
+            )
+
+    buque = get_object_or_404(Buque, pk=buque_id)
+    # El nombre generado necesita el id: se crea y se actualiza en la misma transacción.
+    with transaction.atomic():
+        insp = InspeccionCasco.objects.create(
+            buque=buque,
+            nombre=nombre,
+            descripcion=request.data.get('descripcion', ''),
+            tomado_por=request.data.get('tomado_por', ''),
+        )
+        if not insp.nombre:
+            insp.nombre = nombre_por_defecto(insp)
+            insp.save(update_fields=['nombre'])
+    return Response(_inspeccion_to_dict(insp, request=request), status=201)
+
+
+@extend_schema(
+    tags=['Inspección IA'],
+    summary='Detalle de una inspección',
+    description='Devuelve la inspección con todas sus fotos, secciones y detecciones del modelo YOLO.',
+)
+@extend_schema(
+    methods=['PATCH'],
+    tags=['Inspección IA'],
+    summary='Editar una inspección',
+    description=(
+        'Edita `nombre` y/o `descripcion`. Un `nombre` vacío regenera el nombre por defecto '
+        '"Inspección #<id> — <buque>". Los demás campos se rechazan con 400.'
+    ),
+    request={
+        'application/json': {
+            'type': 'object',
+            'properties': {
+                'nombre': {'type': 'string', 'maxLength': 255},
+                'descripcion': {'type': 'string'},
+            },
+            'additionalProperties': False,
+        }
+    },
+    responses={200: OpenApiTypes.OBJECT, 400: OpenApiTypes.OBJECT, 404: OpenApiTypes.OBJECT},
+)
+@api_view(['GET', 'PATCH', 'DELETE'])
+def api_vision_inspeccion_detalle(request, inspeccion_id):
+    """
+    GET    /api/vision/inspecciones/<id>/  → detalle con fotos
+    PATCH  /api/vision/inspecciones/<id>/  → edita nombre y/o descripcion
+    DELETE /api/vision/inspecciones/<id>/  → elimina la inspección y todos sus archivos físicos
+    """
+    insp = get_object_or_404(
+        InspeccionCasco.objects.select_related('buque'),
+        pk=inspeccion_id,
+    )
+
+    if request.method == 'DELETE':
+        for foto in insp.fotos.all():
+            borrar_archivo(foto.imagen_original)
+            borrar_archivo(foto.imagen_anotada)
+            borrar_archivo(foto.detecciones_archivo)
+        insp.delete()
+        return Response(status=204)
+
+    if request.method == 'PATCH':
+        data = request.data
+        if not hasattr(data, 'keys'):
+            return Response({'error': 'Se esperaba un objeto JSON.'}, status=400)
+        limpios, errores = _validar_edicion_inspeccion(data)
+        if errores:
+            return Response({'error': 'Datos inválidos.', 'campos': errores}, status=400)
+        if 'nombre' in limpios:
+            insp.nombre = limpios['nombre'] or nombre_por_defecto(insp)
+        if 'descripcion' in limpios:
+            insp.descripcion = limpios['descripcion']
+        if limpios:
+            insp.save(update_fields=[*limpios.keys(), 'fecha_modificacion'])
+        return Response(_inspeccion_to_dict(insp, include_fotos=True, request=request))
+
+    return Response(_inspeccion_to_dict(insp, include_fotos=True, request=request))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Endpoints — Fotos
+# ─────────────────────────────────────────────────────────────────────────────
+
+@extend_schema(
+    tags=['Inspección IA'],
+    summary='Subir foto a una inspección',
+    description=(
+        'Guarda la foto en disco y crea el registro con estado=pendiente.\n\n'
+        'Responde inmediatamente (HTTP 202). El análisis NO arranca aquí: hay que '
+        'dispararlo con POST /api/vision/inspecciones/<id>/analizar/.\n\n'
+        'Para seguir el progreso, suscribirse a GET /api/vision/inspecciones/<id>/stream/ (SSE). '
+        'GET /api/vision/fotos/<id>/ queda como consulta puntual.\n\n'
+        'Limitado a VISION_RATE_LIMIT_UPLOADS_PER_MINUTE cargas por minuto y por IP (HTTP 429).'
+    ),
+    request={
+        'multipart/form-data': {
+            'type': 'object',
+            'required': ['imagen', 'seccion_id'],
+            'properties': {
+                'imagen': {'type': 'string', 'format': 'binary', 'description': 'Foto del casco (JPG/PNG)'},
+                'seccion_id': {'type': 'integer', 'description': 'ID de una sección del buque de la inspección'},
+            },
+        }
+    },
+    responses={202: OpenApiTypes.OBJECT, 400: OpenApiTypes.OBJECT},
+)
+@api_view(['POST'])
+@parser_classes([MultiPartParser, FormParser])
+def api_vision_subir_foto(request, inspeccion_id):
+    """
+    POST /api/vision/inspecciones/<id>/fotos/
+    Sube una foto a una inspección.
+
+    Parámetros (multipart/form-data):
+        imagen     (file, requerido)  — foto del casco
+        seccion_id (int, requerido)   — sección del casco a la que pertenece
+
+    Respuesta inmediata (estado=pendiente). El análisis se dispara aparte,
+    con POST /api/vision/inspecciones/<id>/analizar/.
+
+    Publica el evento SSE `foto-created` en el canal de la inspección.
+    """
+    insp = get_object_or_404(InspeccionCasco, pk=inspeccion_id)
+
+    ip = get_client_ip(request)
+    ok, err = check_upload_rate(ip)
+    if not ok:
+        return Response({'error': err}, status=429)
+
+    seccion_id = request.data.get('seccion_id')
+    if not seccion_id:
+        return Response({'error': 'El campo seccion_id es requerido.'}, status=400)
+    seccion = get_object_or_404(SeccionCasco, pk=seccion_id)
+    if seccion.buque_id != insp.buque_id:
+        return Response({'error': 'La sección no pertenece al buque de la inspección.'}, status=400)
+
+    if 'imagen' not in request.FILES:
+        return Response({'error': 'El campo imagen es requerido.'}, status=400)
+
+    archivo = request.FILES['imagen']
+
+    # Validar que sea imagen real antes de guardar
+    img_ok, img_error = _validar_imagen(archivo)
+    if not img_ok:
+        return Response({'error': img_error}, status=400)
+
+    # Guardar la imagen original en el storage (disco local o bucket) y
+    # persistir la clave que devuelve, no la solicitada.
+    clave_original = guardar_original(archivo)
+
+    # Crear registro con estado=pendiente
+    foto = FotoInspeccion.objects.create(
+        inspeccion=insp,
+        seccion=seccion,
+        imagen_original=clave_original,
+    )
+
+    foto_dict = _foto_to_dict(foto, request)
+    # Notificar a clientes SSE conectados a esta inspección
+    publicar_evento(insp.id, event='foto-created', data={'foto': foto_dict})
+
+    return Response(foto_dict, status=202)
+
+
+@extend_schema(
+    methods=['GET'],
+    tags=['Inspección IA'],
+    summary='Estado de una foto',
+    description=(
+        'Devuelve el estado actual, sección y detecciones de la foto. '
+        'Consulta puntual — para seguir el progreso en vivo usar el stream SSE '
+        'GET /api/vision/inspecciones/<id>/stream/.'
+    ),
+    responses={200: OpenApiTypes.OBJECT},
+)
+@extend_schema(
+    methods=['POST'],
+    tags=['Inspección IA'],
+    summary='Reintentar análisis de foto',
+    description=(
+        'Reintenta el procesamiento si la foto está en estado "pendiente" o "error". '
+        'Cuerpo opcional: `{"modelo": "<id>"}` (ver GET /api/vision/modelos/); sin él se '
+        'reutiliza el modelo con el que se pidió el análisis de la foto y, si nunca se '
+        'pidió, el modelo por defecto. Un modelo desconocido o no disponible devuelve 400 '
+        'y no cambia la foto.'
+    ),
+    request=_SCHEMA_MODELO,
+    responses={202: OpenApiTypes.OBJECT, 400: OpenApiTypes.OBJECT, 429: OpenApiTypes.OBJECT},
+)
+@api_view(['GET', 'POST', 'DELETE'])
+def api_vision_foto_detalle(request, foto_id):
+    """
+    GET    /api/vision/fotos/<id>/  → estado y resultado de una foto (consulta puntual)
+    POST   /api/vision/fotos/<id>/  → dispara análisis si estado=pendiente o error
+    DELETE /api/vision/fotos/<id>/  → elimina la foto y sus archivos físicos
+    """
+    foto = get_object_or_404(FotoInspeccion.objects.select_related('seccion'), pk=foto_id)
+
+    if request.method == 'GET':
+        return Response(_foto_to_dict(foto, request))
+
+    if request.method == 'DELETE':
+        inspeccion_id = foto.inspeccion_id
+        foto_id_borrado = foto.pk
+        borrar_archivo(foto.imagen_original)
+        borrar_archivo(foto.imagen_anotada)
+        borrar_archivo(foto.detecciones_archivo)
+        foto.delete()
+        recalcular_severidad_max(inspeccion_id)
+        publicar_evento(
+            inspeccion_id,
+            event='foto-deleted',
+            data={'foto_id': foto_id_borrado, 'inspeccion_id': inspeccion_id},
+        )
+        return Response(status=204)
+
+    # POST: disparar análisis (pendiente o error)
+    if foto.estado not in [FotoInspeccion.Estado.PENDIENTE, FotoInspeccion.Estado.ERROR]:
+        return Response(
+            {'error': f'Solo se puede analizar una foto en estado "pendiente" o "error". Estado actual: {foto.estado}.'},
+            status=400,
+        )
+    modelo, error = _resolver_modelo(request.data, por_defecto=foto.modelo_id)
+    if error:
+        return error
+    ip = get_client_ip(request)
+    ok, err = track_concurrent_start(ip, foto.id)
+    if not ok:
+        return Response({'error': err}, status=429)
+    foto.estado = FotoInspeccion.Estado.PENDIENTE
+    foto.error_detalle = None
+    foto.modelo_id = modelo
+    foto.save(update_fields=['estado', 'error_detalle', 'modelo_id'])
+    _disparar_procesamiento(foto.id)
+    return Response(_foto_to_dict(foto, request), status=202)
+
+
+def _deteccion_cruda_to_dict(det):
+    return {
+        'clase': det.get('class_name', ''),
+        **info_clase(det.get('class_name', '')),
+        'color': color_clase(det.get('class_id')),
+        'confianza': det.get('confidence'),
+        'bbox': det.get('bbox'),
+        'mascara': det.get('mask'),
+    }
+
+
+@extend_schema(
+    tags=['Inspección IA'],
+    summary='Detecciones de una foto (cajas y máscaras)',
+    description=(
+        'Una entrada por instancia detectada en el último análisis: clase con su taxonomía '
+        '(`etiqueta`, `tipo`, `severidad`, `color`), `confianza`, `bbox` en píxeles de la imagen '
+        'original (`ancho` x `alto`) y `mascara` en RLE COCO sin comprimir (`size` = [alto, ancho], '
+        '`counts` por columnas, empezando por una racha de ceros) o `null` si el modelo no produce '
+        'máscaras. 404 si la foto no existe o no tiene detecciones guardadas '
+        '(`detalle_disponible=false`).'
+    ),
+    responses={200: OpenApiTypes.OBJECT, 404: OpenApiTypes.OBJECT, 500: OpenApiTypes.OBJECT},
+)
+@api_view(['GET'])
+def api_vision_foto_detecciones(request, foto_id):
+    """
+    GET /api/vision/fotos/<id>/detecciones/
+    Cajas y máscaras de cada detección del último análisis de la foto.
+    """
+    foto = get_object_or_404(FotoInspeccion, pk=foto_id)
+    if not foto.detecciones_archivo:
+        return Response({'error': 'La foto no tiene detecciones guardadas.'}, status=404)
+    try:
+        crudas = json.loads(leer_archivo(foto.detecciones_archivo))
+    except Exception:
+        logger.exception('No se pudieron leer las detecciones de la foto %s', foto_id)
+        return Response({'error': 'No se pudieron leer las detecciones de la foto.'}, status=500)
+    return Response({
+        'ancho': crudas.get('ancho'),
+        'alto': crudas.get('alto'),
+        'detecciones': [_deteccion_cruda_to_dict(d) for d in crudas.get('detecciones', [])],
+    })
+
+
+@extend_schema(
+    tags=['Inspección IA'],
+    summary='Analizar las fotos pendientes de una inspección',
+    description=(
+        'Encola el análisis de todas las fotos en estado "pendiente" con el modelo elegido. '
+        'Cuerpo opcional: `{"modelo": "<id>"}` (ids en GET /api/vision/modelos/); sin él se '
+        'usa el modelo por defecto del servidor (`VISION_MODEL_ID`). El modelo se guarda en '
+        'cada foto (`modelo`). Un modelo desconocido o no disponible devuelve 400 y no se '
+        'encola ni cambia nada.'
+    ),
+    request=_SCHEMA_MODELO,
+    responses={202: OpenApiTypes.OBJECT, 400: OpenApiTypes.OBJECT, 429: OpenApiTypes.OBJECT},
+)
+@api_view(['POST'])
+def api_vision_analizar_inspeccion(request, inspeccion_id):
+    """
+    POST /api/vision/inspecciones/<id>/analizar/
+    Dispara el análisis para todas las fotos en estado 'pendiente' de la inspección,
+    con el modelo indicado en `modelo` (opcional; por defecto VISION_MODEL_ID).
+    """
+    insp = get_object_or_404(InspeccionCasco, pk=inspeccion_id)
+    modelo, error = _resolver_modelo(request.data)
+    if error:
+        return error
+    fotos = FotoInspeccion.objects.filter(
+        inspeccion=insp,
+        estado=FotoInspeccion.Estado.PENDIENTE,
+    )
+    if not fotos.exists():
+        return Response({'error': 'No hay fotos pendientes de análisis.'}, status=400)
+
+    ip = get_client_ip(request)
+    dispatched = 0
+    skipped = 0
+    for foto in fotos:
+        ok, _ = track_concurrent_start(ip, foto.id)
+        if not ok:
+            skipped += 1
+            continue
+        # The worker reads the model from the photo: persist it before enqueueing.
+        foto.modelo_id = modelo
+        foto.save(update_fields=['modelo_id'])
+        _disparar_procesamiento(foto.id)
+        dispatched += 1
+
+    if dispatched == 0:
+        return Response(
+            {'error': f'Límite de tareas concurrentes alcanzado. {skipped} foto(s) en espera.'},
+            status=429,
+        )
+    return Response({'iniciadas': dispatched, 'omitidas_por_limite': skipped}, status=202)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SSE — stream de eventos en tiempo real (sustituye al polling del frontend)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _sse_format(data: str, event: str | None = None, event_id: str | None = None) -> str:
+    """Formatea un mensaje SSE según la especificación text/event-stream."""
+    out = []
+    if event:
+        out.append(f"event: {event}")
+    if event_id:
+        out.append(f"id: {event_id}")
+    # `data:` admite múltiples líneas; aquí mandamos JSON serializado en una sola
+    out.append(f"data: {data}")
+    out.append("")  # línea vacía = fin de mensaje
+    out.append("")
+    return "\n".join(out)
+
+
+@csrf_exempt
+@require_http_methods(['GET'])
+def api_vision_inspeccion_stream(request, inspeccion_id):
+    """
+    GET /api/vision/inspecciones/<id>/stream/
+    Server-Sent Events: empuja eventos de cambio de estado de fotos al frontend.
+    """
+    # Verificar que la inspección existe antes de abrir el stream
+    get_object_or_404(InspeccionCasco, pk=inspeccion_id)
+
+    keepalive_seconds = getattr(settings, 'SSE_KEEPALIVE_SECONDS', 15)
+
+    def event_stream():
+        try:
+            pubsub = suscribirse(inspeccion_id)
+        except Exception:
+            logger.exception("No se pudo suscribir a Redis pub/sub")
+            yield _sse_format(json.dumps({"error": "pubsub_unavailable"}), event="error")
+            return
+
+        # Handshake: avisa al cliente que el stream está activo
+        yield _sse_format(
+            json.dumps({"inspeccion_id": inspeccion_id, "ts": int(time.time())}),
+            event="ready",
+        )
+
+        # Sugerir al browser un retry de 5s si pierde la conexión
+        yield "retry: 5000\n\n"
+
+        try:
+            last_keepalive = time.time()
+            while True:
+                # get_message con timeout corto → permite intercalar keepalives
+                msg = pubsub.get_message(timeout=1.0)
+                if msg and msg.get('type') == 'message':
+                    # El productor envía {"event": "<tipo>", "data": {...}}.
+                    # Desempaquetamos: el browser recibe `event: <tipo>` y `data: <json>`.
+                    try:
+                        envelope = json.loads(msg['data'])
+                        evt = envelope.get('event') or 'message'
+                        payload = json.dumps(envelope.get('data', {}))
+                    except (ValueError, TypeError):
+                        evt = 'message'
+                        payload = msg['data']
+                    yield _sse_format(payload, event=evt)
+                # Keepalive periódico (comentario SSE: línea con prefijo `:`)
+                if time.time() - last_keepalive >= keepalive_seconds:
+                    yield ":keepalive\n\n"
+                    last_keepalive = time.time()
+        except GeneratorExit:
+            # Cliente cerró conexión
+            pass
+        except Exception:
+            logger.exception("Error en SSE stream (inspeccion=%s)", inspeccion_id)
+        finally:
+            try:
+                pubsub.close()
+            except Exception:
+                pass
+
+    response = StreamingHttpResponse(
+        event_stream(),
+        content_type='text/event-stream',
+    )
+    # Cabeceras críticas para SSE: desactivar buffering en proxies y caches.
+    # `Connection: keep-alive` lo gestiona automáticamente el servidor WSGI/ASGI;
+    # setearlo aquí dispara AssertionError("Hop-by-hop header not allowed").
+    response['Cache-Control'] = 'no-cache'
+    response['X-Accel-Buffering'] = 'no'  # nginx
+    return response

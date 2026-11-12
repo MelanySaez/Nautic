@@ -1,0 +1,588 @@
+# Módulo de Inspección IA — Documentación técnica
+
+## Índice
+
+1. [Visión general](#1-visión-general)
+2. [Arquitectura y stack](#2-arquitectura-y-stack)
+3. [Modelos de base de datos](#3-modelos-de-base-de-datos)
+4. [API REST, SSE y rate limiting](#4-api-rest-sse-y-rate-limiting)
+5. [Procesamiento YOLO asíncrono (Celery)](#5-procesamiento-yolo-asíncrono-celery)
+6. [Persistencia de imágenes (disco local o bucket)](#6-persistencia-de-imágenes-disco-local-o-bucket)
+7. [Frontend (pendiente)](#7-frontend-pendiente)
+8. [Estructura de respuesta de una foto](#8-estructura-de-respuesta-de-una-foto)
+9. [Sistema de severidad de anomalías](#9-sistema-de-severidad-de-anomalías)
+10. [Flujo completo de uso](#10-flujo-completo-de-uso)
+11. [Decisiones de diseño](#11-decisiones-de-diseño)
+
+---
+
+## 1. Visión general
+
+El módulo de Inspección IA permite a los inspectores navales fotografiar secciones del casco de un buque y obtener detecciones automáticas de anomalías usando un modelo YOLO (`core_engine.vision.analyze`, vía `vision/inference.py`). Las inspecciones se agrupan por buque y sesión, las fotos se organizan por sección del casco, y el análisis corre en workers Celery sin bloquear la API. El progreso llega al cliente por Server-Sent Events.
+
+> **Estado:** este documento describe el backend (`backend/vision/`). El frontend anterior fue eliminado; el nuevo vivirá en `frontend/` y aún no existe (ver [sección 7](#7-frontend-pendiente)). En el producto final, todo análisis pertenece a una inspección concreta (`InspeccionCasco`) de un `Buque`.
+
+Clases detectables por el modelo:
+
+| `class_name` | Descripción | Tipo |
+|---|---|---|
+| `corrosion` | Corrosión | Anomalía |
+| `defect` | Defecto estructural | Anomalía |
+| `marine_growth` | Incrustación marina | Anomalía |
+| `paint_peel` | Descascaramiento de pintura | Anomalía |
+| `ship_hull` | Casco del buque | Componente |
+| `bilge_keel` | Quilla de balance | Componente |
+| `propeller` | Hélice | Componente |
+| `anode` | Ánodo de sacrificio | Componente |
+| `sea_chest_grating` | Rejilla de toma de mar | Componente |
+| `over_board_valve` | Válvula de descarga | Componente |
+
+---
+
+## 2. Arquitectura y stack
+
+Stack: Django 5.1 · Celery 5.4 · RabbitMQ (broker) · Redis (pub/sub + rate limit) · PostgreSQL · nautic_core v3
+
+```
+backend/vision/models.py     ← modelos Django (Buque, SeccionCasco, InspeccionCasco, FotoInspeccion)
+backend/vision/views.py      ← endpoints REST + endpoint SSE
+backend/vision/tasks.py      ← tarea Celery procesar_foto + DLQ
+backend/vision/inference.py  ← run_inference() sobre core_engine.vision + validación de configuración
+backend/vision/pubsub.py     ← cliente Redis pub/sub para eventos SSE
+backend/vision/ratelimit.py  ← rate limiting por IP (uploads + concurrencia)
+backend/vision/urls.py       ← registro de rutas
+backend/vision/secciones.py  ← SECCIONES_ESTANDAR + creación/validación de las secciones de cada buque
+
+backend/config/celery.py     ← app Celery del proyecto
+backend/config/settings.py   ← config CELERY_*, REDIS_URL, SSE_*, VISION_*
+```
+
+**Flujo de datos:**
+
+```
+Django view (upload)  → guarda en storage (disco o bucket) → publica foto-created (Redis)
+Django view (analizar)→ rate limit → procesar_foto.apply_async() → RabbitMQ cola "vision"
+Celery worker         → inferencia YOLO → guarda en Postgres → publica foto-updated (Redis)
+Django view (stream)  → SUBSCRIBE Redis → StreamingHttpResponse (SSE) → browser EventSource
+```
+
+**Dependencias clave:**
+- `core_engine.vision` — modelos de visión (paquete externo `nautic_core`, tag `v3.1.0`); se consume solo a través de `vision.inference.run_inference`
+- `celery` + RabbitMQ — cola de tareas para la inferencia
+- `redis` — pub/sub de eventos SSE y contadores de rate limiting
+- `PIL` (Pillow) — validación de imágenes antes de guardarlas o procesarlas
+
+> Detalle ampliado del backend en [`VISION_BACKEND.md`](../../VISION_BACKEND.md).
+
+---
+
+## 3. Modelos de base de datos
+
+### `SeccionCasco`
+Zona física del casco de un buque. Cada buque declara las suyas al crearse con `POST /api/buques/`: `secciones` omitido o `"estandar"` crea las 20 de `SECCIONES_ESTANDAR`; una lista `[{nombre, codigo?, descripcion?}]` crea exactamente esas, en ese orden. No depende de ninguna inspección.
+
+```python
+class SeccionCasco(models.Model):
+    buque       = models.ForeignKey(Buque, on_delete=models.CASCADE, related_name='secciones')
+    codigo      = models.CharField(max_length=20)               # ej: "FWD-BTM"; único por buque
+    nombre      = models.CharField(max_length=100)              # ej: "Fondo - Proa"
+    descripcion = models.TextField(blank=True)
+    orden       = models.IntegerField(default=0)
+```
+
+**Decisión:** las secciones son del buque (no un catálogo global) porque los cascos difieren; `UniqueConstraint(buque, codigo)` hace único el código dentro de cada buque, y cualquier inspección del buque las reutiliza. Subir una foto exige que la sección pertenezca al buque de la inspección (400 si no). El campo `orden` permite controlar el orden de presentación en la interfaz sin depender del orden de inserción.
+
+---
+
+### `Buque`
+Entidad buque con su ficha técnica (dimensiones, autonomía, capacidades, JSON de contexto operacional, etc.). Vive en `vision/models.py` con `db_table = 'buques'`. Todavía no tiene endpoints CRUD ni registro en el admin: los buques se crean desde `manage.py shell` o directamente en la base de datos.
+
+---
+
+### `InspeccionCasco`
+Sesión de inspección: agrupa todas las fotos de una campaña de revisión de un buque.
+
+```python
+class InspeccionCasco(models.Model):
+    buque              = models.ForeignKey(Buque, on_delete=models.CASCADE, related_name='inspecciones_casco')
+    nombre             = models.CharField(max_length=255, blank=True, default='')   # vacío al crear → "Inspección #<id> — <buque>"
+    severidad_max      = models.PositiveSmallIntegerField(null=True, blank=True, choices=NivelSeveridad.choices)
+    descripcion        = models.TextField(blank=True)
+    tomado_por         = models.CharField(max_length=255, blank=True)
+    fecha_creacion     = models.DateTimeField(auto_now_add=True)
+    fecha_modificacion = models.DateTimeField(auto_now=True)
+```
+
+`severidad_max` guarda la peor severidad de las fotos completadas (`NivelSeveridad`: 1 `low`, 2 `medium`, 3 `high`, 4 `critical`) para poder filtrar y ordenar en SQL. La tarea Celery la sube con un `UPDATE ... WHERE severidad_max IS NULL OR severidad_max < n` (atómico, nunca la baja) y borrar una foto la recalcula desde las que quedan. En el JSON de la inspección se expone como texto (`"high"`) o `null`.
+
+**Decisión:** El campo `tomado_por` es texto libre, no una FK a un usuario, porque el sistema es versión lite y no tiene módulo de autenticación. Esto simplifica la creación sin requerir login.
+
+---
+
+### `FotoInspeccion`
+Unidad atómica del módulo: una foto individual analizada por YOLO.
+
+```python
+class FotoInspeccion(models.Model):
+    class Estado(models.TextChoices):
+        PENDIENTE  = 'pendiente'
+        EN_PROCESO = 'en_proceso'
+        COMPLETADA = 'completada'
+        ERROR      = 'error'
+
+    inspeccion           = models.ForeignKey(InspeccionCasco, on_delete=models.CASCADE, related_name='fotos')
+    seccion              = models.ForeignKey(SeccionCasco, on_delete=models.PROTECT, related_name='fotos')
+    imagen_original      = models.CharField(max_length=500)
+    imagen_anotada       = models.CharField(max_length=500, blank=True, null=True)
+    detecciones          = models.JSONField(null=True, blank=True)
+    tiempo_inferencia_ms = models.FloatField(null=True, blank=True)
+    severidad            = models.CharField(max_length=20, null=True, blank=True)
+    estado               = models.CharField(choices=Estado.choices, default=Estado.PENDIENTE)
+    error_detalle        = models.TextField(blank=True, null=True)
+    modelo_id            = models.CharField(max_length=50, blank=True, null=True)  # modelo de core_engine elegido al analizar
+    modelo_version       = models.CharField(max_length=32, blank=True, null=True)  # model_version del último análisis completado
+    taxonomia_version    = models.CharField(max_length=32, blank=True, null=True)  # taxonomy_version del último análisis completado
+    fecha_creacion       = models.DateTimeField(auto_now_add=True)
+```
+
+Los resultados del análisis YOLO se dividen en tres campos independientes:
+
+| Campo | Tipo | Contenido |
+|---|---|---|
+| `detecciones` | `JSONField` | Clases únicas detectadas (una entrada por clase) |
+| `tiempo_inferencia_ms` | `FloatField` | Tiempo de inferencia del modelo en milisegundos |
+| `severidad` | `CharField` | Severidad general de la foto (`critical`/`high`/`medium`/`low`/null) |
+
+Estructura de `detecciones` — una entrada por clase única, sin repeticiones:
+
+```json
+[
+  {"class_name": "corrosion", "count": 3, "max_confidence": 0.92},
+  {"class_name": "marine_growth", "count": 1, "max_confidence": 0.74},
+  {"class_name": "ship_hull", "count": 1, "max_confidence": 0.88}
+]
+```
+
+Cada entrada incluye:
+- `class_name` — identificador de la clase YOLO
+- `count` — cantidad de veces que esa clase fue detectada en la imagen
+- `max_confidence` — la mayor confianza entre todas las detecciones de esa clase
+
+La API añade a cada entrada, al leer, la taxonomía de `core_engine` (`vision/taxonomia.py`): `etiqueta` (nombre en español), `tipo` (`anomalia` o `componente`) y `severidad` (solo anomalías). `GET /api/vision/taxonomia/` lista todas las clases con su color.
+
+Las cajas y máscaras de cada instancia (que `detecciones` agrupa y descarta) se guardan en un JSON aparte en el storage de fotos (`detecciones_archivo`) y se sirven en `GET /api/vision/fotos/<id>/detecciones/`; `detalle_disponible` indica si la foto lo tiene.
+
+**Decisión de fragmentar los campos:** la versión inicial guardaba el resultado crudo completo del modelo YOLO como un solo JSON (bboxes, confidence, tiempos, metadatos de imagen). Esto producía un blob ilegible en la base de datos. Se dividió en tres campos con propósitos claros: `detecciones` para las clases, `tiempo_inferencia_ms` para el rendimiento, y `severidad` para la clasificación de riesgo. La agrupación por clase única se realiza en el backend con `_agrupar_detecciones()` al momento del procesamiento.
+
+**Otras decisiones:**
+- `imagen_original` y `imagen_anotada` son `CharField`, no `ImageField`. Esto es consistente con `Buque.imagen` (que también guarda una ruta como texto) y permite mayor control manual sobre las rutas de almacenamiento.
+- La FK a `SeccionCasco` usa `on_delete=PROTECT` (no CASCADE): si una sección tiene fotos asociadas no se puede eliminar accidentalmente.
+- Los índices `(inspeccion, estado)` y `(seccion)` optimizan el filtrado de fotos pendientes (endpoint `/analizar/`) y la agrupación por sección de la vista de resultados.
+
+---
+
+## 4. API REST, SSE y rate limiting
+
+Todos registrados en `vision/urls.py` (montado en la raíz por `backend/config/urls.py`) y prefijados con `/api/`.
+
+| Método | URL | Descripción |
+|---|---|---|
+| `GET` | `/api/vision/secciones/?buque=<id>` | Secciones del casco de un buque (`buque` requerido) |
+| `GET` | `/api/vision/modelos/` | Catálogo de modelos de IA con `por_defecto` y `disponible` |
+| `GET` | `/api/vision/inspecciones/` | Busca inspecciones (`buque`, `desde`, `hasta`, `severidad_min`, `q`, `limit`, `cursor`) → `{resultados, siguiente, hay_mas}` |
+| `POST` | `/api/vision/inspecciones/` | Crear nueva inspección (`nombre` opcional) |
+| `GET` | `/api/vision/inspecciones/<id>/` | Detalle de inspección con todas sus fotos |
+| `PATCH` | `/api/vision/inspecciones/<id>/` | Editar `nombre` y/o `descripcion` |
+| `DELETE` | `/api/vision/inspecciones/<id>/` | Eliminar inspección + archivos físicos |
+| `POST` | `/api/vision/inspecciones/<id>/fotos/` | Subir foto (multipart) |
+| `GET` | `/api/vision/fotos/<id>/` | Estado de una foto (consulta puntual / fallback) |
+| `POST` | `/api/vision/fotos/<id>/` | Reintentar análisis de foto en estado `pendiente` o `error` (`modelo` opcional) |
+| `DELETE` | `/api/vision/fotos/<id>/` | Eliminar foto + archivos físicos |
+| `POST` | `/api/vision/inspecciones/<id>/analizar/` | Iniciar análisis de todas las fotos pendientes (`modelo` opcional) |
+| `GET` | `/api/vision/inspecciones/<id>/stream/` | Stream SSE de eventos de la inspección |
+
+### Búsqueda de inspecciones (`vision/busqueda.py`)
+
+El listado es una búsqueda: filtros combinables con AND, orden fijo `-fecha_creacion, -id` y paginación por cursor opaco (sin `total`, que obligaría a contar toda la tabla). Detalle de parámetros y errores en `VISION_BACKEND.md`.
+
+**Decisiones:**
+- *Registro declarativo de filtros* (`FILTROS`): cada criterio es una entrada con parser y función `aplicar`. Agregar un criterio no toca la vista, y `describir_filtros()` lo expone como JSON para derivar el esquema de un futuro intérprete de lenguaje natural.
+- *Cursor keyset* `(fecha_creacion, id)` en lugar de offset: el costo no crece con la página y las inserciones nuevas no duplican ni saltan filas. Se piden `limit + 1` filas para calcular `hay_mas` sin `COUNT`.
+- *`severidad_max` desnormalizada* en la inspección: filtrar por severidad sin joins ni agregaciones sobre fotos.
+- *Búsqueda por nombre* con `ILIKE` (lookup `contiene_ilike`; `icontains` emite `UPPER(...) LIKE` y no usaría el índice) servido por un índice GIN de trigramas (extensión `pg_trgm`).
+- Los parámetros de consulta desconocidos se ignoran; los conocidos inválidos devuelven 400 con `campos`.
+
+### Rate limiting (`vision/ratelimit.py`)
+
+Dos controles por IP respaldados por contadores Redis. Ambos **fallan abiertos**: si Redis no responde, la operación pasa igualmente (no se bloquea el negocio por indisponibilidad del cache).
+
+| Control | Dónde aplica | Límite (env) | Respuesta al superarlo |
+|---|---|---|---|
+| Uploads por minuto (ventana de 60 s) | `POST .../fotos/` | `VISION_RATE_LIMIT_UPLOADS_PER_MINUTE` (20) | `429` |
+| Fotos activas simultáneas | `POST /fotos/<id>/` y `POST .../analizar/` | `VISION_RATE_LIMIT_MAX_CONCURRENT` (10) | `429` (o parcial, ver abajo) |
+
+`track_concurrent_start(ip, foto_id)` se llama desde la vista al disparar; `track_concurrent_end(foto_id)` desde el worker al terminar (éxito, error final o skip). El mapeo `foto → IP` vive en Redis con TTL de 2 h.
+
+En `POST .../analizar/` el límite se aplica foto por foto: la respuesta `202` devuelve `{"iniciadas": N, "omitidas_por_limite": M}`. Solo devuelve `429` si no se pudo disparar ninguna.
+
+La IP real se extrae respetando `X-Forwarded-For` (primer valor) para funcionar detrás de nginx/proxies.
+
+### Eventos SSE emitidos
+
+`GET /api/vision/inspecciones/<id>/stream/` devuelve `text/event-stream`. Emite un `ready` de handshake, sugiere `retry: 5000` al browser, y envía un comentario `:keepalive` cada `SSE_KEEPALIVE_SECONDS` (15 por defecto) para sobrevivir proxies con timeouts agresivos.
+
+| Evento | Emisor | Payload |
+|---|---|---|
+| `ready` | vista SSE | `{inspeccion_id, ts}` |
+| `foto-created` | vista de upload | `{foto: {...}}` |
+| `foto-updated` | worker Celery | `{foto_id, inspeccion_id, estado, severidad, detecciones, tiempo_inferencia_ms, modelo, modelo_version, taxonomia_version, imagen_anotada, error_detalle, detalle_disponible}` |
+| `foto-deleted` | vista de borrado | `{foto_id, inspeccion_id}` |
+
+**Nota sobre URLs de imagen:** el worker Celery no tiene `request`, por lo que `foto-updated` lleva la URL tal como la devuelve el storage: relativa (`/media/...`) en local, absoluta y firmada en un bucket. El `GET` de detalle devuelve URLs absolutas (en local usa `request.build_absolute_uri`). El cliente debe normalizar ambas formas antes de mergear el evento, para no pisar una URL buena con una relativa. Las URL firmadas caducan (`S3_URL_EXPIRE_SECONDS`); un `GET` posterior devuelve URLs nuevas.
+
+### Endpoint legado
+
+`POST /api/ai/anomalias/` — inferencia directa sin persistencia. Recibe una imagen y devuelve la imagen anotada en JPEG o un JSON con detecciones + imagen en base64. Acepta `confidence`; ya no acepta ni devuelve `iou` (nautic_core v3 fija su NMS). Los errores de inferencia responden `500` con un mensaje genérico, sin rutas del servidor; el detalle va al log. Se mantiene por compatibilidad pero no lo usa el flujo de inspección.
+
+### Validación de imágenes en el servidor
+
+Antes de guardar cualquier archivo, `_validar_imagen()` aplica tres comprobaciones:
+1. Extensión permitida (`.jpg`, `.jpeg`, `.png`, `.bmp`, `.webp`, `.tiff`)
+2. Content-Type del navegador dentro de la lista aceptada
+3. `PIL.Image.open().verify()` — verifica magic bytes para rechazar archivos renombrados con extensión falsa
+
+**Decisión:** La validación a nivel de bytes (PIL) es la única verificación real. Las otras dos son filtros rápidos de primera línea. Verificar con PIL antes de guardar evita que el worker YOLO reciba archivos corruptos horas después del upload.
+
+---
+
+## 5. Procesamiento YOLO asíncrono (Celery)
+
+### Por qué asíncrono
+
+La inferencia YOLO puede tardar entre 100ms y varios segundos dependiendo del hardware. Bloquear el worker HTTP de Django durante ese tiempo colapsaría la capacidad de respuesta del servidor ante múltiples uploads simultáneos.
+
+### Implementación con Celery + RabbitMQ
+
+La vista solo encola. Toda la inferencia vive en el worker.
+
+```python
+# vision/views.py
+def _disparar_procesamiento(foto_id):
+    """Encola la tarea Celery ``vision.procesar_foto`` para la foto dada."""
+    procesar_foto.apply_async(kwargs={"foto_id": foto_id})
+```
+
+**Colas** (`backend/config/settings.py`): `vision` es la cola principal, declarada con `x-dead-letter-exchange: vision.dlx`; `vision.dead` recoge lo que RabbitMQ reencamina y las tareas que agotan reintentos.
+
+Parámetros relevantes:
+
+| Setting | Valor | Razón |
+|---|---|---|
+| `CELERY_RESULT_BACKEND` | `None` | Postgres (`FotoInspeccion.estado`) es la fuente de verdad; no hace falta backend de resultados |
+| `CELERY_WORKER_PREFETCH_MULTIPLIER` | `1` | Tareas largas de ML: evita que un worker acapare la cola |
+| `CELERY_TASK_ACKS_LATE` | `True` | Si el worker muere a mitad de inferencia, RabbitMQ re-encola en otro |
+| `CELERY_TASK_REJECT_ON_WORKER_LOST` | `True` | Complemento del anterior |
+| `CELERY_TASK_SOFT_TIME_LIMIT` / `TIME_LIMIT` | `270` / `300` s | Soft lanza excepción; hard mata el proceso |
+| `CELERY_TASK_ALWAYS_EAGER` | env, `False` | Modo síncrono para tests/CI |
+
+Arranque del worker:
+
+```bash
+cd backend
+uv run celery -A config worker -Q vision -l info --concurrency=2 --pool=prefork
+```
+
+Si `NAUTIC_WEIGHTS_DIR` o `VISION_MODEL_ID` son inválidos el worker no arranca (ver abajo).
+
+### Adaptador de inferencia (`vision/inference.py`)
+
+`run_inference(image_bytes, confidence=None, incluir_mascaras=False, model_id=None)` es el único punto de entrada hacia `core_engine`: llama a `core_engine.vision.analyze(...)` con `model_id` (si es `None`, el definido en `VISION_MODEL_ID`: `yolo-seg` por defecto; también `yolo-tiled`, `maskrcnn`, `rtdetr`) y devuelve `(jpeg_anotado, resultado)`. Es síncrono y no recibe `iou`. Con `confidence=None` cada modelo usa su propio umbral calibrado (ya no se fuerza 0.25).
+
+El mismo módulo expone el catálogo: `listar_modelos()`, `modelo_disponible()` / `motivo_no_disponible()` (construidos sobre `core_engine.vision.model_availability()` / `models_availability()` de nautic_core v3.1: pesos y módulos requeridos, sin cargar torch; el motivo para el cliente nombra los pesos y módulos faltantes y el `install_hint`, nunca rutas del servidor) e `ids_modelos()`.
+
+`core_engine` cachea el detector por modelo dentro de cada proceso, así que los pesos se cargan una sola vez sin necesidad de un singleton propio. Los pesos se buscan en el directorio de la variable de entorno **`NAUTIC_WEIGHTS_DIR`**. En workers prefork, la señal `worker_process_init` precarga el modelo por defecto al arrancar cada subproceso, de modo que la primera tarea no paga la latencia de inicialización; los demás modelos se cargan la primera vez que una foto los pide.
+
+**Validación de configuración:** `verificar_configuracion()` comprueba que `VISION_MODEL_ID` exista en el catálogo de `core_engine` y que `NAUTIC_WEIGHTS_DIR` sea un directorio existente. Se ejecuta como system check de Django (`vision.E001`) y en la señal Celery `worker_init`: un worker mal configurado se detiene con un mensaje claro en lugar de reiniciar subprocesos en bucle.
+
+### Flujo de la tarea (`vision/tasks.py`)
+
+```python
+@shared_task(
+    bind=True,
+    name="vision.procesar_foto",
+    autoretry_for=(IOError, OSError),
+    retry_backoff=True, retry_backoff_max=60, retry_jitter=True,
+    retry_kwargs={"max_retries": 3},
+)
+def procesar_foto(self, foto_id):
+    si la foto no existe        → track_concurrent_end + return
+    si estado == 'completada'   → track_concurrent_end + return   # idempotencia
+    foto.estado = 'en_proceso'  → guarda → _notificar()           # evento SSE
+    lee imagen del storage (leer_archivo)
+    valida con PIL (protege contra archivos corruptos)
+    imagen_anotada_bytes, resultados = run_inference(imagen_bytes) # core_engine v3
+    guarda imagen anotada en el storage (guardar_anotada → clave)
+
+    raw_detections = resultados['detections']
+    foto.imagen_anotada       = clave
+    foto.detecciones          = _agrupar_detecciones(raw_detections)
+    foto.tiempo_inferencia_ms = round(resultados['inference_time_ms'], 2)
+    foto.severidad            = _calcular_severidad(raw_detections)
+    foto.estado = 'completada'  → guarda → _notificar() → track_concurrent_end()
+
+    # si falla en cualquier punto:
+    foto.estado = 'error'; foto.error_detalle = str(exc)[:500] → _notificar()
+    # IOError/OSError → reintenta con backoff hasta 3 veces
+    # cualquier otra excepción → fallo terminal → dead_letter en cola vision.dead
+```
+
+**Idempotencia:** con `acks_late`, RabbitMQ puede re-entregar una tarea cuyo worker murió. La comprobación `estado == 'completada'` al inicio evita reprocesar trabajo ya hecho.
+
+**Dead Letter Queue:** `dead_letter(foto_id, error_type, error_detail, original_task_id)` es una tarea aparte en la cola `vision.dead`. No repara nada — registra el fallo con nivel `ERROR` y queda visible en Flower para diagnóstico y requeue manual:
+
+```python
+from vision.tasks import procesar_foto
+procesar_foto.apply_async([foto_id])
+```
+
+La tarea aplica dos transformaciones sobre la salida cruda del modelo antes de guardar:
+
+- **`_agrupar_detecciones(raw_detections)`** — colapsa la lista de detecciones individuales en una entrada por clase única, conservando el conteo de apariciones y la confianza máxima.
+- **`_calcular_severidad(raw_detections)`** — evalúa todas las clases detectadas contra la taxonomía de `core_engine` (`inference.severidad_por_clase()`, que envuelve `severity_map()`) y retorna el nivel más alto encontrado (`critical` > `high` > `medium` > `low`). Si no hay anomalías reales entre las detecciones, retorna `None`.
+
+### Por qué NO se inicia automáticamente al subir
+
+**Decisión deliberada:** el análisis no se dispara al subir la foto. El inspector puede subir múltiples fotos a distintas secciones, revisarlas, eliminar errores, y solo cuando considera que el lote está completo presiona **"Iniciar análisis"**. Esto evita consumir recursos de GPU/CPU en fotos que se iban a eliminar de todas formas.
+
+El endpoint `POST /api/vision/inspecciones/<id>/analizar/` itera todas las fotos en estado `pendiente`, reserva slot de concurrencia para cada una, guarda en ella el modelo elegido (`modelo_id`) y llama `_disparar_procesamiento`.
+
+### Elección del modelo de IA
+
+El inspector sube las fotos, elige un modelo de `GET /api/vision/modelos/` y presiona "Analizar": `POST .../analizar/` con `{"modelo": "<id>"}` (opcional; por defecto `VISION_MODEL_ID`).
+
+- **Decisión:** el modelo se elige al analizar, no al subir ni por inspección; así se puede subir primero y decidir después, y cada foto registra con qué modelo se analizó (`modelo` en el dict de la foto y en los eventos SSE) y, al completarse, con qué versión del modelo y de la taxonomía (`modelo_version`, `taxonomia_version`, tomadas de `model_version` / `taxonomy_version` de `analyze()`; `null` si no se reportan o la foto es anterior a la migración `0005`; un reintento los sobrescribe).
+- Un `modelo` desconocido o no disponible (faltan pesos o dependencias en el servidor) responde `400` antes de encolar nada y sin modificar ninguna foto; nunca llega a fallar dentro del worker.
+- Cada modelo usa su umbral de confianza calibrado (`confianza_por_defecto` en el catálogo).
+- Pendiente (fuera de alcance): re-analizar con otro modelo una foto ya `completada`.
+
+### Reintentar fotos en error
+
+`POST /api/vision/fotos/<id>/` permite reintentar el análisis de una foto en estado `error` **o** `pendiente`. Restablece el estado a `pendiente`, limpia `error_detalle` y re-encola la tarea. Acepta el mismo `modelo` opcional que `/analizar/`; sin él conserva el `modelo_id` de la foto (y si nunca tuvo, usa `VISION_MODEL_ID`). Útil cuando el fallo fue terminal (sin reintento automático) o cuando ya se agotaron los 3 reintentos de Celery.
+
+---
+
+## 6. Persistencia de imágenes (disco local o bucket)
+
+Las fotos se manejan **siempre** con la API de almacenamiento de Django (`default_storage`), a través de los helpers de `vision/almacenamiento.py`. Nunca se usa `open()`, `os.remove()` ni `os.makedirs()` sobre rutas de fotos.
+
+### Selección de backend
+
+`config/almacenamiento.py` construye `settings.STORAGES` desde variables de entorno:
+
+| `STORAGE_BACKEND` | Backend | Uso |
+|---|---|---|
+| `local` (defecto) | `FileSystemStorage` en `MEDIA_ROOT` (`backend/media/`, ignorado por git) | desarrollo |
+| `s3` | `django-storages` `S3Storage`: bucket S3-compatible privado, URL firmadas con vigencia limitada | producción |
+
+Con `s3` se leen `S3_BUCKET` (obligatoria), `S3_ACCESS_KEY_ID` y `S3_SECRET_ACCESS_KEY` (opcionales y juntas; si faltan se usa la cadena de credenciales de boto3, p. ej. un rol IAM), `S3_ENDPOINT_URL` (R2, MinIO u otros S3-compatibles), `S3_REGION`, `S3_LOCATION` (prefijo de claves) y `S3_URL_EXPIRE_SECONDS` (900 por defecto). Un backend desconocido o la falta del bucket impiden arrancar (`ImproperlyConfigured`). Ver `backend/.env.example`.
+
+**Decisión:** el proveedor concreto (AWS S3, Cloudflare R2, MinIO) es una decisión de despliegue, no de código: ningún camino del código sabe qué backend está activo.
+
+### Claves de almacenamiento
+
+La base de datos guarda la **clave** del archivo en el storage, nunca una URL ni un prefijo `media/`:
+
+```
+inspecciones/originales/3f7a1b2c9e4d.jpg
+inspecciones/anotadas/42_9a8b7c6d.jpg
+```
+
+En local, la clave es la ruta relativa a `MEDIA_ROOT`. En un bucket, es la clave del objeto (bajo `S3_LOCATION` si se definió). Siempre se persiste el nombre que **devuelve** `storage.save()`, porque un backend puede modificarlo.
+
+La migración `0003_claves_de_almacenamiento` quita el prefijo `media/` de las filas existentes (y es reversible).
+
+### Conversión a URL
+
+```python
+def url_archivo(clave, request=None):
+    url = default_storage.url(clave)
+    if request is not None and url.startswith('/'):
+        return request.build_absolute_uri(url)
+    return url
+```
+
+- Local: `inspecciones/originales/foto.jpg` → `http://HOST/media/inspecciones/originales/foto.jpg` (con `request`; relativa sin él).
+- Bucket: URL firmada absoluta que expira; se devuelve tal cual.
+
+### Nombres de archivo
+
+- **Original:** `uuid.uuid4().hex + extension` — garantiza unicidad sin depender del nombre original del archivo (que podría contener caracteres especiales o colisionar).
+- **Anotada:** `{foto_id}_{uuid4().hex[:8]}.jpg` — incluye el ID de la foto para facilitar rastreo, más un sufijo aleatorio corto para evitar colisiones en reintento.
+
+La subida pasa el `UploadedFile` directamente al storage, que lo escribe por bloques sin cargarlo entero en memoria.
+
+### Eliminación de archivos
+
+Al eliminar una foto o una inspección completa, el backend elimina primero los archivos del storage y luego los registros de la BD. `borrar_archivo(clave)` nunca lanza: si el storage falla, registra el error con `logger.exception` y el borrado del registro continúa, de modo que un bucket caído no convierte el `DELETE` en un 500 (el archivo puede quedar huérfano y limpiarse después). Borrar un archivo que ya no existe no es un error.
+
+```python
+borrar_archivo(foto.imagen_original)
+borrar_archivo(foto.imagen_anotada)
+foto.delete()
+```
+
+Mover las fotos ya existentes de disco a un bucket queda fuera de este módulo (haría falta un comando de gestión puntual).
+
+---
+
+## 7. Frontend (pendiente)
+
+El frontend React anterior fue eliminado del repositorio. El nuevo vivirá en `frontend/` (aún no existe) y se organizará en tres secciones:
+
+| Sección | Rol | Backend actual |
+|---|---|---|
+| **Buques** | Alta y consulta de buques (ficha técnica) | Solo el modelo `Buque`; faltan endpoints |
+| **Inspecciones** | Sesiones de inspección por buque | `/api/vision/inspecciones/...` |
+| **Visión IA** | Subida de fotos por sección, análisis y resultados | `/api/vision/...` + SSE |
+
+**Contrato que el backend ofrece a cualquier cliente:**
+
+- Carga inicial por REST (`GET /api/vision/inspecciones/<id>/`) y deltas por SSE (`foto-created`, `foto-updated`, `foto-deleted`).
+- Límite de concurrencia por IP: `VISION_RATE_LIMIT_MAX_CONCURRENT` (`backend/config/settings.py`). Si el cliente quiere avisar antes del `429`, debe mantener su propia constante en sincronía con ese valor.
+- El análisis no arranca al subir: el cliente lo dispara con `POST .../analizar/` o `POST /fotos/<id>/`.
+- Documentación OpenAPI en `/api/docs/`.
+
+Las decisiones de UI del frontend anterior (componentes, i18n, eliminación optimista) quedan en el historial de git y no se documentan aquí.
+
+---
+
+## 8. Estructura de respuesta de una foto
+
+```json
+{
+  "id": 42,
+  "seccion": { "id": 3, "codigo": "MID-BTM", "nombre": "Fondo - Centro", ... },
+  "imagen_original": "http://HOST/media/inspecciones/originales/uuid.jpg",
+  "imagen_anotada": "http://HOST/media/inspecciones/anotadas/42_hex.jpg",
+  "detecciones": [
+    { "class_name": "corrosion", "count": 3, "max_confidence": 0.92 },
+    { "class_name": "ship_hull", "count": 1, "max_confidence": 0.88 }
+  ],
+  "tiempo_inferencia_ms": 186.42,
+  "severidad": "critical",
+  "estado": "completada",
+  "error_detalle": null,
+  "fecha_creacion": "2026-03-13T..."
+}
+```
+
+---
+
+## 9. Sistema de severidad de anomalías
+
+### Criterio de clasificación
+
+Solo se asigna severidad a las clases que representan **fallas o daños reales**. Las clases que el modelo detecta como referencia estructural (componentes del casco) no tienen nivel de severidad asignado y se muestran en la lista sin badge.
+
+Mapa de severidad (clases de anomalía):
+
+| Clase | Severidad |
+|---|---|
+| `corrosion` | `critical` |
+| `defect` | `high` |
+| `marine_growth` | `medium` |
+| `paint_peel` | `low` |
+
+Sin severidad (componentes, no fallas): `ship_hull`, `bilge_keel`, `propeller`, `anode`, `sea_chest_grating`, `over_board_valve`.
+
+### Severidad global de la foto
+
+La severidad se calcula en el worker Celery durante el procesamiento y se persiste en el campo `FotoInspeccion.severidad`. `_calcular_severidad()` evalúa todas las detecciones contra la severidad por clase que define la taxonomía de `core_engine` y retorna la peor encontrada. El backend no mantiene una copia de esa tabla: si `nautic_core` cambia una severidad o añade una clase, el backend la sigue sin cambios.
+
+```python
+# Backend: vision/inference.py
+def severidad_por_clase():
+    from core_engine.vision.domain import severity_map
+    return severity_map()
+# nautic_core 3.0.0: {'corrosion': 'critical', 'defect': 'high',
+#                     'marine_growth': 'medium', 'paint_peel': 'low'}
+```
+
+El cliente lee `foto.severidad` directamente; no la calcula.
+
+**Decisión:** persistir la severidad en la BD permite filtros y reportes sin recalcular, y mantiene al cliente como capa de presentación pura.
+
+### Colores sugeridos (referencia de presentación)
+
+- `critical` → rojo (#dc2626): urgencia máxima, corrosión activa
+- `high` → naranja (#ea580c): defecto estructural importante
+- `medium` → ámbar (#d97706): incrustación marina, requiere atención
+- `low` → azul (#2563eb): descascaramiento de pintura, mantenimiento preventivo
+
+Se usa azul (no verde) para "Bajo" porque verde implicaría que no hay problema, cuando en realidad sigue siendo una anomalía que requiere acción.
+
+---
+
+## 10. Flujo completo de uso
+
+```
+1. Crear (o elegir) un Buque                     ← hoy: shell/DB; sin endpoint
+2. POST /api/vision/inspecciones/                ← buque_id, nombre (opcional), descripcion, tomado_por → InspeccionCasco
+3. GET  /api/vision/secciones/?buque=<id>        ← secciones del casco del buque
+   GET  /api/vision/modelos/                     ← catálogo de modelos de IA (para elegir uno antes de analizar)
+4. POST /api/vision/inspecciones/<id>/fotos/     ← multipart (imagen, seccion_id) → 202, foto en estado=pendiente
+   └── Se publica foto-created en Redis
+5. (Opcional) DELETE /api/vision/fotos/<id>/     ← descartar fotos erróneas antes de analizar
+6. POST /api/vision/inspecciones/<id>/analizar/  ← {"modelo": "<id>"} opcional; encola una tarea Celery por foto pendiente (cola "vision")
+   └── El worker publica foto-updated en Redis en cada cambio de estado
+7. GET  /api/vision/inspecciones/<id>/stream/    ← SSE: ready, foto-created, foto-updated, foto-deleted
+8. GET  /api/vision/inspecciones/<id>/           ← resultados: fotos con detecciones, severidad y estado
+9. Fotos en error: POST /api/vision/fotos/<id>/  ← reintento
+10. DELETE /api/vision/inspecciones/<id>/        ← borra archivos físicos + registros
+```
+
+---
+
+## 11. Decisiones de diseño
+
+### Análisis manual vs automático
+
+**Problema:** si el análisis arranca automáticamente al subir cada foto, el inspector puede subir una foto incorrecta, darse cuenta del error, y el worker ya está consumiendo recursos (CPU/GPU) para analizarla.
+
+**Solución:** el upload solo guarda el archivo y crea el registro con `estado=pendiente`. El inspector revisa, elimina errores si los hay, y cuando el lote está listo presiona "Iniciar análisis".
+
+### De hilos daemon a Celery + RabbitMQ
+
+**Estado inicial:** el análisis corría en un `threading.Thread(daemon=True)` lanzado desde la vista. Funcionaba en desarrollo, pero tenía tres problemas serios:
+
+1. **Pérdida de jobs.** Un hilo daemon muere con el proceso. Cualquier reinicio del servidor (deploy, crash, recarga del autoreloader) perdía en silencio todas las inferencias en vuelo, dejando fotos clavadas en `en_proceso` para siempre.
+2. **Sin reintentos ni visibilidad.** Un fallo de E/S transitorio marcaba la foto como `error` definitivamente. No había forma de saber cuántos jobs fallaron ni por qué, más allá de leer logs.
+3. **Sin control de carga.** Nada limitaba cuántos hilos se lanzaban a la vez. Con un lote grande, N hilos competían por CPU/GPU y degradaban el servidor HTTP del que colgaban.
+
+**Estado actual:** RabbitMQ persiste la cola, así que un reinicio no pierde trabajo; `acks_late` + `reject_on_worker_lost` re-encolan lo que quedó a medias, y la comprobación de `estado == 'completada'` al inicio de la tarea garantiza idempotencia frente a re-entregas. Los fallos de E/S reintentan con backoff exponencial y jitter; los terminales van a la DLQ `vision.dead`, visible en Flower. La concurrencia queda acotada por `--concurrency` del worker y por el rate limit por IP.
+
+**Costo asumido:** el stack pasó de "solo Django" a Django + RabbitMQ + Redis + worker. Es más infraestructura que operar, y el módulo deja de funcionar si el broker está caído — a diferencia de los hilos, que al menos degradaban solos. Se aceptó porque perder inferencias en silencio era peor que la complejidad operativa.
+
+### Por qué Redis pub/sub para las notificaciones
+
+Con el worker en otro proceso, Django ya no sabe cuándo termina una foto. Las opciones eran seguir haciendo polling contra Postgres, o que el worker avisara.
+
+Se eligió Redis pub/sub porque Redis ya entraba al stack para el rate limiting, el canal por inspección (`vision:inspeccion:{id}`) aísla naturalmente a los clientes de cada sesión, y `publicar_evento()` no rompe la operación de negocio si Redis está caído — solo loguea y sigue. Se perdería la actualización en vivo, pero la foto se procesa igual y la próxima carga de la vista muestra el estado real desde Postgres.
+
+Se descartó WebSockets: el flujo es unidireccional (servidor → browser), y SSE se resuelve con `StreamingHttpResponse` sin meter Channels ni ASGI en el proyecto.
+
+### Rate limiting fail-open
+
+Ambos controles de `ratelimit.py` dejan pasar la petición si Redis no responde. La alternativa (fail-closed) convertiría una caída del cache en una caída total del módulo. Se prioriza disponibilidad: el rate limit protege contra uso accidental abusivo, no es un control de seguridad.
+
+### `on_delete=CASCADE` en `FotoInspeccion`
+
+Al eliminar una `InspeccionCasco`, Django elimina automáticamente todos los `FotoInspeccion` asociados en cascada. Sin embargo, los archivos en el storage no se eliminan en cascada automáticamente — Django no conoce la semántica de negocio del almacenamiento. Por eso el endpoint `DELETE /inspecciones/<id>/` itera las fotos manualmente y borra sus archivos (`borrar_archivo`) antes de llamar `insp.delete()`.
+
+### SSE en lugar de polling
+
+La versión anterior del cliente consultaba el detalle completo de la inspección cada 3 segundos. Con Celery el worker ya sabe exactamente cuándo cambia el estado de una foto, así que publica el evento a Redis y Django lo empuja por `text/event-stream`. Esto elimina las peticiones en vacío y baja la latencia percibida de ~3 s a inmediata. El `GET` de detalle sigue existiendo para la carga inicial. **No se deben añadir bucles de polling a este módulo.**
+
+### Carga inicial por REST, actualizaciones por SSE
+
+El cliente carga el estado completo con `GET /inspecciones/<id>/` (una sola query, con `select_related('seccion')`) y a partir de ahí solo aplica deltas recibidos por SSE. El stream no reenvía el estado completo: si el browser pierde la conexión, `EventSource` reconecta solo (`retry: 5000`) pero los eventos ocurridos durante el corte se pierden. Se acepta porque cualquier navegación a la vista vuelve a leer el estado real desde Postgres, que sigue siendo la fuente de verdad.

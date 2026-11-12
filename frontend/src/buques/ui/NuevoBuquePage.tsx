@@ -1,0 +1,167 @@
+import { useState, type FormEvent } from 'react'
+import { useNavegar } from '../../shared/hooks/useNavegar'
+import { Enlace } from '../../shared/ui/Enlace'
+import { useDependencias } from '../../app/useDependencias'
+import { ApiError } from '../../shared/http/apiClient'
+import { Boton, EnlaceBoton } from '../../shared/ui/Boton'
+import { MensajeError } from '../../shared/ui/Estados'
+import { Icon } from '../../shared/ui/Icon'
+import { mensajeDe } from '../../shared/ui/formato'
+import type { NuevoBuque } from '../domain/buque'
+import { CamposBuque } from './CamposBuque'
+import {
+  aNuevasSecciones,
+  CLAVE_ERROR_SECCIONES,
+  claveErrorFila,
+  filaVacia,
+  validarSecciones,
+  type FilaSeccion,
+  type ModoSecciones,
+} from './filasSeccion'
+import {
+  CAMPOS_TECNICOS,
+  repartirErroresDelServidor,
+  REQUERIDO,
+  validar,
+  VALORES_VACIOS,
+  type Errores,
+  type Valores,
+} from './formularioBuque'
+import { SeccionesCascoForm } from './SeccionesCascoForm'
+
+/**
+ * Builds the creation input: trimmed text, and only the optional fields the user filled.
+ * Standard sections are requested by omitting `secciones` (the backend default).
+ */
+function aNuevoBuque(valores: Valores, modo: ModoSecciones, filas: FilaSeccion[]): NuevoBuque {
+  const datos: NuevoBuque = { nombre: valores.nombre.trim(), tipo: valores.tipo.trim() }
+  if (valores.etapa.trim()) datos.etapa = valores.etapa.trim()
+  if (valores.descripcion.trim()) datos.descripcion = valores.descripcion.trim()
+  if (valores.imagen.trim()) datos.imagen = valores.imagen.trim()
+  for (const campo of CAMPOS_TECNICOS) {
+    if (valores[campo.clave].trim()) datos[campo.clave] = Number(valores[campo.clave])
+  }
+  if (modo === 'propias') datos.secciones = aNuevasSecciones(filas)
+  return datos
+}
+
+export function NuevoBuquePage() {
+  const { buques } = useDependencias()
+  const navegar = useNavegar()
+
+  const [valores, setValores] = useState<Valores>(VALORES_VACIOS)
+  const [errores, setErrores] = useState<Errores>({})
+  const [modoSecciones, setModoSecciones] = useState<ModoSecciones>('estandar')
+  const [filas, setFilas] = useState<FilaSeccion[]>([filaVacia(0)])
+  const [siguienteUid, setSiguienteUid] = useState(1)
+  const [errorEnvio, setErrorEnvio] = useState<string | null>(null)
+  const [enviando, setEnviando] = useState(false)
+
+  function cambiar(clave: string, valor: string) {
+    setValores((actual) => ({ ...actual, [clave]: valor }))
+    setErrores(({ [clave]: _resuelto, ...resto }) => resto)
+  }
+
+  function quitarErrores(...claves: string[]) {
+    setErrores((actual) => Object.fromEntries(Object.entries(actual).filter(([clave]) => !claves.includes(clave))))
+  }
+
+  function cambiarFila(uid: number, campo: 'nombre' | 'codigo' | 'descripcion', valor: string) {
+    setFilas((actual) => actual.map((fila) => (fila.uid === uid ? { ...fila, [campo]: valor } : fila)))
+    quitarErrores(claveErrorFila(uid), CLAVE_ERROR_SECCIONES)
+  }
+
+  function agregarFila() {
+    setFilas((actual) => [...actual, filaVacia(siguienteUid)])
+    setSiguienteUid(siguienteUid + 1)
+    quitarErrores(CLAVE_ERROR_SECCIONES)
+  }
+
+  function quitarFila(uid: number) {
+    setFilas((actual) => (actual.length > 1 ? actual.filter((fila) => fila.uid !== uid) : actual))
+    quitarErrores(claveErrorFila(uid), CLAVE_ERROR_SECCIONES)
+  }
+
+  function moverFila(uid: number, delta: -1 | 1) {
+    setFilas((actual) => {
+      const origen = actual.findIndex((fila) => fila.uid === uid)
+      const destino = origen + delta
+      if (origen < 0 || destino < 0 || destino >= actual.length) return actual
+      const copia = [...actual]
+      ;[copia[origen], copia[destino]] = [copia[destino], copia[origen]]
+      return copia
+    })
+  }
+
+  function cambiarModo(modo: ModoSecciones) {
+    setModoSecciones(modo)
+    quitarErrores(CLAVE_ERROR_SECCIONES)
+  }
+
+  async function enviar(evento: FormEvent) {
+    evento.preventDefault()
+    const invalidos = { ...validar(valores), ...validarSecciones(modoSecciones, filas, REQUERIDO) }
+    setErrores(invalidos)
+    if (Object.keys(invalidos).length > 0) return
+    setErrorEnvio(null)
+    setEnviando(true)
+    try {
+      const creado = await buques.crear(aNuevoBuque(valores, modoSecciones, filas))
+      navegar(`/buques/${creado.id}`)
+    } catch (error) {
+      if (error instanceof ApiError && error.campos) {
+        const { delFormulario, sinCampo } = repartirErroresDelServidor(error.campos, {
+          secciones: CLAVE_ERROR_SECCIONES,
+        })
+        setErrores(delFormulario)
+        setErrorEnvio(sinCampo.length > 0 ? [error.message, ...sinCampo].join(' · ') : null)
+      } else {
+        setErrorEnvio(mensajeDe(error))
+      }
+      setEnviando(false)
+    }
+  }
+
+  return (
+    <div className="mx-auto flex max-w-2xl flex-col gap-6">
+      <header className="flex items-center gap-3">
+        <Enlace to="/buques" aria-label="Volver al listado" className="rounded p-1 text-ink-muted hover:text-ink">
+          <Icon name="back" className="size-6" />
+        </Enlace>
+        <h1 className="flex-1 text-2xl font-semibold tracking-tight md:text-3xl">Nuevo buque</h1>
+      </header>
+
+      <form onSubmit={enviar} noValidate className="animar-entrada flex flex-col gap-6">
+        <CamposBuque
+          valores={valores}
+          errores={errores}
+          alCambiar={cambiar}
+          ayudaEtapa="Si lo dejas vacío se registra como Activo."
+        />
+
+        <SeccionesCascoForm
+          modo={modoSecciones}
+          alCambiarModo={cambiarModo}
+          filas={filas}
+          errores={errores}
+          alCambiarFila={cambiarFila}
+          alAgregar={agregarFila}
+          alQuitar={quitarFila}
+          alMover={moverFila}
+        />
+
+        {errorEnvio && <MensajeError mensaje={errorEnvio} />}
+
+        <div className="flex flex-col gap-3 border-t border-line pt-6 sm:flex-row-reverse">
+          <Boton type="submit" disabled={enviando} className="sm:min-w-56">
+            <Icon name="plus" className="size-4" />
+            {enviando ? 'Creando…' : 'Crear buque'}
+          </Boton>
+          <EnlaceBoton to="/buques" variante="secundario">
+            Cancelar
+          </EnlaceBoton>
+        </div>
+      </form>
+    </div>
+  )
+}

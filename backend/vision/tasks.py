@@ -1,0 +1,295 @@
+"""
+Tareas Celery del módulo de visión.
+
+La tarea ``procesar_foto`` ejecuta la inferencia YOLO sobre una
+``FotoInspeccion`` y persiste el resultado en Postgres. El procesamiento de
+imagen (preprocesado + inferencia + anotación) se delega íntegramente a
+``core_engine.vision.analyze`` (vía ``inference.run_inference``) — esta capa sólo
+orquesta E/S de disco, transición de estado y categorización de severidad.
+
+DLQ (Dead Letter Queue):
+  Cuando una tarea agota reintentos o falla de forma no recuperable, se envía
+  un mensaje a la cola ``vision.dead`` vía la tarea ``dead_letter``. Visible
+  en Flower como tarea separada para diagnóstico y requeue manual.
+"""
+import io
+import json
+import logging
+
+from PIL import Image
+from celery import shared_task
+
+from .almacenamiento import (
+    borrar_archivo, guardar_anotada, guardar_detecciones, leer_archivo, url_archivo,
+)
+from .inference import modelo_por_defecto, run_inference, severidad_por_clase
+from .models import FotoInspeccion, NivelSeveridad, subir_severidad_max
+from .pubsub import publicar_evento
+from .taxonomia import enriquecer_detecciones
+from .ratelimit import track_concurrent_end
+
+logger = logging.getLogger(__name__)
+
+# Debe coincidir con retry_kwargs["max_retries"] de procesar_foto.
+_MAX_RETRIES = 3
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Post-procesado de resultados (no es procesamiento de imagen — sólo
+# categorización de las detecciones que devuelve nautic_core)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _calcular_severidad(detections):
+    """Nivel de severidad más alto entre las detecciones.
+
+    La severidad de cada clase viene de la taxonomía de ``core_engine``
+    (``severidad_por_clase``); las clases sin severidad se ignoran.
+    """
+    severidades = severidad_por_clase()
+    peor = None
+    for det in detections:
+        texto = severidades.get(det.get("class_name"))
+        if texto is None:
+            continue
+        nivel = NivelSeveridad.desde_texto(texto)
+        if nivel is None:
+            # The taxonomy uses a level NivelSeveridad does not know: never drop it silently.
+            logger.warning(
+                "Severidad desconocida %r para la clase %r; se ignora.",
+                texto, det.get("class_name"),
+            )
+            continue
+        if peor is None or nivel > peor:
+            peor = nivel
+    return NivelSeveridad.a_texto(peor)
+
+
+def _version(valor):
+    """Version string from core_engine, cut to the column size (32); None when absent.
+
+    A longer value must never make the completion save fail after a successful inference.
+    """
+    if not valor:
+        return None
+    return str(valor)[:FotoInspeccion._meta.get_field("modelo_version").max_length]
+
+
+def _agrupar_detecciones(detections):
+    """Colapsa la lista cruda a una entrada por clase única."""
+    grouped = {}
+    for det in detections:
+        cn = det.get("class_name", "")
+        if cn not in grouped:
+            grouped[cn] = {"class_name": cn, "count": 0, "max_confidence": 0.0}
+        grouped[cn]["count"] += 1
+        grouped[cn]["max_confidence"] = max(
+            grouped[cn]["max_confidence"],
+            det.get("confidence", 0.0),
+        )
+    return list(grouped.values())
+
+
+def _detecciones_crudas(resultados):
+    """One entry per detected instance: class, confidence, pixel box and RLE mask (or None).
+
+    The normalized box and the center/size duplicates of the library payload
+    are left out; the image size is kept so a client can scale the boxes.
+    """
+    tamano = resultados.get("image_size") or {}
+    return {
+        "ancho": tamano.get("width"),
+        "alto": tamano.get("height"),
+        "detecciones": [
+            {
+                "class_id": det.get("class_id"),
+                "class_name": det.get("class_name", ""),
+                "confidence": det.get("confidence", 0.0),
+                "bbox": {k: (det.get("bbox") or {}).get(k) for k in ("x1", "y1", "x2", "y2")},
+                "mask": det.get("mask"),
+            }
+            for det in resultados.get("detections", [])
+        ],
+    }
+
+
+def _notificar(foto: FotoInspeccion) -> None:
+    """Publica el estado actual de la foto al canal pub/sub de su inspección."""
+    publicar_evento(
+        foto.inspeccion_id,
+        event="foto-updated",
+        data={
+            "foto_id": foto.pk,
+            "inspeccion_id": foto.inspeccion_id,
+            "estado": foto.estado,
+            "severidad": foto.severidad,
+            "detecciones": enriquecer_detecciones(foto.detecciones),
+            "tiempo_inferencia_ms": foto.tiempo_inferencia_ms,
+            "modelo": foto.modelo_id,
+            "modelo_version": foto.modelo_version,
+            "taxonomia_version": foto.taxonomia_version,
+            # URL (not the storage key): the browser uses it as-is. Relative
+            # (``/media/...``) on local storage, absolute and signed on a bucket.
+            "imagen_anotada": url_archivo(foto.imagen_anotada),
+            "error_detalle": foto.error_detalle,
+            "detalle_disponible": bool(foto.detecciones_archivo),
+        },
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Dead Letter Queue
+# ─────────────────────────────────────────────────────────────────────────────
+
+@shared_task(name="vision.dead_letter", ignore_result=True)
+def dead_letter(
+    foto_id: int,
+    error_type: str,
+    error_detail: str,
+    original_task_id: str,
+) -> None:
+    """
+    Registra tareas que agotaron reintentos o fallaron de forma no recuperable.
+
+    Visible en Flower bajo la cola ``vision.dead``. Para reencolar manualmente:
+        from vision.tasks import procesar_foto
+        procesar_foto.apply_async([foto_id])
+    """
+    logger.error(
+        "DEAD_LETTER | foto=%s | %s: %s | original_task=%s",
+        foto_id,
+        error_type,
+        error_detail[:300],
+        original_task_id,
+    )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Tarea principal
+# ─────────────────────────────────────────────────────────────────────────────
+
+@shared_task(
+    bind=True,
+    name="vision.procesar_foto",
+    autoretry_for=(IOError, OSError),
+    retry_backoff=True,
+    retry_backoff_max=60,
+    retry_jitter=True,
+    retry_kwargs={"max_retries": _MAX_RETRIES},
+)
+def procesar_foto(self, foto_id: int):
+    """Ejecuta la inferencia YOLO sobre una ``FotoInspeccion``.
+
+    Pasos:
+      1. Marca la foto como ``en_proceso`` (idempotente: si ya está
+         ``completada`` la tarea retorna sin reprocesar).
+      2. Lee bytes desde el storage y verifica que la imagen es válida.
+      3. Delega procesado + anotación a ``inference.run_inference`` (nautic_core v3)
+      4. Persiste imagen anotada, detecciones agrupadas, severidad y estado.
+      5. Ante excepción, marca ``error`` con detalle y reintenta si aplica.
+      6. Al finalizar (éxito, error final o skip) libera el slot de concurrencia.
+    """
+    try:
+        foto = FotoInspeccion.objects.get(pk=foto_id)
+    except FotoInspeccion.DoesNotExist:
+        logger.warning("FotoInspeccion %s no existe; tarea abortada.", foto_id)
+        track_concurrent_end(foto_id)
+        return
+
+    # Idempotencia: re-deliveries por acks_late no deben reprocesar lo ya hecho
+    if foto.estado == FotoInspeccion.Estado.COMPLETADA:
+        logger.info("Foto %s ya completada; tarea ignorada.", foto_id)
+        track_concurrent_end(foto_id)
+        return
+
+    foto.estado = FotoInspeccion.Estado.EN_PROCESO
+    foto.error_detalle = None
+    foto.save(update_fields=["estado", "error_detalle"])
+    _notificar(foto)
+
+    try:
+        imagen_bytes = leer_archivo(foto.imagen_original)
+
+        # Validación de integridad (no es procesamiento — sólo defensa contra
+        # archivos corruptos o renombrados con extensión falsa)
+        try:
+            Image.open(io.BytesIO(imagen_bytes)).verify()
+        except Exception:
+            raise ValueError("El archivo almacenado no es una imagen válida.")
+
+        # Procesado + anotación íntegramente vía nautic_core
+        # Modelo elegido al disparar el análisis; fotos anteriores a esa
+        # elección (modelo_id nulo) usan el modelo por defecto.
+        imagen_anotada_bytes, resultados = run_inference(
+            imagen_bytes,
+            incluir_mascaras=True,
+            model_id=foto.modelo_id or modelo_por_defecto(),
+        )
+
+        # Persistir imagen anotada en el storage; se guarda la clave devuelta.
+        clave_anotada = guardar_anotada(foto_id, imagen_anotada_bytes)
+        # Boxes and masks go to storage as JSON; Postgres keeps only the key.
+        detecciones_anteriores = foto.detecciones_archivo
+        clave_detecciones = guardar_detecciones(
+            foto_id, json.dumps(_detecciones_crudas(resultados)).encode("utf-8")
+        )
+
+        raw_detections = resultados.get("detections", [])
+
+        foto.imagen_anotada = clave_anotada
+        foto.detecciones_archivo = clave_detecciones
+        foto.detecciones = _agrupar_detecciones(raw_detections)
+        foto.tiempo_inferencia_ms = round(resultados.get("inference_time_ms", 0), 2)
+        foto.severidad = _calcular_severidad(raw_detections)
+        # Overwritten on every analysis (retries included); None when the
+        # installed core_engine does not report them.
+        foto.modelo_version = _version(resultados.get("model_version"))
+        foto.taxonomia_version = _version(resultados.get("taxonomy_version"))
+        foto.estado = FotoInspeccion.Estado.COMPLETADA
+        foto.error_detalle = None
+        foto.save(update_fields=[
+            "imagen_anotada", "detecciones_archivo", "detecciones", "tiempo_inferencia_ms",
+            "severidad", "modelo_version", "taxonomia_version", "estado",
+            "error_detalle",
+        ])
+        # The previous analysis' file is dropped only once the new key is saved.
+        if detecciones_anteriores and detecciones_anteriores != clave_detecciones:
+            borrar_archivo(detecciones_anteriores)
+        # Mantener la peor severidad de la inspección (UPDATE condicional atómico).
+        subir_severidad_max(
+            foto.inspeccion_id, NivelSeveridad.desde_texto(foto.severidad)
+        )
+        logger.info(
+            "Foto %s procesada (%.2f ms, severidad=%s, detecciones=%d)",
+            foto_id, foto.tiempo_inferencia_ms, foto.severidad, len(raw_detections),
+        )
+        _notificar(foto)
+        track_concurrent_end(foto_id)  # éxito: liberar slot
+
+    except Exception as exc:
+        logger.exception("Error procesando foto %s", foto_id)
+        try:
+            foto.refresh_from_db()
+            foto.estado = FotoInspeccion.Estado.ERROR
+            foto.error_detalle = str(exc)[:500]
+            foto.save(update_fields=["estado", "error_detalle"])
+            _notificar(foto)
+        except Exception:
+            logger.exception(
+                "No se pudo persistir estado de error de foto %s", foto_id
+            )
+
+        # DLQ: liberar slot y enviar a dead letter si es fallo final.
+        # IOError/OSError → autoretry_for reintenta hasta _MAX_RETRIES.
+        # Cualquier otra excepción → no hay retry, es fallo terminal.
+        is_retryable = isinstance(exc, (IOError, OSError))
+        is_final = not is_retryable or self.request.retries >= _MAX_RETRIES
+        if is_final:
+            track_concurrent_end(foto_id)
+            try:
+                dead_letter.apply_async(
+                    args=[foto_id, type(exc).__name__, str(exc)[:500], self.request.id],
+                    queue="vision.dead",
+                )
+            except Exception:
+                logger.exception("No se pudo enviar a DLQ (foto=%s)", foto_id)
+        raise
