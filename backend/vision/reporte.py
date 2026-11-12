@@ -129,6 +129,17 @@ def fotos_revisables(inspeccion):
 _CAMPOS_BORRADOR = ('conclusion', 'observaciones', 'recomendaciones', 'inspector_nombre', 'inspector_cargo')
 
 
+def textos_reporte(inspeccion, borrador=None):
+    """The draft's texts, with the inspector name defaulting to who took the inspection.
+
+    The name is known since the inspection was created, so the editor shows it
+    filled in; a saved name replaces it, and clearing it falls back again.
+    """
+    textos = {campo: getattr(borrador, campo) if borrador else '' for campo in _CAMPOS_BORRADOR}
+    textos['inspector_nombre'] = textos['inspector_nombre'] or inspeccion.tomado_por
+    return textos
+
+
 def datos_reporte(inspeccion):
     """Everything the report shows, from the stored data plus the inspector's draft.
 
@@ -179,7 +190,7 @@ def datos_reporte(inspeccion):
 
     modelos = sorted({(f.modelo_id, f.modelo_version) for f in analizadas if f.modelo_id},
                      key=lambda m: (m[0], m[1] or ''))
-    textos = {campo: getattr(borrador, campo) if borrador else '' for campo in _CAMPOS_BORRADOR}
+    textos = textos_reporte(inspeccion, borrador)
 
     return {
         'inspeccion': {
@@ -187,7 +198,7 @@ def datos_reporte(inspeccion):
             'codigo': 'INS-%04d' % inspeccion.id,
             'nombre': inspeccion.nombre,
             'descripcion': inspeccion.descripcion,
-            'tomado_por': textos['inspector_nombre'] or inspeccion.tomado_por,
+            'tomado_por': textos['inspector_nombre'],
             'cargo': textos['inspector_cargo'],
             'fecha': inspeccion.fecha_creacion,
         },

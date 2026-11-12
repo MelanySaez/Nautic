@@ -145,11 +145,11 @@ function Editor({ inspeccionId, inicial }: { inspeccionId: number; inicial: Borr
             <div className="grid gap-5 sm:grid-cols-2">
               {(
                 [
-                  ['inspectorNombre', 'Nombre del inspector'],
-                  ['inspectorCargo', 'Cargo'],
+                  ['inspectorNombre', 'Nombre del inspector', 'Se completa con quien tomó la inspección; puedes cambiarlo.'],
+                  ['inspectorCargo', 'Cargo', undefined],
                 ] as const
-              ).map(([clave, etiqueta]) => (
-                <Campo key={clave} etiqueta={etiqueta} error={errores[clave]}>
+              ).map(([clave, etiqueta, ayuda]) => (
+                <Campo key={clave} etiqueta={etiqueta} error={errores[clave]} ayuda={ayuda}>
                   <input
                     value={edicion.textos[clave]}
                     onChange={(e) => cambiarTexto(clave, e.target.value)}
