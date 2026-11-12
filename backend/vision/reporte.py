@@ -22,7 +22,7 @@ from reportlab.platypus import (
 )
 
 from .almacenamiento import leer_archivo
-from .models import FotoInspeccion, NivelSeveridad, ReporteInspeccion, ValidacionFoto
+from .models import FotoInspeccion, NivelSeveridad, ReporteInspeccion
 from .taxonomia import TIPO_COMPONENTE, info_clase
 
 logger = logging.getLogger(__name__)
@@ -49,31 +49,31 @@ def _peor(*severidades):
     return peor if _nivel(peor) else None
 
 
-def _hallazgos(detecciones, descartadas=()):
-    """Anomalies of one photo (everything except known components), with taxonomy.
+def _hallazgos(foto):
+    """Anomalies of one photo (its ``DeteccionFoto`` rows except known components), with taxonomy.
 
     ``descartado`` marks the classes the inspector dismissed as false positives.
+    Uses the prefetched rows when the queryset prefetched ``detecciones``.
     """
     hallazgos = []
-    for det in detecciones or []:
-        clase = det.get('class_name', '')
-        info = info_clase(clase)
+    for fila in foto.detecciones.all():
+        info = info_clase(fila.clase)
         if info['tipo'] == TIPO_COMPONENTE:
             continue
         hallazgos.append({
-            'clase': clase,
+            'clase': fila.clase,
             'etiqueta': info['etiqueta'],
             'severidad': info['severidad'],
-            'total': det.get('count') or 0,
-            'confianza_max': det.get('max_confidence'),
-            'descartado': clase in descartadas,
+            'total': fila.cantidad,
+            'confianza_max': fila.confianza_max,
+            'descartado': fila.descartada,
         })
     return hallazgos
 
 
 def clases_anomalia(foto):
     """Class names of a photo's anomalies: the only ones the inspector can discard."""
-    return {h['clase'] for h in _hallazgos(foto.detecciones)}
+    return {h['clase'] for h in _hallazgos(foto)}
 
 
 def _acumular(acumulado, hallazgos):
@@ -96,14 +96,6 @@ def _seccion_ref(seccion):
     return {'codigo': seccion.codigo, 'nombre': seccion.nombre}
 
 
-def validacion_de(foto):
-    """The photo's ``ValidacionFoto`` or None (reverse one-to-one raises when missing)."""
-    try:
-        return foto.validacion
-    except ValidacionFoto.DoesNotExist:
-        return None
-
-
 def borrador_de(inspeccion):
     """The inspection's ``ReporteInspeccion`` or None when it was never saved."""
     try:
@@ -113,15 +105,14 @@ def borrador_de(inspeccion):
 
 
 def fotos_revisables(inspeccion):
-    """Analyzed photos with at least one anomaly, each with its findings and the inspector's review."""
+    """Analyzed photos with at least one anomaly, each with its findings (and their review)."""
     fotos = (inspeccion.fotos.filter(estado=FotoInspeccion.Estado.COMPLETADA)
-             .select_related('seccion', 'validacion').order_by('fecha_creacion', 'id'))
+             .select_related('seccion').prefetch_related('detecciones').order_by('fecha_creacion', 'id'))
     revisables = []
     for foto in fotos:
-        validacion = validacion_de(foto)
-        hallazgos = _hallazgos(foto.detecciones, validacion.descartadas if validacion else ())
+        hallazgos = _hallazgos(foto)
         if hallazgos:
-            revisables.append((foto, validacion, sorted(
+            revisables.append((foto, sorted(
                 hallazgos, key=lambda h: (-_nivel(h['severidad']), -h['total'], h['etiqueta']))))
     return revisables
 
@@ -148,7 +139,8 @@ def datos_reporte(inspeccion):
     """
     buque = inspeccion.buque
     borrador = borrador_de(inspeccion)
-    fotos = list(inspeccion.fotos.select_related('seccion', 'validacion').order_by('fecha_creacion', 'id'))
+    fotos = list(inspeccion.fotos.select_related('seccion').prefetch_related('detecciones')
+                 .order_by('fecha_creacion', 'id'))
     analizadas = [f for f in fotos if f.estado == FotoInspeccion.Estado.COMPLETADA]
 
     anomalias = {}
@@ -156,8 +148,7 @@ def datos_reporte(inspeccion):
     evidencia = []
     descartados = 0
     for foto in analizadas:
-        validacion = validacion_de(foto)
-        todos = _hallazgos(foto.detecciones, validacion.descartadas if validacion else ())
+        todos = _hallazgos(foto)
         descartados += sum(h['descartado'] for h in todos)
         hallazgos = [h for h in todos if not h['descartado']]
         severidad = _peor(*(h['severidad'] for h in hallazgos))
@@ -176,7 +167,7 @@ def datos_reporte(inspeccion):
                 'severidad': severidad,
                 'clave_imagen': foto.imagen_anotada or foto.imagen_original,
                 'hallazgos': _ordenar_hallazgos({h['clase']: h for h in hallazgos}),
-                'nota': validacion.nota if validacion else '',
+                'nota': foto.nota_inspector,
                 'con_descartes': any(h['descartado'] for h in todos),
             })
 

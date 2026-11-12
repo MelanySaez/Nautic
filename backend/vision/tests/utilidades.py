@@ -16,3 +16,16 @@ def png_bytes(lado=4):
     buffer = io.BytesIO()
     Image.new('RGB', (lado, lado)).save(buffer, format='PNG')
     return buffer.getvalue()
+
+
+def crear_foto(detecciones=None, **campos):
+    """A ``FotoInspeccion`` plus its ``DeteccionFoto`` rows, from the grouped API shape
+    ``[{class_name, count, max_confidence}]``."""
+    from vision.models import DeteccionFoto, FotoInspeccion
+
+    foto = FotoInspeccion.objects.create(**campos)
+    DeteccionFoto.objects.bulk_create([
+        DeteccionFoto(foto=foto, clase=d['class_name'], cantidad=d['count'], confianza_max=d['max_confidence'])
+        for d in detecciones or []
+    ])
+    return foto

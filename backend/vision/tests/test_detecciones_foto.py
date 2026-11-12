@@ -7,7 +7,7 @@ from django.core.files.storage import default_storage
 from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 
-from vision.models import Buque, FotoInspeccion, InspeccionCasco, SeccionCasco
+from vision.models import Buque, FotoInspeccion, InspeccionCasco, SeccionCasco, resumen_detecciones
 from vision.tasks import procesar_foto
 from vision.tests.utilidades import STORAGES_EN_MEMORIA, png_bytes
 
@@ -69,7 +69,7 @@ class DeteccionesFotoTests(TestCase):
         ))
 
         self.assertTrue(run.call_args.kwargs['incluir_mascaras'])
-        self.assertEqual(self.foto.detecciones, [
+        self.assertEqual(resumen_detecciones(self.foto), [
             {'class_name': 'corrosion', 'count': 1, 'max_confidence': 0.91},
             {'class_name': 'ship_hull', 'count': 1, 'max_confidence': 0.8},
         ])

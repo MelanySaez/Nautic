@@ -15,7 +15,7 @@ from rest_framework.renderers import BaseRenderer, JSONRenderer
 from rest_framework.response import Response
 
 from .almacenamiento import url_archivo
-from .models import FotoInspeccion, InspeccionCasco, ReporteInspeccion, ValidacionFoto
+from .models import FotoInspeccion, InspeccionCasco, ReporteInspeccion
 from .reporte import borrador_de, clases_anomalia, fotos_revisables, generar_pdf, textos_reporte
 
 logger = logging.getLogger(__name__)
@@ -43,10 +43,10 @@ def _borrador_to_dict(inspeccion, request=None):
             'seccion': {'codigo': foto.seccion.codigo, 'nombre': foto.seccion.nombre},
             'imagen': url_archivo(foto.imagen_anotada or foto.imagen_original, request),
             'severidad': foto.severidad,
-            'nota': validacion.nota if validacion else '',
+            'nota': foto.nota_inspector,
             'hallazgos': hallazgos,
         }
-        for foto, validacion, hallazgos in fotos_revisables(inspeccion)
+        for foto, hallazgos in fotos_revisables(inspeccion)
     ]
     return data
 
@@ -201,7 +201,14 @@ def api_vision_inspeccion_reporte(request, inspeccion_id):
             setattr(borrador, campo, valor)
         borrador.save()  # always: `actualizado` records the last review
         for foto, cambios in fotos:
-            ValidacionFoto.objects.update_or_create(foto=foto, defaults=cambios)
+            if 'descartadas' in cambios:
+                # Only anomaly rows are listed in `descartadas`; components stay as they are.
+                anomalias = foto.detecciones.filter(clase__in=clases_anomalia(foto))
+                anomalias.update(descartada=False)
+                anomalias.filter(clase__in=cambios['descartadas']).update(descartada=True)
+            if 'nota' in cambios:
+                foto.nota_inspector = cambios['nota']
+                foto.save(update_fields=['nota_inspector'])
 
     inspeccion = InspeccionCasco.objects.get(pk=inspeccion.pk)
     return Response(_borrador_to_dict(inspeccion, request))

@@ -81,7 +81,7 @@ Foto individual analizada por YOLO. Máquina de estados asíncrona.
 | `seccion` | FK → SeccionCasco | Zona del casco (PROTECT) |
 | `imagen_original` | CharField(500) | Clave en el storage, sin prefijo `media/`: `inspecciones/originales/<uuid><ext>` |
 | `imagen_anotada` | CharField(500) null | Clave en el storage de la imagen con bounding boxes: `inspecciones/anotadas/<foto_id>_<hex8>.jpg` |
-| `detecciones` | JSONField null | Lista colapsada por clase: `[{class_name, count, max_confidence}]` |
+| `nota_inspector` | TextField | Nota del inspector para el reporte (migración `0011`) |
 | `tiempo_inferencia_ms` | FloatField null | Tiempo de inferencia reportado por nautic_core |
 | `severidad` | CharField(20) null | `critical` / `high` / `medium` / `low` |
 | `estado` | CharField(20) | Estado actual (ver máquina de estados) |
@@ -98,7 +98,7 @@ pendiente → en_proceso → completada
                        ↘ error → (pendiente si se reintenta)
 ```
 
-**Estructura `detecciones` (JSONField):**
+**Detecciones agrupadas (`DeteccionFoto`, migraciones `0011`/`0012`):** una fila por clase y foto (`foto.detecciones`): `clase`, `cantidad`, `confianza_max`, `descartada` (falso positivo descartado por el inspector en el reporte); única por `(foto, clase)`, índice `(clase, foto)`. El worker reemplaza las filas en cada análisis. La API las expone con `resumen_detecciones(foto)` en este formato:
 ```json
 [
   {"class_name": "corrosion", "count": 2, "max_confidence": 0.924},

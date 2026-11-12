@@ -28,7 +28,7 @@ from .inference import (
 )
 from .models import (
     Buque, SeccionCasco, InspeccionCasco, FotoInspeccion, NivelSeveridad,
-    nombre_por_defecto, recalcular_severidad_max,
+    nombre_por_defecto, recalcular_severidad_max, resumen_detecciones,
 )
 from .pubsub import publicar_evento, suscribirse
 from .ratelimit import check_upload_rate, get_client_ip, track_concurrent_start
@@ -254,7 +254,7 @@ def _foto_to_dict(f, request=None):
         'seccion': seccion_to_dict(f.seccion),
         'imagen_original': url_archivo(f.imagen_original, request),
         'imagen_anotada': url_archivo(f.imagen_anotada, request),
-        'detecciones': enriquecer_detecciones(f.detecciones),
+        'detecciones': enriquecer_detecciones(resumen_detecciones(f)),
         'tiempo_inferencia_ms': f.tiempo_inferencia_ms,
         'severidad': f.severidad,
         'estado': f.estado,
@@ -282,7 +282,7 @@ def _inspeccion_to_dict(insp, include_fotos=False, request=None):
         'total_fotos': insp.n_fotos if hasattr(insp, 'n_fotos') else insp.fotos.count(),
     }
     if include_fotos:
-        fotos_qs = insp.fotos.select_related('seccion').order_by('fecha_creacion')
+        fotos_qs = insp.fotos.select_related('seccion').prefetch_related('detecciones').order_by('fecha_creacion')
         d['fotos'] = [_foto_to_dict(f, request) for f in fotos_qs]
     return d
 

@@ -219,9 +219,7 @@ class FotoInspeccion(models.Model):
     )
     imagen_original = models.CharField(max_length=500)
     imagen_anotada = models.CharField(max_length=500, blank=True, null=True)
-    # Clases detectadas — una entrada por clase única:
-    # [{"class_name": "corrosion", "count": 2, "max_confidence": 0.92}, ...]
-    detecciones = models.JSONField(null=True, blank=True)
+    # Grouped detections live in ``DeteccionFoto`` (``foto.detecciones``), one row per class.
     # Storage key of the raw detections of the last analysis (one box and,
     # when the model produces it, one RLE mask per instance), kept as a JSON
     # file next to the photos because masks are too heavy for a column.
@@ -243,6 +241,8 @@ class FotoInspeccion(models.Model):
     # before they were recorded, or not analyzed yet.
     modelo_version = models.CharField(max_length=32, blank=True, null=True)
     taxonomia_version = models.CharField(max_length=32, blank=True, null=True)
+    # Inspector's note for the report (see ``vision/reporte.py``).
+    nota_inspector = models.TextField(blank=True, default='')
     fecha_creacion = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -281,22 +281,50 @@ class ReporteInspeccion(models.Model):
         return f"Reporte de la inspección #{self.inspeccion_id}"
 
 
-class ValidacionFoto(models.Model):
+class DeteccionFoto(models.Model):
     """
-    Inspector's review of one photo's findings for the report: the anomaly
-    classes discarded as false positives and a free note.
+    One detected class in one photo: how many instances the model found and
+    its highest confidence (the boxes and masks stay in ``detecciones_archivo``).
+    ``descartada`` marks a false positive dismissed by the inspector for the
+    report; a new analysis replaces the photo's rows.
     """
-    foto = models.OneToOneField(
+    foto = models.ForeignKey(
         FotoInspeccion,
         on_delete=models.CASCADE,
-        related_name='validacion',
+        related_name='detecciones',
     )
-    descartadas = models.JSONField(default=list, blank=True)  # class names, e.g. ["paint_peel"]
-    nota = models.TextField(blank=True, default='')
-    fecha_modificacion = models.DateTimeField(auto_now=True)
+    clase = models.CharField(max_length=64)          # taxonomy class name, e.g. "corrosion"
+    cantidad = models.PositiveIntegerField()
+    confianza_max = models.FloatField()
+    descartada = models.BooleanField(default=False)
 
     class Meta:
-        db_table = 'validacion_foto'
+        db_table = 'deteccion_foto'
+        ordering = ['id']  # the order the analysis reported the classes in
+        constraints = [
+            models.UniqueConstraint(fields=['foto', 'clase'], name='deteccion_foto_clase_uniq'),
+        ]
+        indexes = [
+            models.Index(fields=['clase', 'foto'], name='deteccion_clase_foto_idx'),
+        ]
 
     def __str__(self):
-        return f"Validación de la foto #{self.foto_id}"
+        return f"{self.clase} ×{self.cantidad} — foto #{self.foto_id}"
+
+
+def resumen_detecciones(foto):
+    """
+    The photo's detections in the API shape ``[{class_name, count, max_confidence}]``.
+
+    ``None`` while the photo has never been analyzed, ``[]`` when it was analyzed
+    and nothing was found (also while it is re-queued: ``detecciones_archivo`` marks
+    a past analysis). Uses prefetched rows when present.
+    """
+    filas = list(foto.detecciones.all())
+    analizada = foto.estado == FotoInspeccion.Estado.COMPLETADA or bool(foto.detecciones_archivo)
+    if not filas and not analizada:
+        return None
+    return [
+        {'class_name': f.clase, 'count': f.cantidad, 'max_confidence': f.confianza_max}
+        for f in filas
+    ]
