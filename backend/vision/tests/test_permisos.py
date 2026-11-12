@@ -70,7 +70,8 @@ class CrearInspeccionTests(BasePermisos):
         res = self._como(self.extrano).post('/api/vision/inspecciones/', {'buque_id': self.buque.id}, format='json')
 
         body = res.json()
-        self.assertEqual(body['lider'], {'id': self.extrano.id, 'nombre': 'Ext', 'email': 'otro@x.com'})
+        # Other users' emails are never exposed: only id and name.
+        self.assertEqual(body['lider'], {'id': self.extrano.id, 'nombre': 'Ext'})
         self.assertFalse(body['privada'])
         self.assertEqual(body['tomado_por'], 'Ext')
         self.assertEqual(body['mis_permisos'], {**TODOS, 'ver': True, 'es_lider': True})
@@ -173,11 +174,12 @@ class MiembrosTests(BasePermisos):
         res = self._como(self.extrano).get(self._url('miembros/'))
 
         self.assertEqual(res.status_code, 200)
-        filas = {m['usuario']['email']: (m['rol'], m['permisos']) for m in res.json()}
+        self.assertTrue(all('email' not in m['usuario'] for m in res.json()))
+        filas = {m['usuario']['nombre']: (m['rol'], m['permisos']) for m in res.json()}
         self.assertEqual(filas, {
-            'cola@x.com': ('colaborador', TODOS),
-            'revi@x.com': ('revisor', {**NINGUNO, 'editar_reporte': True}),
-            'obse@x.com': ('observador', NINGUNO),
+            'Carlos': ('colaborador', TODOS),
+            'Rita': ('revisor', {**NINGUNO, 'editar_reporte': True}),
+            'Omar': ('observador', NINGUNO),
         })
 
     def test_permisos_ajustados_quedan_como_personalizado(self):

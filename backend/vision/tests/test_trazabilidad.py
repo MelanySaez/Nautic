@@ -25,7 +25,7 @@ class TrazabilidadTests(TestCase):
             self.addCleanup(patcher.stop)
 
     def _ref(self):
-        return {'id': self.ana.id, 'nombre': 'Ana', 'email': 'ana@x.com'}
+        return {'id': self.ana.id, 'nombre': 'Ana'}
 
     def _inspeccion(self):
         buque = Buque.objects.create(nombre='ARC Caribe', tipo='Fragata')
@@ -72,3 +72,21 @@ class TrazabilidadTests(TestCase):
         self.assertEqual(ReporteInspeccion.objects.get(inspeccion_id=inspeccion_id).revisado_por, self.ana)
         self.assertEqual(foto.detecciones.get(clase='corrosion').validado_por, self.ana)
         self.assertIsNone(foto.detecciones.get(clase='anode').validado_por)  # components are not reviewed
+
+    def test_sin_nombre_se_muestra_un_alias_y_nunca_el_email(self):
+        self.ana.nombre = ''
+        self.ana.save(update_fields=['nombre'])
+
+        res = self.cliente.post('/api/buques/', {'nombre': 'ARC Austral', 'tipo': 'Fragata'}, format='json')
+
+        self.assertEqual(res.json()['creado_por'], {'id': self.ana.id, 'nombre': f'Usuario #{self.ana.id}'})
+
+    def test_tomado_por_por_defecto_tampoco_usa_el_email(self):
+        self.ana.nombre = ''
+        self.ana.save(update_fields=['nombre'])
+        buque = Buque.objects.create(nombre='ARC Austral', tipo='Fragata')
+
+        res = self.cliente.post('/api/vision/inspecciones/', {'buque_id': buque.id}, format='json')
+
+        self.assertEqual(res.json()['tomado_por'], f'Usuario #{self.ana.id}')
+

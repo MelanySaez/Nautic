@@ -45,3 +45,13 @@ class Usuario(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return self.nombre or self.email
+
+
+def referencia_publica(usuario):
+    """
+    How other users see someone: id and name only, never the email (the user decided
+    other people's emails are private). A user without a name shows as "Usuario #<id>".
+    """
+    if usuario is None:
+        return None
+    return {'id': usuario.id, 'nombre': usuario.nombre or f'Usuario #{usuario.id}'}

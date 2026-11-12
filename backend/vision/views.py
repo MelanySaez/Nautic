@@ -31,6 +31,8 @@ from .models import (
     Buque, SeccionCasco, InspeccionCasco, FotoInspeccion, NivelSeveridad,
     InspeccionMiembro, nombre_por_defecto, recalcular_severidad_max, resumen_detecciones,
 )
+from cuentas.models import referencia_publica
+
 from .permisos import LIDER, exigir, permisos_de, puede_ver, visibles_para
 from .pubsub import publicar_evento, suscribirse
 from .ratelimit import check_upload_rate, get_client_ip, track_concurrent_start
@@ -251,7 +253,7 @@ def api_ai_anomalias(request):
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _usuario_ref(usuario):
-    return {'id': usuario.id, 'nombre': usuario.nombre, 'email': usuario.email} if usuario else None
+    return referencia_publica(usuario)
 
 
 def _foto_to_dict(f, request=None):
@@ -639,7 +641,7 @@ def api_vision_inspecciones(request):
             descripcion=request.data.get('descripcion', ''),
             # Who creates it leads it; the name signs by default and stays editable.
             tomado_por=(tomado_por.strip() if isinstance(tomado_por, str) else '')
-            or request.user.nombre or request.user.email,
+            or referencia_publica(request.user)['nombre'],  # never the email
             lider=request.user,
         )
         if not insp.nombre:

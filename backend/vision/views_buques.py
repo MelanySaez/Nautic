@@ -9,6 +9,8 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
 from .models import Buque
+from cuentas.models import referencia_publica
+
 from .permisos import condicion_visible
 from .secciones import (
     crear_secciones_estandar, crear_secciones_personalizadas, seccion_to_dict, validar_secciones,
@@ -63,10 +65,7 @@ def _buque_to_dict(buque):
     for campo in _CAMPOS_ESCRITURA:
         data[campo] = getattr(buque, campo)
     data['secciones'] = [seccion_to_dict(s) for s in buque.secciones.all()]
-    creador = buque.creado_por
-    data['creado_por'] = (
-        {'id': creador.id, 'nombre': creador.nombre, 'email': creador.email} if creador else None
-    )
+    data['creado_por'] = referencia_publica(buque.creado_por)
     data['created_at'] = _iso(buque.created_at)
     data['updated_at'] = _iso(buque.updated_at)
     return data

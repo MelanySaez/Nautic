@@ -16,6 +16,8 @@ from rest_framework.response import Response
 
 from .almacenamiento import url_archivo
 from .models import FotoInspeccion, InspeccionCasco, ReporteInspeccion
+from cuentas.models import referencia_publica
+
 from .permisos import exigir
 from .reporte import borrador_de, clases_anomalia, fotos_revisables, generar_pdf, textos_reporte
 
@@ -38,8 +40,7 @@ def _borrador_to_dict(inspeccion, request=None):
     borrador = borrador_de(inspeccion)
     data = textos_reporte(inspeccion, borrador)
     data['actualizado'] = borrador.fecha_modificacion.isoformat() if borrador else None
-    revisor = borrador.revisado_por if borrador else None
-    data['revisado_por'] = {'id': revisor.id, 'nombre': revisor.nombre, 'email': revisor.email} if revisor else None
+    data['revisado_por'] = referencia_publica(borrador.revisado_por if borrador else None)
     data['fotos'] = [
         {
             'foto_id': foto.id,

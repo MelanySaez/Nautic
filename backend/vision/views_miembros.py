@@ -11,6 +11,8 @@ from drf_spectacular.utils import extend_schema
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
+from cuentas.models import referencia_publica
+
 from .models import InspeccionCasco, InspeccionMiembro
 from .permisos import LIDER, exigir
 
@@ -21,7 +23,7 @@ def _miembro_to_dict(miembro):
     usuario = miembro.usuario
     return {
         'id': miembro.id,
-        'usuario': {'id': usuario.id, 'nombre': usuario.nombre, 'email': usuario.email, 'cargo': usuario.cargo},
+        'usuario': {**referencia_publica(usuario), 'cargo': usuario.cargo},
         'rol': miembro.rol,
         'permisos': miembro.permisos(),
         'fecha_agregado': miembro.fecha_agregado.isoformat(),
