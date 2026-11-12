@@ -46,6 +46,16 @@ class Usuario(AbstractBaseUser, PermissionsMixin):
     def __str__(self):
         return self.nombre or self.email
 
+    def clean(self):
+        super().clean()
+        # Model forms run this before uniqueness validation, including the admin.
+        self.email = type(self).objects.normalize_email(self.email).lower()
+
+    def save(self, *args, **kwargs):
+        self.email = type(self).objects.normalize_email(self.email).lower()
+        # Respect update_fields: a login update must not rewrite a legacy address.
+        return super().save(*args, **kwargs)
+
 
 def referencia_publica(usuario):
     """

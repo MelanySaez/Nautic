@@ -1,7 +1,8 @@
 """User accounts and session login (cookie + CSRF)."""
 from django.contrib.auth import get_user_model
+from django.contrib import admin
 from django.core.cache import cache
-from django.test import TestCase, override_settings
+from django.test import RequestFactory, TestCase, override_settings
 from rest_framework.test import APIClient
 
 Usuario = get_user_model()
@@ -39,6 +40,70 @@ class UsuarioTests(TestCase):
         admin = Usuario.objects.create_superuser('admin@ejemplo.com', 'x')
 
         self.assertTrue(admin.is_staff and admin.is_superuser)
+
+    def test_guardado_directo_normaliza_el_email_sin_ampliar_update_fields(self):
+        usuario = Usuario(email='Directa@Ejemplo.COM')
+        usuario.save()
+        usuario.refresh_from_db()
+        self.assertEqual(usuario.email, 'directa@ejemplo.com')
+        usuario.email = 'Otra@Ejemplo.COM'
+        usuario.save(update_fields=['email'])
+        usuario.refresh_from_db()
+        self.assertEqual(usuario.email, 'otra@ejemplo.com')
+
+        # Legacy rows are not rewritten by unrelated partial updates, including login.
+        Usuario.objects.filter(pk=usuario.pk).update(email='Anterior@Ejemplo.COM')
+        usuario.refresh_from_db()
+        usuario.nombre = 'Nuevo nombre'
+        usuario.save(update_fields=['nombre'])
+        usuario.refresh_from_db()
+        self.assertEqual(usuario.email, 'Anterior@Ejemplo.COM')
+        self.assertEqual(usuario.nombre, 'Nuevo nombre')
+
+
+class UsuarioAdminTests(TestCase):
+    def setUp(self):
+        self.request = RequestFactory().get('/admin/cuentas/usuario/add/')
+        self.request.user = Usuario.objects.create_superuser('admin@ejemplo.com', 'x')
+        self.model_admin = admin.site._registry[Usuario]
+
+    def _formulario(self, email, usuario=None):
+        formulario = self.model_admin.get_form(self.request, obj=usuario)
+        return formulario(data={
+            'email': email, 'nombre': 'Ana', 'cargo': '',
+            'password1': 'Casco-firme-2026', 'password2': 'Casco-firme-2026',
+            'is_active': True,
+        }, instance=usuario)
+
+    def test_creacion_y_edicion_normalizan_el_email_y_permiten_login(self):
+        formulario = self._formulario('Ana@Ejemplo.COM')
+        self.assertTrue(formulario.is_valid(), formulario.errors)
+        usuario = formulario.save()
+        usuario.refresh_from_db()
+        self.assertEqual(usuario.email, 'ana@ejemplo.com')
+        cache.clear()
+        cliente = APIClient()
+        respuesta = cliente.post(URL_LOGIN, {'email': 'ANA@Ejemplo.COM', 'password': 'Casco-firme-2026'})
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertEqual(cliente.get(URL_YO).json()['id'], usuario.id)
+
+        formulario = self._formulario('Editada@Ejemplo.COM', usuario)
+        self.assertTrue(formulario.is_valid(), formulario.errors)
+        formulario.save()
+        usuario.refresh_from_db()
+        self.assertEqual(usuario.email, 'editada@ejemplo.com')
+
+    def test_email_duplicado_con_mayusculas_es_error_del_formulario(self):
+        Usuario.objects.create_user('ana@ejemplo.com', 'x')
+        otro = Usuario.objects.create_user('otro@ejemplo.com', 'x')
+        for usuario in (None, otro):
+            with self.subTest(edicion=usuario is not None):
+                formulario = self._formulario('ANA@Ejemplo.COM', usuario)
+                self.assertFalse(formulario.is_valid())
+                self.assertIn('email', formulario.errors)
+        otro.refresh_from_db()
+        self.assertEqual(otro.email, 'otro@ejemplo.com')
+        self.assertEqual(Usuario.objects.count(), 3)
 
 
 class SesionTests(TestCase):
@@ -134,6 +199,31 @@ class RegistroTests(TestCase):
         respuesta = self._registrar(email='no-es-un-email')
         self.assertIn('email', respuesta.json()['campos'])
         self.assertEqual(Usuario.objects.count(), 1)
+
+    def test_email_superior_al_maximo_no_crea_cuenta_ni_sesion(self):
+        email = 'a' * 64 + '@' + 'b' * 63 + '.' + 'c' * 63 + '.' + 'd' * 58 + '.com'
+        self.assertEqual(len(email), Usuario._meta.get_field('email').max_length + 1)
+
+        respuesta = self._registrar(email=email)
+
+        self.assertEqual(respuesta.status_code, 400)
+        self.assertEqual(respuesta.json(), {
+            'error': 'Datos inválidos.', 'campos': {'email': ['Máximo 254 caracteres.']},
+        })
+        self.assertFalse(Usuario.objects.exists())
+        self.assertNotIn('_auth_user_id', self.cliente.session)
+        self.assertEqual(self.cliente.get(URL_YO).status_code, 401)
+
+    def test_email_del_maximo_permitido_crea_cuenta_y_sesion(self):
+        email = 'a' * 64 + '@' + 'b' * 63 + '.' + 'c' * 63 + '.' + 'd' * 57 + '.com'
+        self.assertEqual(len(email), Usuario._meta.get_field('email').max_length)
+
+        respuesta = self._registrar(email=email)
+
+        self.assertEqual(respuesta.status_code, 201)
+        usuario = Usuario.objects.get()
+        self.assertEqual(usuario.email, email)
+        self.assertEqual(self.cliente.get(URL_YO).json()['id'], usuario.id)
 
     def test_no_permite_elegir_privilegios(self):
         self._registrar(is_staff=True, is_superuser=True)

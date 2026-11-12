@@ -127,6 +127,8 @@ def api_auth_registro(request):
     campos = {}
     if not email:
         campos['email'] = ['Este campo es requerido.']
+    elif len(email) > Usuario._meta.get_field('email').max_length:
+        campos['email'] = [f'Máximo {Usuario._meta.get_field("email").max_length} caracteres.']
     else:
         email = email.lower()
         try:
