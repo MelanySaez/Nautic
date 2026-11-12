@@ -160,7 +160,7 @@ def api_auth_registro(request):
     return Response(usuario_to_dict(usuario), status=201)
 
 
-@extend_schema(tags=['Cuentas'], summary='Cerrar sesión', responses={204: None})
+@extend_schema(tags=['Cuentas'], summary='Cerrar sesión', request=None, responses={204: None})
 @api_view(['POST'])
 @permission_classes([AllowAny])
 def api_auth_logout(request):
