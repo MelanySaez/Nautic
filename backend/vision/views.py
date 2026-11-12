@@ -1021,6 +1021,13 @@ def api_vision_inspeccion_stream(request, inspeccion_id):
 
     keepalive_seconds = getattr(settings, 'SSE_KEEPALIVE_SECONDS', 15)
 
+    def sigue_autorizado():
+        # Re-read account and visibility; never reuse an inspection's membership cache.
+        usuario = get_user_model().objects.filter(pk=request.user.pk, is_active=True).first()
+        return usuario is not None and visibles_para(
+            usuario, InspeccionCasco.objects.filter(pk=inspeccion_id),
+        ).exists()
+
     def event_stream():
         try:
             pubsub = suscribirse(inspeccion_id)
@@ -1029,20 +1036,23 @@ def api_vision_inspeccion_stream(request, inspeccion_id):
             yield _sse_format(json.dumps({"error": "pubsub_unavailable"}), event="error")
             return
 
-        # Handshake: avisa al cliente que el stream está activo
-        yield _sse_format(
-            json.dumps({"inspeccion_id": inspeccion_id, "ts": int(time.time())}),
-            event="ready",
-        )
-
-        # Sugerir al browser un retry de 5s si pierde la conexión
-        yield "retry: 5000\n\n"
-
         try:
+            if not sigue_autorizado():
+                return
+            yield _sse_format(
+                json.dumps({"inspeccion_id": inspeccion_id, "ts": int(time.time())}),
+                event="ready",
+            )
+            if not sigue_autorizado():
+                return
+            yield "retry: 5000\n\n"
+
             last_keepalive = time.time()
             while True:
                 # get_message con timeout corto → permite intercalar keepalives
                 msg = pubsub.get_message(timeout=1.0)
+                if not sigue_autorizado():
+                    return
                 if msg and msg.get('type') == 'message':
                     # El productor envía {"event": "<tipo>", "data": {...}}.
                     # Desempaquetamos: el browser recibe `event: <tipo>` y `data: <json>`.
@@ -1056,6 +1066,8 @@ def api_vision_inspeccion_stream(request, inspeccion_id):
                     yield _sse_format(payload, event=evt)
                 # Keepalive periódico (comentario SSE: línea con prefijo `:`)
                 if time.time() - last_keepalive >= keepalive_seconds:
+                    if not sigue_autorizado():
+                        return
                     yield ":keepalive\n\n"
                     last_keepalive = time.time()
         except GeneratorExit:

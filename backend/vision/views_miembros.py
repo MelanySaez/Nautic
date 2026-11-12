@@ -4,7 +4,7 @@ Members of an inspection: the leader invites users by email, gives them a role
 Everyone who can read the inspection can see who its members are.
 """
 from django.contrib.auth import get_user_model
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.shortcuts import get_object_or_404
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema
@@ -103,8 +103,16 @@ def api_vision_miembros(request, inspeccion_id):
 
     miembro = InspeccionMiembro(inspeccion=inspeccion, usuario=usuario, agregado_por=request.user)
     miembro.asignar(permisos)
-    with transaction.atomic():
-        miembro.save()
+    try:
+        with transaction.atomic():
+            miembro.save()
+    except IntegrityError:
+        # Query only after the failed savepoint has been rolled back.
+        if not inspeccion.miembros.filter(usuario=usuario).exists():
+            raise
+        return Response({'error': 'Datos inválidos.', 'campos': {
+            'email': ['Ya es miembro de la inspección.'],
+        }}, status=400)
     return Response(_miembro_to_dict(miembro), status=201)
 
 

@@ -2,6 +2,8 @@
 from unittest import mock
 
 from django.contrib.auth import get_user_model
+from django.db import IntegrityError
+from django.db.models.query import QuerySet
 from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 
@@ -13,9 +15,14 @@ TODOS = {'subir_fotos': True, 'analizar': True, 'editar_reporte': True, 'editar_
 NINGUNO = {'subir_fotos': False, 'analizar': False, 'editar_reporte': False, 'editar_inspeccion': False}
 
 
-@override_settings(STORAGES=STORAGES_EN_MEMORIA)
+@override_settings(STORAGES=STORAGES_EN_MEMORIA, CELERY_TASK_ALWAYS_EAGER=True)
 class BasePermisos(TestCase):
     def setUp(self):
+        for destino in ('vision.views.publicar_evento', 'vision.views.procesar_foto',
+                        'vision.views.check_upload_rate', 'vision.views.track_concurrent_start'):
+            parche = mock.patch(destino, return_value=(True, None))
+            parche.start()
+            self.addCleanup(parche.stop)
         self.lider = Usuario.objects.create_user('lider@x.com', None, nombre='Lía Líder')
         self.colaborador = Usuario.objects.create_user('cola@x.com', None, nombre='Carlos')
         self.revisor = Usuario.objects.create_user('revi@x.com', None, nombre='Rita')
@@ -168,8 +175,65 @@ class AccionesTests(BasePermisos):
         self.assertEqual(self._como(self.colaborador).patch(
             self._url(), {'lider_id': self.colaborador.id}, format='json').status_code, 403)
 
+    def test_lider_invalido_no_cambia_ningun_campo_ni_miembro(self):
+        self.revisor.is_active = False
+        self.revisor.save(update_fields=['is_active'])
+        antes = list(self.insp.miembros.order_by('id').values())
+        for valor in (None, True, '1', 1.5, [], {}, -1, 999999999, self.revisor.id):
+            with self.subTest(lider_id=valor):
+                res = self._como(self.lider).patch(self._url(), {
+                    'lider_id': valor, 'nombre': 'No guardar',
+                    'descripcion': 'No guardar', 'privada': True,
+                }, format='json')
+                self.assertEqual(res.status_code, 400)
+                self.assertIn('lider_id', res.json()['campos'])
+                self.insp.refresh_from_db()
+                self.assertEqual(self.insp.lider_id, self.lider.id)
+                self.assertEqual(self.insp.nombre, 'Dique')
+                self.assertEqual(self.insp.descripcion, '')
+                self.assertFalse(self.insp.privada)
+                self.assertEqual(list(self.insp.miembros.order_by('id').values()), antes)
+
 
 class MiembrosTests(BasePermisos):
+    def test_invitacion_competidora_devuelve_400_y_conserva_el_miembro(self):
+        existe = QuerySet.exists
+        competidor = None
+
+        def insertar_antes_del_guardado(queryset):
+            nonlocal competidor
+            if queryset.model is InspeccionMiembro and competidor is None:
+                # The competing transaction has committed after validation's read.
+                competidor = InspeccionMiembro(inspeccion=self.insp, usuario=self.extrano,
+                                               agregado_por=self.lider)
+                competidor.asignar(InspeccionMiembro.ROLES['observador'])
+                competidor.save()
+                return False
+            return existe(queryset)
+
+        antes = list(self.insp.miembros.order_by('id').values())
+        with mock.patch.object(QuerySet, 'exists', insertar_antes_del_guardado):
+            res = self._como(self.lider).post(self._url('miembros/'), {
+                'email': self.extrano.email, 'rol': 'colaborador',
+            }, format='json')
+
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(res.json(), {'error': 'Datos inválidos.',
+                                      'campos': {'email': ['Ya es miembro de la inspección.']}})
+        self.assertEqual(list(self.insp.miembros.exclude(pk=competidor.pk).order_by('id').values()), antes)
+        competidor.refresh_from_db()
+        self.assertEqual(competidor.rol, 'observador')
+        self.assertEqual(competidor.permisos(), NINGUNO)
+
+    def test_otro_error_de_integridad_no_se_oculta_como_duplicado(self):
+        antes = list(self.insp.miembros.order_by('id').values())
+        with mock.patch.object(InspeccionMiembro, 'save', side_effect=IntegrityError('other constraint')):
+            with self.assertRaisesMessage(IntegrityError, 'other constraint'):
+                self._como(self.lider).post(self._url('miembros/'), {
+                    'email': self.extrano.email, 'rol': 'revisor',
+                }, format='json')
+        self.assertEqual(list(self.insp.miembros.order_by('id').values()), antes)
+
     def test_lista_de_miembros(self):
         res = self._como(self.extrano).get(self._url('miembros/'))
 
