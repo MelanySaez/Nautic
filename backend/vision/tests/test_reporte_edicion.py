@@ -3,10 +3,10 @@ from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 
 from vision.models import (
-    Buque, FotoInspeccion, InspeccionCasco, ReporteInspeccion, SeccionCasco, ValidacionFoto,
+    Buque, DeteccionFoto, FotoInspeccion, InspeccionCasco, ReporteInspeccion, SeccionCasco,
 )
 from vision.reporte import datos_reporte
-from vision.tests.utilidades import STORAGES_EN_MEMORIA
+from vision.tests.utilidades import STORAGES_EN_MEMORIA, crear_foto
 
 COMPLETADA = FotoInspeccion.Estado.COMPLETADA
 
@@ -27,7 +27,7 @@ class BaseReporte(TestCase):
         self.incrustada = self._foto(self.popa, [_det('marine_growth', 1, 0.7)], 'medium')
 
     def _foto(self, seccion, detecciones, severidad, estado=COMPLETADA, inspeccion=None):
-        return FotoInspeccion.objects.create(
+        return crear_foto(
             inspeccion=inspeccion or self.insp, seccion=seccion, imagen_original='inspecciones/originales/x.png',
             estado=estado, detecciones=detecciones, severidad=severidad,
         )
@@ -99,14 +99,17 @@ class EditarBorradorTests(BaseReporte):
         borrador = ReporteInspeccion.objects.get(inspeccion=self.insp)
         self.assertEqual(borrador.conclusion, 'Casco en estado regular.')
         self.assertEqual(borrador.observaciones, 'Revisar en seco.')
-        self.assertEqual(ValidacionFoto.objects.get(foto=self.corroida).descartadas, ['paint_peel'])
+        self.assertEqual(list(self.corroida.detecciones.filter(descartada=True).values_list('clase', flat=True)),
+                         ['paint_peel'])
+        self.corroida.refresh_from_db()
+        self.assertEqual(self.corroida.nota_inspector, 'Sombra, no pintura.')
 
     def test_volver_a_confirmar_un_hallazgo(self):
         self._patch({'fotos': [{'foto_id': self.corroida.id, 'descartadas': ['paint_peel']}]})
 
         self._patch({'fotos': [{'foto_id': self.corroida.id, 'descartadas': []}]})
 
-        self.assertEqual(ValidacionFoto.objects.get(foto=self.corroida).descartadas, [])
+        self.assertFalse(self.corroida.detecciones.filter(descartada=True).exists())
 
     def test_datos_invalidos_no_guardan_nada(self):
         otra = InspeccionCasco.objects.create(buque=self.buque)
@@ -131,7 +134,7 @@ class EditarBorradorTests(BaseReporte):
         self.assertEqual(set(campos), {'observaciones', 'recomendaciones', 'campo_raro', 'fotos'})
         self.assertEqual(len(campos['fotos']), 4)
         self.assertFalse(ReporteInspeccion.objects.exists())
-        self.assertFalse(ValidacionFoto.objects.exists())
+        self.assertFalse(DeteccionFoto.objects.filter(descartada=True).exists())
 
     def test_foto_repetida(self):
         res = self._patch({'fotos': [
@@ -141,7 +144,7 @@ class EditarBorradorTests(BaseReporte):
 
         self.assertEqual(res.status_code, 400)
         self.assertEqual(len(res.json()['campos']['fotos']), 1)
-        self.assertFalse(ValidacionFoto.objects.exists())
+        self.assertFalse(DeteccionFoto.objects.filter(descartada=True).exists())
 
     def test_foto_id_que_no_es_entero(self):
         res = self._patch({'fotos': [

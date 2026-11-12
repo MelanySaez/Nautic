@@ -16,6 +16,8 @@ import io
 import json
 import logging
 
+from django.db import transaction
+
 from PIL import Image
 from celery import shared_task
 
@@ -23,7 +25,7 @@ from .almacenamiento import (
     borrar_archivo, guardar_anotada, guardar_detecciones, leer_archivo, url_archivo,
 )
 from .inference import modelo_por_defecto, run_inference, severidad_por_clase
-from .models import FotoInspeccion, NivelSeveridad, subir_severidad_max
+from .models import DeteccionFoto, FotoInspeccion, NivelSeveridad, resumen_detecciones, subir_severidad_max
 from .pubsub import publicar_evento
 from .taxonomia import enriquecer_detecciones
 from .ratelimit import track_concurrent_end
@@ -122,7 +124,7 @@ def _notificar(foto: FotoInspeccion) -> None:
             "inspeccion_id": foto.inspeccion_id,
             "estado": foto.estado,
             "severidad": foto.severidad,
-            "detecciones": enriquecer_detecciones(foto.detecciones),
+            "detecciones": enriquecer_detecciones(resumen_detecciones(foto)),
             "tiempo_inferencia_ms": foto.tiempo_inferencia_ms,
             "modelo": foto.modelo_id,
             "modelo_version": foto.modelo_version,
@@ -237,7 +239,6 @@ def procesar_foto(self, foto_id: int):
 
         foto.imagen_anotada = clave_anotada
         foto.detecciones_archivo = clave_detecciones
-        foto.detecciones = _agrupar_detecciones(raw_detections)
         foto.tiempo_inferencia_ms = round(resultados.get("inference_time_ms", 0), 2)
         foto.severidad = _calcular_severidad(raw_detections)
         # Overwritten on every analysis (retries included); None when the
@@ -246,11 +247,19 @@ def procesar_foto(self, foto_id: int):
         foto.taxonomia_version = _version(resultados.get("taxonomy_version"))
         foto.estado = FotoInspeccion.Estado.COMPLETADA
         foto.error_detalle = None
-        foto.save(update_fields=[
-            "imagen_anotada", "detecciones_archivo", "detecciones", "tiempo_inferencia_ms",
-            "severidad", "modelo_version", "taxonomia_version", "estado",
-            "error_detalle",
-        ])
+        with transaction.atomic():
+            foto.save(update_fields=[
+                "imagen_anotada", "detecciones_archivo", "tiempo_inferencia_ms",
+                "severidad", "modelo_version", "taxonomia_version", "estado",
+                "error_detalle",
+            ])
+            # A new analysis replaces the rows, so earlier discards do not carry over.
+            foto.detecciones.all().delete()
+            DeteccionFoto.objects.bulk_create([
+                DeteccionFoto(foto=foto, clase=d["class_name"], cantidad=d["count"],
+                              confianza_max=d["max_confidence"])
+                for d in _agrupar_detecciones(raw_detections)
+            ])
         # The previous analysis' file is dropped only once the new key is saved.
         if detecciones_anteriores and detecciones_anteriores != clave_detecciones:
             borrar_archivo(detecciones_anteriores)

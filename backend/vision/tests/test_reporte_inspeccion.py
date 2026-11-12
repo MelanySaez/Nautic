@@ -6,7 +6,7 @@ from rest_framework.test import APIClient
 
 from vision.models import Buque, FotoInspeccion, InspeccionCasco, NivelSeveridad, SeccionCasco
 from vision.reporte import datos_reporte
-from vision.tests.utilidades import STORAGES_EN_MEMORIA, png_bytes
+from vision.tests.utilidades import STORAGES_EN_MEMORIA, crear_foto, png_bytes
 
 COMPLETADA = FotoInspeccion.Estado.COMPLETADA
 
@@ -31,7 +31,7 @@ class DatosReporteTests(TestCase):
 
     def _foto(self, seccion, estado=COMPLETADA, detecciones=None, severidad=None, **extra):
         clave = default_storage.save('inspecciones/originales/x.png', ContentFile(png_bytes()))
-        return FotoInspeccion.objects.create(
+        return crear_foto(
             inspeccion=self.insp, seccion=seccion, imagen_original=clave, estado=estado,
             detecciones=detecciones, severidad=severidad, **extra,
         )
@@ -116,7 +116,7 @@ class DescargarReporteTests(TestCase):
 
     def test_descarga_un_pdf_adjunto(self):
         clave = default_storage.save('inspecciones/originales/a.png', ContentFile(png_bytes(64)))
-        FotoInspeccion.objects.create(
+        crear_foto(
             inspeccion=self.insp, seccion=self.seccion, imagen_original=clave,
             estado=COMPLETADA, detecciones=[_det('corrosion')], severidad='critical',
         )
@@ -151,7 +151,7 @@ class DescargarReporteTests(TestCase):
         self.assertTrue(res.content.startswith(b'%PDF'))
 
     def test_imagen_ilegible_no_rompe_el_reporte(self):
-        FotoInspeccion.objects.create(
+        crear_foto(
             inspeccion=self.insp, seccion=self.seccion, imagen_original='inspecciones/originales/no-existe.png',
             estado=COMPLETADA, detecciones=[_det('corrosion')], severidad='critical',
         )

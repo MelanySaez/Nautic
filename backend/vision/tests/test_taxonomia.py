@@ -6,7 +6,7 @@ from rest_framework.test import APIClient
 
 from vision.models import Buque, FotoInspeccion, InspeccionCasco, SeccionCasco
 from vision.tasks import _notificar
-from vision.tests.utilidades import STORAGES_EN_MEMORIA
+from vision.tests.utilidades import STORAGES_EN_MEMORIA, crear_foto
 
 DETECCIONES = [
     {'class_name': 'corrosion', 'count': 2, 'max_confidence': 0.9},
@@ -22,7 +22,7 @@ class DeteccionesConTaxonomiaTests(TestCase):
             buque=Buque.objects.create(nombre='ARC Caribe', tipo='Fragata')
         )
         seccion = SeccionCasco.objects.create(buque=insp.buque, codigo='FWD', nombre='Proa')
-        self.foto = FotoInspeccion.objects.create(
+        self.foto = crear_foto(
             inspeccion=insp, seccion=seccion, imagen_original='inspecciones/originales/a.png',
             detecciones=DETECCIONES, estado=FotoInspeccion.Estado.COMPLETADA,
         )
@@ -53,9 +53,10 @@ class DeteccionesConTaxonomiaTests(TestCase):
 
         self._comprobar(publicar.call_args.kwargs['data']['detecciones'])
 
-    def test_una_foto_sin_detecciones_sigue_en_none(self):
-        self.foto.detecciones = None
-        self.foto.save(update_fields=['detecciones'])
+    def test_una_foto_sin_analizar_sigue_en_none(self):
+        self.foto.detecciones.all().delete()
+        self.foto.estado = FotoInspeccion.Estado.PENDIENTE
+        self.foto.save(update_fields=['estado'])
 
         foto = APIClient().get(f'/api/vision/fotos/{self.foto.id}/').json()
 
