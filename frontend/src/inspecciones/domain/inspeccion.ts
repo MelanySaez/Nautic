@@ -95,6 +95,8 @@ export interface NuevaInspeccion {
   descripcion: string
   /** Team invited at creation; the backend creates nothing if any invitation is invalid. */
   miembros?: NuevoMiembro[]
+  /** Private: only the leader and members can see it. Omitted means public (read-only for everyone). */
+  privada?: boolean
 }
 
 /** Server-side search criteria; every field is optional and they combine with AND. */

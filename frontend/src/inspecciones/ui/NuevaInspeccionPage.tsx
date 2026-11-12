@@ -48,6 +48,7 @@ export function NuevaInspeccionPage() {
   const [errorEnvio, setErrorEnvio] = useState<string | null>(null)
   const [enviando, setEnviando] = useState(false)
   const [invitados, setInvitados] = useState<FilaInvitado[]>([])
+  const [privada, setPrivada] = useState(false)
   const [siguienteUid, setSiguienteUid] = useState(1)
   const [erroresInvitados, setErroresInvitados] = useState<Record<number, ErroresFila>>({})
 
@@ -74,6 +75,7 @@ export function NuevaInspeccionPage() {
         tomadoPor: tomadoPor.trim(),
         descripcion: descripcion.trim(),
         ...(enviadas.length ? { miembros: enviadas.map((f) => ({ email: f.email.trim(), rol: f.rol })) } : {}),
+        ...(privada ? { privada: true } : {}),
       })
       navegar(`/vision/${creada.id}`)
     } catch (error) {
@@ -158,6 +160,8 @@ export function NuevaInspeccionPage() {
         <EquipoInicial
           filas={invitados}
           errores={erroresInvitados}
+          privada={privada}
+          alCambiarPrivada={setPrivada}
           alAgregar={() => {
             setInvitados((actual) => [...actual, { uid: siguienteUid, email: '', rol: 'colaborador' }])
             setSiguienteUid(siguienteUid + 1)

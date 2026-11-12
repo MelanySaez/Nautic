@@ -280,6 +280,14 @@ describe('HttpInspeccionesRepository', () => {
     expect(JSON.parse(String(ultimaLlamada().init.body)).miembros).toEqual([{ email: 'ana@nautic.test', rol: 'revisor' }])
   })
 
+  it('sends privada only when the inspection is created private', async () => {
+    fetchMock.mockResolvedValue(respuesta(201, inspeccionDto))
+
+    await repo.crear({ buqueId: 2, tomadoPor: '', descripcion: '', privada: true })
+
+    expect(JSON.parse(String(ultimaLlamada().init.body)).privada).toBe(true)
+  })
+
   it('renames an inspection with a PATCH carrying only the name', async () => {
     fetchMock.mockResolvedValue(respuesta(200, { ...inspeccionDto, nombre: 'Casco proa', fotos: [] }))
 

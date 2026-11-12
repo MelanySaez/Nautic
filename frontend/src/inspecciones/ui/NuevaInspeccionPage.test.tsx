@@ -172,4 +172,19 @@ describe('NuevaInspeccionPage', () => {
       miembros: [{ email: 'ana@nautic.test', rol: 'colaborador' }, { email: 'luis@nautic.test', rol: 'colaborador' }],
     }))
   })
+
+  it('creates a private inspection when that option is checked', async () => {
+    const { dependencias } = crearDependenciasFalsas()
+    dependencias.inspecciones.crear.mockResolvedValue(unaInspeccion({ id: 42 }))
+    renderizar(dependencias)
+    await screen.findByRole('option', { name: 'ARA Libertad · Fragata' })
+    await userEvent.selectOptions(screen.getByLabelText('Buque'), '2')
+
+    const privada = screen.getByRole('checkbox', { name: 'Inspección privada' })
+    expect(privada).not.toBeChecked()
+    await userEvent.click(privada)
+    await userEvent.click(screen.getByRole('button', { name: 'Iniciar inspección' }))
+
+    expect(dependencias.inspecciones.crear).toHaveBeenCalledWith(expect.objectContaining({ buqueId: 2, privada: true }))
+  })
 })

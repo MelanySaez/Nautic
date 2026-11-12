@@ -83,6 +83,7 @@ export class HttpInspeccionesRepository implements InspeccionesRepository {
       descripcion: datos.descripcion,
       // Omitted when nobody is invited, so the request is unchanged for a solo inspection.
       ...(datos.miembros?.length ? { miembros: datos.miembros.map(({ email, rol }) => ({ email, rol })) } : {}),
+      ...(datos.privada ? { privada: true } : {}),
     })
     return aInspeccion(dto)
   }

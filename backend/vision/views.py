@@ -596,6 +596,10 @@ def api_vision_taxonomia(request):
                 },
                 'descripcion': {'type': 'string', 'description': 'Descripción de la inspección (opcional)'},
                 'tomado_por': {'type': 'string', 'description': 'Nombre del inspector (opcional)'},
+                'privada': {
+                    'type': 'boolean', 'default': False,
+                    'description': 'Privada: solo la ven el líder y sus miembros (por defecto, pública en modo lectura).',
+                },
                 'miembros': {
                     'type': 'array',
                     'description': (
@@ -641,6 +645,10 @@ def api_vision_inspecciones(request):
                 {'error': 'Datos inválidos.', 'campos': {'nombre': [error]}}, status=400,
             )
 
+    privada = request.data.get('privada', False)
+    if not isinstance(privada, bool):
+        return Response({'error': 'Datos inválidos.', 'campos': {'privada': ['Debe ser true o false.']}}, status=400)
+
     buque = get_object_or_404(Buque, pk=buque_id)
     # Optional team invited at creation: validated as a whole before anything is saved.
     equipo = []
@@ -659,6 +667,8 @@ def api_vision_inspecciones(request):
             tomado_por=(tomado_por.strip() if isinstance(tomado_por, str) else '')
             or referencia_publica(request.user)['nombre'],  # never the email
             lider=request.user,
+            # The creator is the leader, the only one allowed to make it private.
+            privada=privada,
         )
         if not insp.nombre:
             insp.nombre = nombre_por_defecto(insp)

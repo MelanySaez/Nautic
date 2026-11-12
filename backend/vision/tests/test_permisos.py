@@ -364,3 +364,33 @@ class CrearConEquipoTests(BasePermisos):
         self.assertEqual(res.status_code, 400)
         self.assertEqual(list(res.json()['campos']), ['miembros'])
         self.assertEqual(InspeccionCasco.objects.count(), antes)
+
+
+class CrearPrivadaTests(BasePermisos):
+    def test_se_puede_crear_privada(self):
+        res = self._como(self.lider).post('/api/vision/inspecciones/', {
+            'buque_id': self.buque.id, 'privada': True,
+            'miembros': [{'email': 'revi@x.com', 'rol': 'revisor'}],
+        }, format='json')
+
+        self.assertEqual(res.status_code, 201, res.content)
+        self.assertTrue(res.json()['privada'])
+        url = f"/api/vision/inspecciones/{res.json()['id']}/"
+        self.assertEqual(self._como(self.extrano).get(url).status_code, 404)
+        self.assertEqual(self._como(self.revisor).get(url).status_code, 200)
+
+    def test_por_defecto_es_publica(self):
+        res = self._como(self.lider).post('/api/vision/inspecciones/', {'buque_id': self.buque.id}, format='json')
+
+        self.assertFalse(res.json()['privada'])
+
+    def test_privada_debe_ser_booleano_y_no_crea_nada(self):
+        antes = InspeccionCasco.objects.count()
+
+        res = self._como(self.lider).post('/api/vision/inspecciones/', {
+            'buque_id': self.buque.id, 'privada': 'si',
+        }, format='json')
+
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(list(res.json()['campos']), ['privada'])
+        self.assertEqual(InspeccionCasco.objects.count(), antes)
