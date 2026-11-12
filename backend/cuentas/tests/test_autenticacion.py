@@ -158,3 +158,19 @@ class RegistroTests(TestCase):
             self.assertEqual(self._registrar(password='1').status_code, 400, intento)
 
         self.assertEqual(self._registrar(password='1').status_code, 429)
+
+    @override_settings(REST_FRAMEWORK={
+        'DEFAULT_AUTHENTICATION_CLASSES': ['cuentas.autenticacion.Sesion'],
+        'DEFAULT_THROTTLE_RATES': {'cuentas': '3/min'},
+    })
+    def test_cambiar_x_forwarded_for_no_esquiva_el_limite(self):
+        codigos = []
+        for i in range(5):
+            self.cliente.get(URL_CSRF)
+            codigos.append(self.cliente.post(
+                URL_LOGIN, {'email': 'a@b.com', 'password': 'x'}, format='json',
+                HTTP_X_CSRFTOKEN=self.cliente.cookies['csrftoken'].value, HTTP_X_FORWARDED_FOR=f'10.0.0.{i}',
+            ).status_code)
+
+        self.assertEqual(codigos, [400, 400, 400, 429, 429])
+

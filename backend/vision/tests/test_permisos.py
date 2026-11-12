@@ -224,3 +224,22 @@ class MiembrosTests(BasePermisos):
             self.assertEqual(c.patch(self._url(f'miembros/{miembro.id}/'), {'rol': 'revisor'},
                                      format='json').status_code, 403)
             self.assertEqual(c.delete(self._url(f'miembros/{miembro.id}/')).status_code, 403)
+
+
+class BuquesConInspeccionesTests(BasePermisos):
+    def _totales(self, usuario):
+        res = self._como(usuario).get('/api/buques/?con_inspecciones=1')
+        return {b['nombre']: b['total_inspecciones'] for b in res.json()['resultados']}
+
+    def test_las_inspecciones_privadas_no_se_cuentan_para_quien_no_las_ve(self):
+        self._crear_como(self.lider)                      # ARC Caribe: Dique (public) + a second public one
+        self._privada()                                   # Dique becomes private
+        solo_privada = Buque.objects.create(nombre='ARC Secreto', tipo='Fragata')
+        oculta = InspeccionCasco.objects.create(buque=solo_privada, lider=self.lider, privada=True)
+
+        self.assertEqual(self._totales(self.extrano), {'ARC Caribe': 1})
+        self.assertEqual(self._totales(self.observador), {'ARC Caribe': 2})
+        self.assertEqual(self._totales(self.lider), {'ARC Caribe': 2, 'ARC Secreto': 1})
+        self.assertEqual(self._totales(self.admin), {'ARC Caribe': 2, 'ARC Secreto': 1})
+        self.assertTrue(oculta.pk)
+

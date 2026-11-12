@@ -56,12 +56,23 @@ def permisos_de(usuario, inspeccion):
     return {'ver': puede_ver(usuario, inspeccion), 'es_lider': lider, **concedidos}
 
 
-def visibles_para(usuario, queryset):
-    """Inspections ``usuario`` may read (no join: membership goes through a subquery)."""
+def condicion_visible(usuario, prefijo=''):
+    """``Q`` matching the inspections ``usuario`` may read, or None when it reads all (superuser).
+
+    ``prefijo`` reaches inspections through a relation, e.g. ``'inspecciones_casco__'``
+    from ``Buque`` to filter an aggregate. Membership goes through a subquery (no join).
+    """
     if usuario.is_superuser:
-        return queryset
+        return None
     propias = InspeccionMiembro.objects.filter(usuario=usuario).values('inspeccion_id')
-    return queryset.filter(Q(privada=False) | Q(lider=usuario) | Q(id__in=propias))
+    return (Q(**{f'{prefijo}privada': False}) | Q(**{f'{prefijo}lider': usuario})
+            | Q(**{f'{prefijo}id__in': propias}))
+
+
+def visibles_para(usuario, queryset):
+    """Inspections ``usuario`` may read."""
+    condicion = condicion_visible(usuario)
+    return queryset if condicion is None else queryset.filter(condicion)
 
 
 def exigir(usuario, inspeccion, permiso=None):

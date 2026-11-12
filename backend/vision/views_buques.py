@@ -9,6 +9,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
 from .models import Buque
+from .permisos import condicion_visible
 from .secciones import (
     crear_secciones_estandar, crear_secciones_personalizadas, seccion_to_dict, validar_secciones,
 )
@@ -304,7 +305,9 @@ def api_buques(request):
         con_inspecciones = _parse_booleano(request.query_params.get('con_inspecciones'))
         if con_inspecciones is None:
             return Response({'error': 'con_inspecciones debe ser true, false, 1 o 0.'}, status=400)
-        qs = Buque.objects.annotate(total_inspecciones=models.Count('inspecciones_casco'))
+        # Count only the inspections this user may read: private ones must not leak.
+        visibles = condicion_visible(request.user, prefijo='inspecciones_casco__')
+        qs = Buque.objects.annotate(total_inspecciones=models.Count('inspecciones_casco', filter=visibles))
         if con_inspecciones:
             qs = qs.filter(total_inspecciones__gt=0)
         qs = qs.order_by('nombre', 'id')
