@@ -2,11 +2,10 @@
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.test import TestCase, override_settings
-from rest_framework.test import APIClient
 
 from vision.models import Buque, FotoInspeccion, InspeccionCasco, NivelSeveridad, SeccionCasco
 from vision.reporte import datos_reporte
-from vision.tests.utilidades import STORAGES_EN_MEMORIA, crear_foto, png_bytes
+from vision.tests.utilidades import STORAGES_EN_MEMORIA, cliente_admin, crear_foto, png_bytes
 
 COMPLETADA = FotoInspeccion.Estado.COMPLETADA
 
@@ -106,7 +105,7 @@ class DatosReporteTests(TestCase):
 @override_settings(STORAGES=STORAGES_EN_MEMORIA)
 class DescargarReporteTests(TestCase):
     def setUp(self):
-        self.client = APIClient()
+        self.client = cliente_admin()
         buque = Buque.objects.create(nombre='ARC Caribe', tipo='Fragata')
         self.seccion = SeccionCasco.objects.create(buque=buque, codigo='PRW', nombre='Proa')
         self.insp = InspeccionCasco.objects.create(buque=buque, nombre='Dique 2026')

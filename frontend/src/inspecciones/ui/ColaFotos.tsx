@@ -15,6 +15,8 @@ export function ColaFotos({
   alReintentar,
   reintentoBloqueado = false,
   alEliminar,
+  puedeReintentar = true,
+  puedeEliminar = true,
 }: {
   fotos: Foto[]
   modelos: ModeloIA[]
@@ -23,6 +25,10 @@ export function ColaFotos({
   /** True while no model can be sent yet (catalog loading or no usable model). */
   reintentoBloqueado?: boolean
   alEliminar: (foto: Foto) => void
+  /** The user may analyze this inspection. */
+  puedeReintentar?: boolean
+  /** The user may upload (and so delete) photos of this inspection. */
+  puedeEliminar?: boolean
 }) {
   return (
     <ul aria-label="Fotos de la inspección" className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
@@ -57,7 +63,7 @@ export function ColaFotos({
                 <p className="line-clamp-2 text-xs text-critical">{foto.errorDetalle}</p>
               )}
               <div className="flex justify-end gap-1">
-                {foto.estado === 'error' && (
+                {puedeReintentar && foto.estado === 'error' && (
                   <button
                     type="button"
                     onClick={() => alReintentar(foto)}
@@ -68,15 +74,17 @@ export function ColaFotos({
                     <Icon name="refresh" className="size-4" />
                   </button>
                 )}
-                <button
-                  type="button"
-                  onClick={() => alEliminar(foto)}
-                  disabled={ocupada || foto.estado === 'en_proceso'}
-                  aria-label="Eliminar foto"
-                  className="rounded p-1.5 text-ink-dim hover:bg-critical-bg hover:text-critical disabled:opacity-50"
-                >
-                  <Icon name="trash" className="size-4" />
-                </button>
+                {puedeEliminar && (
+                  <button
+                    type="button"
+                    onClick={() => alEliminar(foto)}
+                    disabled={ocupada || foto.estado === 'en_proceso'}
+                    aria-label="Eliminar foto"
+                    className="rounded p-1.5 text-ink-dim hover:bg-critical-bg hover:text-critical disabled:opacity-50"
+                  >
+                    <Icon name="trash" className="size-4" />
+                  </button>
+                )}
               </div>
             </div>
           </li>

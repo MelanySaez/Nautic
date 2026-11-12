@@ -2,12 +2,19 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { ApiError } from '../../shared/http/apiClient'
-import { crearDependenciasFalsas, renderizarRutas, unaInspeccion, unaPagina, unDetalleBuque } from '../../test/dobles'
+import {
+  crearDependenciasFalsas,
+  renderizarRutas,
+  unaInspeccion,
+  unaPagina,
+  unDetalleBuque,
+  unUsuario,
+} from '../../test/dobles'
 import { ListaInspeccionesRuta } from './ListaInspeccionesPage'
 
 const RUTA = '/inspecciones/buque/1'
 
-function renderizar(dependencias = crearDependenciasFalsas().dependencias, ruta = RUTA) {
+function renderizar(dependencias = crearDependenciasFalsas().dependencias, ruta = RUTA, usuario = unUsuario()) {
   const router = renderizarRutas(
     [
       { path: '/', element: <p>Embarcaciones</p> },
@@ -18,6 +25,7 @@ function renderizar(dependencias = crearDependenciasFalsas().dependencias, ruta 
     ],
     dependencias,
     ruta,
+    usuario,
   )
   return { router, dependencias }
 }
@@ -263,5 +271,37 @@ describe('ListaInspeccionesPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Reintentar' }))
 
     expect(await screen.findByRole('article')).toBeInTheDocument()
+  })
+})
+
+describe('ListaInspeccionesPage permissions', () => {
+  const AJENA = unaInspeccion({ id: 43, lider: { id: 8, nombre: 'Luis Sosa' } })
+
+  it('offers the deletion only to the leader of the inspection', async () => {
+    const { dependencias } = crearDependenciasFalsas()
+    dependencias.inspecciones.buscar.mockResolvedValue(unaPagina([AJENA]))
+    renderizar(dependencias)
+
+    const tarjeta = await screen.findByRole('article')
+
+    expect(within(tarjeta).queryByRole('button', { name: 'Eliminar inspección' })).not.toBeInTheDocument()
+  })
+
+  it('offers the deletion to an admin even when someone else leads it', async () => {
+    const { dependencias } = crearDependenciasFalsas()
+    dependencias.inspecciones.buscar.mockResolvedValue(unaPagina([AJENA]))
+    renderizar(dependencias, RUTA, unUsuario({ id: 99, esAdmin: true }))
+
+    const tarjeta = await screen.findByRole('article')
+
+    expect(within(tarjeta).getByRole('button', { name: 'Eliminar inspección' })).toBeInTheDocument()
+  })
+
+  it('marks private inspections on their card', async () => {
+    const { dependencias } = crearDependenciasFalsas()
+    dependencias.inspecciones.buscar.mockResolvedValue(unaPagina([unaInspeccion({ privada: true })]))
+    renderizar(dependencias)
+
+    expect(within(await screen.findByRole('article')).getByText('Privada')).toBeInTheDocument()
   })
 })

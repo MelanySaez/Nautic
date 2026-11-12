@@ -9,6 +9,9 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
 from .models import Buque
+from cuentas.models import referencia_publica
+
+from .permisos import condicion_visible
 from .secciones import (
     crear_secciones_estandar, crear_secciones_personalizadas, seccion_to_dict, validar_secciones,
 )
@@ -20,7 +23,7 @@ _LIMIT_MAXIMO = 200
 _OFFSET_MAXIMO = 2_147_483_647
 
 # Fields the client may never send.
-_CAMPOS_SOLO_LECTURA = {'id', 'created_at', 'updated_at'}
+_CAMPOS_SOLO_LECTURA = {'id', 'created_at', 'updated_at', 'creado_por'}
 
 # Fields that must be present and non-blank.
 _CAMPOS_REQUERIDOS = ('nombre', 'tipo')
@@ -62,6 +65,7 @@ def _buque_to_dict(buque):
     for campo in _CAMPOS_ESCRITURA:
         data[campo] = getattr(buque, campo)
     data['secciones'] = [seccion_to_dict(s) for s in buque.secciones.all()]
+    data['creado_por'] = referencia_publica(buque.creado_por)
     data['created_at'] = _iso(buque.created_at)
     data['updated_at'] = _iso(buque.updated_at)
     return data
@@ -300,7 +304,9 @@ def api_buques(request):
         con_inspecciones = _parse_booleano(request.query_params.get('con_inspecciones'))
         if con_inspecciones is None:
             return Response({'error': 'con_inspecciones debe ser true, false, 1 o 0.'}, status=400)
-        qs = Buque.objects.annotate(total_inspecciones=models.Count('inspecciones_casco'))
+        # Count only the inspections this user may read: private ones must not leak.
+        visibles = condicion_visible(request.user, prefijo='inspecciones_casco__')
+        qs = Buque.objects.annotate(total_inspecciones=models.Count('inspecciones_casco', filter=visibles))
         if con_inspecciones:
             qs = qs.filter(total_inspecciones__gt=0)
         qs = qs.order_by('nombre', 'id')
@@ -327,6 +333,7 @@ def api_buques(request):
     if errores:
         return Response({'error': 'Datos inválidos.', 'campos': errores}, status=400)
 
+    buque.creado_por = request.user
     with transaction.atomic():
         buque.save()
         if secciones is None:

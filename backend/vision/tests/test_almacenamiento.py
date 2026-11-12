@@ -8,12 +8,11 @@ from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
-from rest_framework.test import APIClient
 
 from vision import almacenamiento
 from vision.models import Buque, FotoInspeccion, InspeccionCasco, SeccionCasco
 from vision.tasks import procesar_foto
-from vision.tests.utilidades import STORAGES_EN_MEMORIA, png_bytes
+from vision.tests.utilidades import STORAGES_EN_MEMORIA, cliente_admin, png_bytes
 
 
 def _fotos_url(inspeccion_id):
@@ -25,7 +24,7 @@ class AlmacenamientoBase(TestCase):
     """Runs every test against an in-memory ``default_storage``."""
 
     def setUp(self):
-        self.client = APIClient()
+        self.client = cliente_admin()
         self.insp = InspeccionCasco.objects.create(
             buque=Buque.objects.create(nombre='ARC Caribe', tipo='Fragata')
         )

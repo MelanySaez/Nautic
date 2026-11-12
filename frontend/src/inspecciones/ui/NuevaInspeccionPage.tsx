@@ -10,6 +10,29 @@ import { MensajeError } from '../../shared/ui/Estados'
 import { Icon } from '../../shared/ui/Icon'
 import { Tarjeta } from '../../shared/ui/Tarjeta'
 import { mensajeDe } from '../../shared/ui/formato'
+import { ApiError } from '../../shared/http/apiClient'
+import { EquipoInicial, type ErroresFila, type FilaInvitado } from './EquipoInicial'
+
+const CLAVE_MIEMBRO = /^miembros\.(\d+)\.(email|rol|permisos)$/
+
+/**
+ * Places server errors keyed `miembros.<i>.<campo>` on the UI rows. `<i>` is the position in
+ * the list that was sent (blank rows are not sent), so `enviadas` maps it back to the row uid.
+ */
+function erroresPorFila(campos: Record<string, string[]>, enviadas: number[]) {
+  const porFila: Record<number, ErroresFila> = {}
+  const otros: string[] = []
+  for (const [clave, mensajes] of Object.entries(campos)) {
+    const coincidencia = CLAVE_MIEMBRO.exec(clave)
+    const uid = coincidencia ? enviadas[Number(coincidencia[1])] : undefined
+    if (coincidencia && uid !== undefined) {
+      porFila[uid] = { ...porFila[uid], [coincidencia[2]]: mensajes.join(' ') }
+    } else {
+      otros.push(...mensajes)
+    }
+  }
+  return { porFila, otros }
+}
 
 export function NuevaInspeccionPage() {
   const { buques, inspecciones } = useDependencias()
@@ -24,6 +47,15 @@ export function NuevaInspeccionPage() {
   const [errorBuque, setErrorBuque] = useState<string | null>(null)
   const [errorEnvio, setErrorEnvio] = useState<string | null>(null)
   const [enviando, setEnviando] = useState(false)
+  const [invitados, setInvitados] = useState<FilaInvitado[]>([])
+  const [privada, setPrivada] = useState(false)
+  const [siguienteUid, setSiguienteUid] = useState(1)
+  const [erroresInvitados, setErroresInvitados] = useState<Record<number, ErroresFila>>({})
+
+  function cambiarInvitado(uid: number, cambio: Partial<Omit<FilaInvitado, 'uid'>>) {
+    setInvitados((actual) => actual.map((f) => (f.uid === uid ? { ...f, ...cambio } : f)))
+    setErroresInvitados(({ [uid]: _resuelto, ...resto }) => resto)
+  }
 
   async function enviar(evento: FormEvent) {
     evento.preventDefault()
@@ -32,17 +64,30 @@ export function NuevaInspeccionPage() {
       return
     }
     setErrorEnvio(null)
+    setErroresInvitados({})
     setEnviando(true)
+    // Rows left blank are not invitations.
+    const enviadas = invitados.filter((f) => f.email.trim())
     try {
       const creada = await inspecciones.crear({
         buqueId: Number(buqueId),
         nombre: nombre.trim(),
         tomadoPor: tomadoPor.trim(),
         descripcion: descripcion.trim(),
+        ...(enviadas.length ? { miembros: enviadas.map((f) => ({ email: f.email.trim(), rol: f.rol })) } : {}),
+        ...(privada ? { privada: true } : {}),
       })
       navegar(`/vision/${creada.id}`)
     } catch (error) {
-      setErrorEnvio(mensajeDe(error))
+      if (error instanceof ApiError && error.campos) {
+        const { porFila, otros } = erroresPorFila(error.campos, enviadas.map((f) => f.uid))
+        setErroresInvitados(porFila)
+        // Rows show their own messages; anything else (or an empty `campos`) goes to the alert.
+        const sinFila = otros.length > 0 || Object.keys(porFila).length === 0
+        setErrorEnvio(sinFila ? [mensajeDe(error), ...otros].join(' · ') : null)
+      } else {
+        setErrorEnvio(mensajeDe(error))
+      }
       setEnviando(false)
     }
   }
@@ -111,6 +156,22 @@ export function NuevaInspeccionPage() {
             </Campo>
           </div>
         </Tarjeta>
+
+        <EquipoInicial
+          filas={invitados}
+          errores={erroresInvitados}
+          privada={privada}
+          alCambiarPrivada={setPrivada}
+          alAgregar={() => {
+            setInvitados((actual) => [...actual, { uid: siguienteUid, email: '', rol: 'colaborador' }])
+            setSiguienteUid(siguienteUid + 1)
+          }}
+          alCambiar={cambiarInvitado}
+          alQuitar={(uid) => {
+            setInvitados((actual) => actual.filter((f) => f.uid !== uid))
+            setErroresInvitados(({ [uid]: _quitado, ...resto }) => resto)
+          }}
+        />
 
         {errorEnvio && <MensajeError mensaje={errorEnvio} />}
 

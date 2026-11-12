@@ -43,27 +43,76 @@ async function errorDeRespuesta(respuesta: Response): Promise<ApiError> {
   return new ApiError(respuesta.status, `El servidor respondió con un error (${respuesta.status}).`)
 }
 
+/** Reads the document cookies (`a=1; b=2`); injectable for tests. */
+export type LectorCookies = () => string
+
+const leerCookiesDelDocumento: LectorCookies = () => (typeof document === 'undefined' ? '' : document.cookie)
+
+const METODOS_SEGUROS = new Set(['GET', 'HEAD', 'OPTIONS', 'TRACE'])
+
+function valorCookie(cookies: string, nombre: string): string | null {
+  for (const par of cookies.split(';')) {
+    const [clave, ...resto] = par.trim().split('=')
+    if (clave === nombre) return decodeURIComponent(resto.join('='))
+  }
+  return null
+}
+
+const oyentesNoAutorizado = new Set<() => void>()
+
+/**
+ * Subscribes to "the server answered 401" from any ApiClient (the session expired or never
+ * existed). Returns a function that removes the listener.
+ */
+export function alNoAutorizado(oyente: () => void): () => void {
+  oyentesNoAutorizado.add(oyente)
+  return () => {
+    oyentesNoAutorizado.delete(oyente)
+  }
+}
+
 export class ApiClient {
   private readonly baseUrl: string
   private readonly fetcher: Fetcher
+  private readonly leerCookies: LectorCookies
 
-  constructor(baseUrl: string, fetcher: Fetcher = (...args) => fetch(...args)) {
+  constructor(
+    baseUrl: string,
+    fetcher: Fetcher = (...args) => fetch(...args),
+    leerCookies: LectorCookies = leerCookiesDelDocumento,
+  ) {
     this.baseUrl = baseUrl.replace(/\/+$/, '')
     this.fetcher = fetcher
+    this.leerCookies = leerCookies
+  }
+
+  /** Asks Django for the `csrftoken` cookie; call it before the first unsafe request without a session. */
+  prepararCsrf(): Promise<void> {
+    return this.request<void>('/api/auth/csrf/')
   }
 
   async request<T>(ruta: string, init: RequestInit = {}): Promise<T> {
     let respuesta: Response
     try {
-      respuesta = await this.fetcher(`${this.baseUrl}${ruta}`, init)
+      respuesta = await this.fetcher(`${this.baseUrl}${ruta}`, this.conSesion(init))
     } catch {
       throw new ApiError(0, 'No se pudo conectar con el servidor.')
     }
     if (!respuesta.ok) {
+      if (respuesta.status === 401) oyentesNoAutorizado.forEach((oyente) => oyente())
       throw await errorDeRespuesta(respuesta)
     }
     if (respuesta.status === 204) return undefined as T
     return (await respuesta.json()) as T
+  }
+
+  /** Session cookies on every request, plus Django's CSRF header on unsafe methods. */
+  private conSesion(init: RequestInit): RequestInit {
+    const conCookies: RequestInit = { ...init, credentials: 'same-origin' }
+    if (METODOS_SEGUROS.has((init.method ?? 'GET').toUpperCase())) return conCookies
+    const token = valorCookie(this.leerCookies(), 'csrftoken')
+    if (!token) return conCookies
+    return { ...conCookies, headers: { ...(init.headers as Record<string, string> | undefined), 'X-CSRFToken': token } }
   }
 
   get<T>(ruta: string): Promise<T> {

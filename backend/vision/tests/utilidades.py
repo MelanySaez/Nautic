@@ -29,3 +29,28 @@ def crear_foto(detecciones=None, **campos):
         for d in detecciones or []
     ])
     return foto
+
+
+def cliente_admin():
+    """An API client signed in as a superuser: for tests about behavior, not permissions
+    (those live in ``test_permisos.py``)."""
+    from django.contrib.auth import get_user_model
+    from rest_framework.test import APIClient
+
+    Usuario = get_user_model()
+    admin = Usuario.objects.filter(email='admin@pruebas.local').first() or Usuario.objects.create_superuser(
+        'admin@pruebas.local', None, nombre='Admin de pruebas',  # no password: hashing is slow
+    )
+    cliente = APIClient()
+    cliente.force_authenticate(admin)
+    return cliente
+
+
+def cliente_admin_sin_bd():
+    """Like ``cliente_admin`` for ``SimpleTestCase``: an unsaved superuser, for endpoints that never query users."""
+    from django.contrib.auth import get_user_model
+    from rest_framework.test import APIClient
+
+    cliente = APIClient()
+    cliente.force_authenticate(get_user_model()(email='admin@pruebas.local', is_superuser=True))
+    return cliente

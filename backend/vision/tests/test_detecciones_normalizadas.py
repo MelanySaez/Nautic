@@ -6,11 +6,10 @@ from django.core.files.storage import default_storage
 from django.db import IntegrityError, connection, transaction
 from django.db.migrations.executor import MigrationExecutor
 from django.test import TestCase, TransactionTestCase, override_settings
-from rest_framework.test import APIClient
 
 from vision.models import Buque, DeteccionFoto, FotoInspeccion, InspeccionCasco, SeccionCasco
 from vision.tasks import procesar_foto
-from vision.tests.utilidades import STORAGES_EN_MEMORIA, png_bytes
+from vision.tests.utilidades import STORAGES_EN_MEMORIA, cliente_admin, png_bytes
 
 
 def _det(class_id, class_name, confidence):
@@ -55,7 +54,7 @@ class DeteccionesPorFilaTests(TestCase):
         self.assertEqual(self._filas(), [('paint_peel', 1, 0.5, False)])
 
     def test_la_api_conserva_el_formato_de_detecciones(self):
-        cliente = APIClient()
+        cliente = cliente_admin()
         url = f'/api/vision/fotos/{self.foto.id}/'
         self.assertIsNone(cliente.get(url).json()['detecciones'])  # never analyzed
 
@@ -73,7 +72,7 @@ class DeteccionesPorFilaTests(TestCase):
         self.foto.estado = FotoInspeccion.Estado.PENDIENTE
         self.foto.save(update_fields=['estado'])
 
-        self.assertEqual(APIClient().get(f'/api/vision/fotos/{self.foto.id}/').json()['detecciones'], [])
+        self.assertEqual(cliente_admin().get(f'/api/vision/fotos/{self.foto.id}/').json()['detecciones'], [])
 
     def test_una_clase_por_foto(self):
         DeteccionFoto.objects.create(foto=self.foto, clase='corrosion', cantidad=1, confianza_max=0.5)

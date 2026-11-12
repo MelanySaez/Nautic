@@ -16,6 +16,16 @@ const inspeccionDto = {
   fecha_creacion: '2026-10-01T10:00:00Z',
   fecha_modificacion: '2026-10-02T10:00:00Z',
   total_fotos: 1,
+  lider: { id: 3, nombre: 'Juan Gómez' },
+  privada: true,
+}
+const misPermisosDto = {
+  ver: true,
+  es_lider: false,
+  subir_fotos: true,
+  analizar: false,
+  editar_reporte: true,
+  editar_inspeccion: false,
 }
 const fotoDto = {
   id: 11,
@@ -81,8 +91,53 @@ describe('HttpInspeccionesRepository', () => {
         fechaCreacion: '2026-10-01T10:00:00Z',
         fechaModificacion: '2026-10-02T10:00:00Z',
         totalFotos: 1,
+        lider: { id: 3, nombre: 'Juan Gómez' },
+        privada: true,
       },
     ])
+  })
+
+  it('maps what the current user may do on the inspection detail', async () => {
+    fetchMock.mockResolvedValue(respuesta(200, { ...inspeccionDto, mis_permisos: misPermisosDto, fotos: [] }))
+
+    const detalle = await repo.obtener(7)
+
+    expect(detalle.misPermisos).toEqual({
+      ver: true,
+      esLider: false,
+      subirFotos: true,
+      analizar: false,
+      editarReporte: true,
+      editarInspeccion: false,
+    })
+  })
+
+  it('grants nothing when the detail carries no permissions and has no leader', async () => {
+    fetchMock.mockResolvedValue(respuesta(200, { ...inspeccionDto, lider: null, fotos: [] }))
+
+    const detalle = await repo.obtener(7)
+
+    expect(detalle.lider).toBeNull()
+    expect(detalle.misPermisos).toEqual({
+      ver: false,
+      esLider: false,
+      subirFotos: false,
+      analizar: false,
+      editarReporte: false,
+      editarInspeccion: false,
+    })
+  })
+
+  it('changes the privacy with a PATCH carrying only privada', async () => {
+    fetchMock.mockResolvedValue(respuesta(200, { ...inspeccionDto, privada: false, mis_permisos: misPermisosDto, fotos: [] }))
+
+    const detalle = await repo.cambiarPrivacidad(7, false)
+
+    const { url, init } = ultimaLlamada()
+    expect(url).toBe('http://api.test/api/vision/inspecciones/7/')
+    expect(init.method).toBe('PATCH')
+    expect(JSON.parse(String(init.body))).toEqual({ privada: false })
+    expect(detalle.privada).toBe(false)
   })
 
   it('passes the cursor untouched to get the next page and omits blank filters', async () => {
@@ -210,6 +265,27 @@ describe('HttpInspeccionesRepository', () => {
       descripcion: 'Control anual',
     })
     expect(creada.id).toBe(7)
+  })
+
+  it('sends the team invited at creation', async () => {
+    fetchMock.mockResolvedValue(respuesta(201, inspeccionDto))
+
+    await repo.crear({
+      buqueId: 2,
+      tomadoPor: '',
+      descripcion: '',
+      miembros: [{ email: 'ana@nautic.test', rol: 'revisor' }],
+    })
+
+    expect(JSON.parse(String(ultimaLlamada().init.body)).miembros).toEqual([{ email: 'ana@nautic.test', rol: 'revisor' }])
+  })
+
+  it('sends privada only when the inspection is created private', async () => {
+    fetchMock.mockResolvedValue(respuesta(201, inspeccionDto))
+
+    await repo.crear({ buqueId: 2, tomadoPor: '', descripcion: '', privada: true })
+
+    expect(JSON.parse(String(ultimaLlamada().init.body)).privada).toBe(true)
   })
 
   it('renames an inspection with a PATCH carrying only the name', async () => {

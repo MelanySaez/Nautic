@@ -16,6 +16,9 @@ from rest_framework.response import Response
 
 from .almacenamiento import url_archivo
 from .models import FotoInspeccion, InspeccionCasco, ReporteInspeccion
+from cuentas.models import referencia_publica
+
+from .permisos import exigir
 from .reporte import borrador_de, clases_anomalia, fotos_revisables, generar_pdf, textos_reporte
 
 logger = logging.getLogger(__name__)
@@ -37,6 +40,7 @@ def _borrador_to_dict(inspeccion, request=None):
     borrador = borrador_de(inspeccion)
     data = textos_reporte(inspeccion, borrador)
     data['actualizado'] = borrador.fecha_modificacion.isoformat() if borrador else None
+    data['revisado_por'] = referencia_publica(borrador.revisado_por if borrador else None)
     data['fotos'] = [
         {
             'foto_id': foto.id,
@@ -170,6 +174,7 @@ def api_vision_inspeccion_reporte(request, inspeccion_id):
     PATCH /api/vision/inspecciones/<id>/reporte/  → edita textos y validaciones
     """
     inspeccion = get_object_or_404(InspeccionCasco, pk=inspeccion_id)
+    exigir(request.user, inspeccion, None if request.method == 'GET' else 'editar_reporte')
     if request.method == 'GET':
         return Response(_borrador_to_dict(inspeccion, request))
 
@@ -199,12 +204,13 @@ def api_vision_inspeccion_reporte(request, inspeccion_id):
         borrador, _ = ReporteInspeccion.objects.get_or_create(inspeccion=inspeccion)
         for campo, valor in textos.items():
             setattr(borrador, campo, valor)
-        borrador.save()  # always: `actualizado` records the last review
+        borrador.revisado_por = request.user
+        borrador.save()  # always: `actualizado` and `revisado_por` record the last review
         for foto, cambios in fotos:
             if 'descartadas' in cambios:
                 # Only anomaly rows are listed in `descartadas`; components stay as they are.
                 anomalias = foto.detecciones.filter(clase__in=clases_anomalia(foto))
-                anomalias.update(descartada=False)
+                anomalias.update(descartada=False, validado_por=request.user)
                 anomalias.filter(clase__in=cambios['descartadas']).update(descartada=True)
             if 'nota' in cambios:
                 foto.nota_inspector = cambios['nota']
@@ -232,6 +238,7 @@ def api_vision_inspeccion_reporte_pdf(request, inspeccion_id):
     GET /api/vision/inspecciones/<id>/reporte/pdf/  → PDF adjunto
     """
     inspeccion = get_object_or_404(InspeccionCasco.objects.select_related('buque'), pk=inspeccion_id)
+    exigir(request.user, inspeccion)
     try:
         pdf = generar_pdf(inspeccion)
     except Exception:

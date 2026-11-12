@@ -1,12 +1,11 @@
 """Editable report draft: inspector texts and per-photo validation of findings."""
 from django.test import TestCase, override_settings
-from rest_framework.test import APIClient
 
 from vision.models import (
     Buque, DeteccionFoto, FotoInspeccion, InspeccionCasco, ReporteInspeccion, SeccionCasco,
 )
 from vision.reporte import datos_reporte
-from vision.tests.utilidades import STORAGES_EN_MEMORIA, crear_foto
+from vision.tests.utilidades import STORAGES_EN_MEMORIA, cliente_admin, crear_foto
 
 COMPLETADA = FotoInspeccion.Estado.COMPLETADA
 
@@ -18,7 +17,7 @@ def _det(clase, total=1, confianza=0.8):
 @override_settings(STORAGES=STORAGES_EN_MEMORIA)
 class BaseReporte(TestCase):
     def setUp(self):
-        self.client = APIClient()
+        self.client = cliente_admin()
         self.buque = Buque.objects.create(nombre='ARC Caribe', tipo='Fragata')
         self.proa = SeccionCasco.objects.create(buque=self.buque, codigo='PRW', nombre='Proa', orden=0)
         self.popa = SeccionCasco.objects.create(buque=self.buque, codigo='AFT', nombre='Popa', orden=1)

@@ -6,12 +6,14 @@ import type {
   Inspeccion,
   InspeccionDetalle,
   PaginaInspecciones,
+  PermisosInspeccion,
   SeccionCasco,
   Severidad,
   TipoClase,
 } from '../domain/inspeccion'
 import type { BorradorReporte, CambiosReporte, TextosReporte } from '../domain/reporte'
 import type { DetallePorInstancia } from '../domain/detecciones'
+import type { CambiosMiembro, Miembro, PermisosMiembro, RolMiembro } from '../domain/miembros'
 import type { ModeloIA } from '../domain/modelo'
 
 // Wire shapes of the Django vision API (snake_case), mapped to the domain at the edge.
@@ -63,6 +65,22 @@ export interface InspeccionDto {
   fecha_creacion: string
   fecha_modificacion: string
   total_fotos: number
+  lider?: UsuarioRefDto | null
+  privada?: boolean
+}
+
+export interface UsuarioRefDto {
+  id: number
+  nombre: string
+}
+
+export interface PermisosInspeccionDto {
+  ver: boolean
+  es_lider: boolean
+  subir_fotos: boolean
+  analizar: boolean
+  editar_reporte: boolean
+  editar_inspeccion: boolean
 }
 
 /** Page of `GET /api/vision/inspecciones/` (cursor pagination, no total). */
@@ -74,6 +92,8 @@ export interface ListaInspeccionesDto {
 
 export interface InspeccionDetalleDto extends InspeccionDto {
   fotos: FotoDto[]
+  /** Absent only on servers without accounts; then nothing is granted (the server enforces anyway). */
+  mis_permisos?: PermisosInspeccionDto
 }
 
 /** Payload of the `foto-updated` SSE event published by the Celery worker. */
@@ -160,6 +180,19 @@ export function aInspeccion(dto: InspeccionDto): Inspeccion {
     fechaCreacion: dto.fecha_creacion,
     fechaModificacion: dto.fecha_modificacion,
     totalFotos: dto.total_fotos,
+    lider: dto.lider ? { id: dto.lider.id, nombre: dto.lider.nombre } : null,
+    privada: dto.privada ?? false,
+  }
+}
+
+function aPermisosInspeccion(dto: PermisosInspeccionDto | undefined): PermisosInspeccion {
+  return {
+    ver: dto?.ver ?? false,
+    esLider: dto?.es_lider ?? false,
+    subirFotos: dto?.subir_fotos ?? false,
+    analizar: dto?.analizar ?? false,
+    editarReporte: dto?.editar_reporte ?? false,
+    editarInspeccion: dto?.editar_inspeccion ?? false,
   }
 }
 
@@ -168,7 +201,7 @@ export function aPagina(dto: ListaInspeccionesDto): PaginaInspecciones {
 }
 
 export function aInspeccionDetalle(dto: InspeccionDetalleDto): InspeccionDetalle {
-  return { ...aInspeccion(dto), fotos: dto.fotos.map(aFoto) }
+  return { ...aInspeccion(dto), fotos: dto.fotos.map(aFoto), misPermisos: aPermisosInspeccion(dto.mis_permisos) }
 }
 
 export function aActualizacionFoto(
@@ -307,6 +340,58 @@ export function aCambiosReporteDto(cambios: CambiosReporte): Record<string, unkn
   }
   if (cambios.fotos !== undefined) {
     dto.fotos = cambios.fotos.map((f) => ({ foto_id: f.fotoId, descartadas: f.descartadas, nota: f.nota }))
+  }
+  return dto
+}
+
+export interface PermisosMiembroDto {
+  subir_fotos: boolean
+  analizar: boolean
+  editar_reporte: boolean
+  editar_inspeccion: boolean
+}
+
+/** One entry of `GET /api/vision/inspecciones/<id>/miembros/`. */
+export interface MiembroDto {
+  id: number
+  usuario: { id: number; nombre: string; cargo: string }
+  rol: RolMiembro
+  permisos: PermisosMiembroDto
+  fecha_agregado: string
+}
+
+export function aMiembro(dto: MiembroDto): Miembro {
+  return {
+    id: dto.id,
+    usuario: { id: dto.usuario.id, nombre: dto.usuario.nombre, cargo: dto.usuario.cargo ?? '' },
+    rol: dto.rol,
+    permisos: {
+      subirFotos: dto.permisos.subir_fotos,
+      analizar: dto.permisos.analizar,
+      editarReporte: dto.permisos.editar_reporte,
+      editarInspeccion: dto.permisos.editar_inspeccion,
+    },
+    fechaAgregado: dto.fecha_agregado,
+  }
+}
+
+const CAMPO_PERMISO: Record<keyof PermisosMiembro, keyof PermisosMiembroDto> = {
+  subirFotos: 'subir_fotos',
+  analizar: 'analizar',
+  editarReporte: 'editar_reporte',
+  editarInspeccion: 'editar_inspeccion',
+}
+
+/** Only the given keys travel, so a role change does not resend permissions. */
+export function aCambiosMiembroDto(cambios: CambiosMiembro): Record<string, unknown> {
+  const dto: Record<string, unknown> = {}
+  if (cambios.rol) dto.rol = cambios.rol
+  if (cambios.permisos) {
+    const permisos: Partial<PermisosMiembroDto> = {}
+    for (const [clave, valor] of Object.entries(cambios.permisos) as [keyof PermisosMiembro, boolean | undefined][]) {
+      if (valor !== undefined) permisos[CAMPO_PERMISO[clave]] = valor
+    }
+    dto.permisos = permisos
   }
   return dto
 }

@@ -26,3 +26,8 @@ export function InsigniaEstado({ estado }: { estado: EstadoFoto }) {
   const { texto, clases } = ESTADO[estado]
   return <span className={`${BASE} ${clases}`}>{texto}</span>
 }
+
+/** Marks an inspection only its leader and members can see. */
+export function InsigniaPrivada() {
+  return <span className={`${BASE} bg-info-bg text-info`}>Privada</span>
+}

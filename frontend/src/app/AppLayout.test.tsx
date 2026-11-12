@@ -1,6 +1,8 @@
 import { render, screen, within } from '@testing-library/react'
 import { createMemoryRouter, RouterProvider } from 'react-router'
 import { describe, expect, it } from 'vitest'
+import { SesionContext } from '../cuentas/ui/sesion'
+import { unUsuario } from '../test/dobles'
 import { AppLayout } from './AppLayout'
 
 function renderLayout(ruta = '/') {
@@ -17,7 +19,11 @@ function renderLayout(ruta = '/') {
     ],
     { initialEntries: [ruta] },
   )
-  return render(<RouterProvider router={router} />)
+  return render(
+    <SesionContext.Provider value={{ usuario: unUsuario(), iniciar: () => {}, cerrarSesion: async () => {} }}>
+      <RouterProvider router={router} />
+    </SesionContext.Provider>,
+  )
 }
 
 describe('AppLayout', () => {

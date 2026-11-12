@@ -1,3 +1,4 @@
+import type { NuevoMiembro } from './miembros'
 export type EstadoFoto = 'pendiente' | 'en_proceso' | 'completada' | 'error'
 
 export type Severidad = 'critical' | 'high' | 'medium' | 'low'
@@ -45,6 +46,23 @@ export interface Foto {
   fechaCreacion: string
 }
 
+/** A user as other records reference it (leader, uploader). */
+export interface UsuarioRef {
+  id: number
+  nombre: string
+}
+
+/** What the logged-in user may do on one inspection, as the server computed it. */
+export interface PermisosInspeccion {
+  ver: boolean
+  /** The leader (or an admin): may delete it, change its privacy and manage its members. */
+  esLider: boolean
+  subirFotos: boolean
+  analizar: boolean
+  editarReporte: boolean
+  editarInspeccion: boolean
+}
+
 export interface Inspeccion {
   id: number
   buqueId: number
@@ -58,10 +76,15 @@ export interface Inspeccion {
   fechaCreacion: string
   fechaModificacion: string
   totalFotos: number
+  /** The creator, who manages the inspection; null for inspections created before accounts existed. */
+  lider: UsuarioRef | null
+  /** Private inspections are visible only to their leader and members. */
+  privada: boolean
 }
 
 export interface InspeccionDetalle extends Inspeccion {
   fotos: Foto[]
+  misPermisos: PermisosInspeccion
 }
 
 export interface NuevaInspeccion {
@@ -70,6 +93,10 @@ export interface NuevaInspeccion {
   nombre?: string
   tomadoPor: string
   descripcion: string
+  /** Team invited at creation; the backend creates nothing if any invitation is invalid. */
+  miembros?: NuevoMiembro[]
+  /** Private: only the leader and members can see it. Omitted means public (read-only for everyone). */
+  privada?: boolean
 }
 
 /** Server-side search criteria; every field is optional and they combine with AND. */

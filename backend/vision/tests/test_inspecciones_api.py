@@ -7,7 +7,6 @@ from django.core.files.storage import default_storage
 from django.db import connection
 from django.test import TestCase, override_settings
 from django.test.utils import CaptureQueriesContext
-from rest_framework.test import APIClient
 
 from vision.models import (
     Buque,
@@ -19,7 +18,7 @@ from vision.models import (
     subir_severidad_max,
 )
 from vision.tasks import procesar_foto
-from vision.tests.utilidades import STORAGES_EN_MEMORIA, png_bytes
+from vision.tests.utilidades import STORAGES_EN_MEMORIA, cliente_admin, png_bytes
 
 URL_LISTA = '/api/vision/inspecciones/'
 
@@ -53,7 +52,7 @@ class NivelSeveridadTests(TestCase):
 
 class CrearInspeccionNombreTests(TestCase):
     def setUp(self):
-        self.client = APIClient()
+        self.client = cliente_admin()
         self.buque = _crear_buque()
 
     def _post(self, **extra):
@@ -126,7 +125,7 @@ class CrearInspeccionNombreTests(TestCase):
 
 class EditarInspeccionTests(TestCase):
     def setUp(self):
-        self.client = APIClient()
+        self.client = cliente_admin()
         self.buque = _crear_buque()
         self.insp = InspeccionCasco.objects.create(
             buque=self.buque, nombre='Original', descripcion='desc',
@@ -266,7 +265,7 @@ class SeveridadMaxTests(TestCase):
         subir_severidad_max(self.insp.id, NivelSeveridad.CRITICAL)
 
         with mock.patch('vision.views.publicar_evento'):
-            res = APIClient().delete(f'/api/vision/fotos/{peor.id}/')
+            res = cliente_admin().delete(f'/api/vision/fotos/{peor.id}/')
 
         self.assertEqual(res.status_code, 204)
         self.assertEqual(self._sev(), 2)
@@ -276,14 +275,14 @@ class SeveridadMaxTests(TestCase):
         subir_severidad_max(self.insp.id, NivelSeveridad.HIGH)
 
         with mock.patch('vision.views.publicar_evento'):
-            APIClient().delete(f'/api/vision/fotos/{unica.id}/')
+            cliente_admin().delete(f'/api/vision/fotos/{unica.id}/')
 
         self.assertIsNone(self._sev())
 
     def test_el_dict_expone_el_texto(self):
         subir_severidad_max(self.insp.id, NivelSeveridad.CRITICAL)
 
-        body = APIClient().get(_url_detalle(self.insp.id)).json()
+        body = cliente_admin().get(_url_detalle(self.insp.id)).json()
 
         self.assertEqual(body['severidad_max'], 'critical')
         self.assertIn('nombre', body)

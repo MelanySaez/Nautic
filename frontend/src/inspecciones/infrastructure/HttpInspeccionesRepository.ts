@@ -81,12 +81,19 @@ export class HttpInspeccionesRepository implements InspeccionesRepository {
       ...(datos.nombre?.trim() ? { nombre: datos.nombre.trim() } : {}),
       tomado_por: datos.tomadoPor,
       descripcion: datos.descripcion,
+      // Omitted when nobody is invited, so the request is unchanged for a solo inspection.
+      ...(datos.miembros?.length ? { miembros: datos.miembros.map(({ email, rol }) => ({ email, rol })) } : {}),
+      ...(datos.privada ? { privada: true } : {}),
     })
     return aInspeccion(dto)
   }
 
   async renombrar(id: number, nombre: string): Promise<Inspeccion> {
     return aInspeccion(await this.api.patch<InspeccionDto>(`/api/vision/inspecciones/${id}/`, { nombre: nombre.trim() }))
+  }
+
+  async cambiarPrivacidad(id: number, privada: boolean): Promise<InspeccionDetalle> {
+    return aInspeccionDetalle(await this.api.patch<InspeccionDetalleDto>(`/api/vision/inspecciones/${id}/`, { privada }))
   }
 
   eliminar(id: number): Promise<void> {

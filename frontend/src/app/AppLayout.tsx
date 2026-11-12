@@ -1,4 +1,6 @@
+import { useState } from 'react'
 import { Outlet } from 'react-router'
+import { useSesion } from '../cuentas/ui/sesion'
 import { EnlaceNav } from '../shared/ui/Enlace'
 import { ThemeToggle } from '../shared/theme/ThemeToggle'
 import { Icon } from '../shared/ui/Icon'
@@ -7,6 +9,9 @@ const claseEnlace = ({ isActive }: { isActive: boolean }) =>
   `label-caps rounded px-3 py-2 ${isActive ? 'bg-info-bg text-info' : 'text-ink-muted hover:text-ink'}`
 
 export function AppLayout() {
+  const { usuario, cerrarSesion } = useSesion()
+  const [saliendo, setSaliendo] = useState(false)
+
   return (
     <div className="min-h-dvh">
       <header
@@ -31,6 +36,25 @@ export function AppLayout() {
             </EnlaceNav>
           </nav>
           <ThemeToggle />
+          {usuario && (
+            <div className="flex items-center gap-3">
+              <span className="hidden items-center gap-1.5 text-sm text-ink-muted sm:flex">
+                <Icon name="user" className="size-4" />
+                <span className="max-w-40 truncate">{usuario.nombre}</span>
+              </span>
+              <button
+                type="button"
+                disabled={saliendo}
+                onClick={() => {
+                  setSaliendo(true)
+                  void cerrarSesion()
+                }}
+                className="label-caps rounded px-3 py-2 text-ink-muted hover:text-ink disabled:opacity-50"
+              >
+                Cerrar sesión
+              </button>
+            </div>
+          )}
         </div>
       </header>
       <main className="mx-auto max-w-6xl px-4 py-6 md:py-10">
