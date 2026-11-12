@@ -90,6 +90,9 @@ function Resultados({ datos }: { datos: DatosInspeccion }) {
           >
             Renombrar inspección
           </Boton>
+          <EnlaceBoton variante="secundario" to={`/inspecciones/${detalle.id}/reporte`}>
+            Reporte
+          </EnlaceBoton>
           <EnlaceBoton to={`/vision/${detalle.id}`}>Editar inspección</EnlaceBoton>
         </div>
       </header>

@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes } from 'react'
+import type { AnchorHTMLAttributes, ButtonHTMLAttributes } from 'react'
 import type { LinkProps } from 'react-router'
 import { Enlace } from './Enlace'
 
@@ -28,4 +28,11 @@ type EnlaceBotonProps = LinkProps & { variante?: VarianteBoton }
 
 export function EnlaceBoton({ variante = 'primario', className = '', ...props }: EnlaceBotonProps) {
   return <Enlace className={clasesBoton(variante, className)} {...props} />
+}
+
+type AnclaBotonProps = AnchorHTMLAttributes<HTMLAnchorElement> & { variante?: VarianteBoton }
+
+/** Plain anchor styled as a button, for links the router must not handle (file downloads). */
+export function AnclaBoton({ variante = 'primario', className = '', ...props }: AnclaBotonProps) {
+  return <a className={clasesBoton(variante, className)} {...props} />
 }

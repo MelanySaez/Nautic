@@ -55,6 +55,7 @@ function renderizar(fotos: Foto[]) {
     [
       { path: '/vision/:id/resultados', element: <ResultadosRuta /> },
       { path: '/vision/:id', element: <p>Carga de fotos</p> },
+      { path: '/inspecciones/:id/reporte', element: <p>Editor del reporte</p> },
     ],
     falsas.dependencias,
     '/vision/7/resultados',
@@ -284,5 +285,13 @@ describe('ResultadosPage', () => {
     )
 
     expect(screen.getByRole('article', { name: 'KEEL · Foto #25' })).toHaveTextContent('Media')
+  })
+
+  it('links to the report editor of the inspection', async () => {
+    const { router } = renderizar([CORROIDA])
+
+    await userEvent.click(await screen.findByRole('link', { name: 'Reporte' }))
+
+    expect(router.state.location.pathname).toBe('/inspecciones/7/reporte')
   })
 })

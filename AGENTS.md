@@ -16,7 +16,7 @@ The product has three sections, each with its API and its screens:
 | Section | Purpose | Status |
 |---|---|---|
 | **Buques** | Vessel entity with a technical sheet and its own hull sections | API create / list / detail / partial update (`vision/views_buques.py`, no delete); screens `/buques`, `/buques/nuevo`, `/buques/:id`, `/buques/:id/editar` |
-| **Inspecciones** | History of the inspections already created | API search, detail, rename, delete; screens `/` (vessels with inspections), `/inspecciones/buque/:id` (that vessel's inspections, with filters) and `/inspecciones/:id/resultados` |
+| **Inspecciones** | History of the inspections already created | API search, detail, rename, delete, editable report + PDF; screens `/` (vessels with inspections), `/inspecciones/buque/:id` (that vessel's inspections, with filters) and `/inspecciones/:id/resultados`, `/inspecciones/:id/reporte` (report editor) |
 | **Visión IA** | Create an inspection and analyze its photos; every analysis belongs to an inspection | API photos → Celery → SSE with model selection; screens `/vision`, `/vision/:id`, `/vision/:id/resultados` |
 
 All endpoints live under `/api/`. The `vision` module needs infrastructure beyond Django + Postgres: **RabbitMQ** (Celery broker) and **Redis** (SSE pub/sub + rate limiting).
@@ -39,7 +39,7 @@ All endpoints live under `/api/`. The `vision` module needs infrastructure beyon
 │   │   ├── wsgi.py, asgi.py
 │   │   └── spectacular_hooks.py
 │   └── vision/                  # the only Django app
-│       ├── models.py, views.py, views_buques.py, busqueda.py, secciones.py, taxonomia.py, urls.py, tasks.py
+│       ├── models.py, views.py, views_buques.py, views_reporte.py, busqueda.py, secciones.py, taxonomia.py, reporte.py, urls.py, tasks.py
 │       ├── almacenamiento.py
 │       ├── inference.py, pubsub.py, ratelimit.py
 │       └── INSPECCION_IA.md
@@ -115,7 +115,7 @@ Inspection photos (originals and annotated) live behind Django's storage API, se
 
 ## Test Commands
 
-Backend tests live in `backend/vision/tests/` (`test_buques_api.py` for the Buques API, `test_inspecciones_api.py` and `test_busqueda_inspecciones.py` for inspection name/severity and search, `test_modelos.py` and `test_seleccion_modelo.py` for the model catalog and model selection, `test_secciones_migracion.py` for the sections-per-vessel data migration, `test_versiones_foto.py` for the `procesar_foto` task with `run_inference` mocked, `test_severidad.py` for its severity helper, `test_taxonomia.py` for the class taxonomy on detections and its endpoint, `test_detecciones_foto.py` for the raw boxes/masks file and its endpoint). There is no end-to-end test with a real broker or real inference.
+Backend tests live in `backend/vision/tests/` (`test_buques_api.py` for the Buques API, `test_inspecciones_api.py` and `test_busqueda_inspecciones.py` for inspection name/severity and search, `test_modelos.py` and `test_seleccion_modelo.py` for the model catalog and model selection, `test_secciones_migracion.py` for the sections-per-vessel data migration, `test_versiones_foto.py` for the `procesar_foto` task with `run_inference` mocked, `test_severidad.py` for its severity helper, `test_taxonomia.py` for the class taxonomy on detections and its endpoint, `test_detecciones_foto.py` for the raw boxes/masks file and its endpoint, `test_reporte_inspeccion.py` for the PDF report data and download, `test_reporte_edicion.py` for the editable draft and its effect on the PDF). There is no end-to-end test with a real broker or real inference.
 
 ```bash
 cd backend
@@ -184,6 +184,7 @@ pnpm add <pkg>     # add a dependency (pnpm add -D <pkg> for dev)
 - **Styling**: Tailwind with the semantic tokens in `src/index.css` (`bg-surface`, `text-ink`, `border-line`, `text-critical`, …). They swap in dark mode, so `dark:` variants are rarely needed.
 - **Language**: identifiers follow the Spanish domain (`Inspeccion`, `subirFoto`); UI copy is neutral Spanish; code comments in English.
 - **Inspections history**: `/` (`BuquesConInspeccionesPage`) lists only the vessels that have inspections, by name, with their count (`BuquesRepository.listarConInspecciones()`), plus a client-side vessel name search (case- and accent-insensitive, kept in `?q=`); there are no inspection cards there. Vessel links pass `{buqueNombre, volverA}` in the location state, so the vessel name morphs into the next page's title and the back link restores the search. Each vessel links to `/inspecciones/buque/:id` (`ListaInspeccionesPage`), which shows the vessel name and calls `InspeccionesRepository.buscar({...filtro, buqueId}, cursor?)` (one server page per call, `limit=24`, no walk-all). The vessel comes from the route; the filter bar (`FiltrosInspecciones`: `desde`/`hasta`, minimum severity, name text, no vessel selector) keeps its state in the URL query (`desde`, `hasta`, `severidad_min`, `q`; see `ui/filtroUrl.ts`); the text is debounced (300 ms) and `q` is only sent with 2+ characters. Any filter change restarts from the first page, "Cargar más" appends the next one while `hayMas`, and `useBusquedaInspecciones` drops responses of a previous search. 400 `ApiError.campos` messages are shown next to the matching control. Cards show `nombre` and the `severidadMax` badge, not the vessel; the rename (`renombrar` → `PATCH`) lives on `/inspecciones/:id/resultados`.
+- **Inspection report**: the results page links to `/inspecciones/:id/reporte` (`ReportePage`). It loads `InspeccionesRepository.obtenerReporte(id)` (`domain/reporte.ts`: `BorradorReporte`, `FotoRevisable`) and edits the inspector texts plus, per photo (`FotoRevision`), a confirm/discard checkbox per anomaly and a note. "Guardar" sends only `cambiosDeReporte(guardado, edicion)` via `guardarReporte` (`PATCH`). "Descargar PDF" is a plain `<a download>` (`AnclaBoton`) to `urlReporte(id)` (`/reporte/pdf/`); it is a disabled button while there are unsaved changes.
 - **Detections**: `Deteccion` carries the backend taxonomy (`etiqueta`, `tipo` `anomalia` | `componente` | null, `severidad`); the DTO mapper falls back to the de-snaked class name when a server omits it. `esAnomalia` / `tieneAnomalias` (`domain/reglas.ts`) treat only components as non-anomalies, so an unknown class is never hidden. Result cards list anomalies (with a severity badge) apart from components, and "Con anomalías" counts photos with at least one anomaly.
 - **Boxes and masks**: `Foto.detalleDisponible` says the server kept the instances of the last analysis; `InspeccionesRepository.obtenerDetecciones(fotoId)` loads them (`domain/detecciones.ts`: `DetallePorInstancia`, `decodificarRle` for the column-major COCO RLE). On `/vision/:id/resultados` the "Mostrar contornos" switch shows the original image with `CapaDetecciones` (a canvas in the image's pixel space: translucent masks plus boxes in the taxonomy color) and a per-class filter ("Clases visibles"); the annotated switch is disabled meanwhile.
 - **Hull sections**: the create form (`NuevoBuquePage` + `SeccionesCascoForm`) offers standard or custom sections; standard mode omits `secciones` from the POST (the backend default), custom sends `{nombre, codigo?, descripcion?}[]` in row order. `BuqueDetalle.secciones` feeds the vessel sheet, and `InspeccionesRepository.listarSecciones(buqueId)` requests `?buque=<id>` (the upload page uses the inspection's vessel).
@@ -231,6 +232,20 @@ pnpm add <pkg>     # add a dependency (pnpm add -D <pkg> for dev)
 - **Model selection**: the model is chosen when analyzing, not at upload. `GET /api/vision/modelos/` lists the catalog (`id, label, descripcion, arquitectura, version, produce_mascaras, confianza_por_defecto, por_defecto, disponible`). `POST /api/vision/inspecciones/<id>/analizar/` and the photo retry `POST /api/vision/fotos/<id>/` accept an optional `{"modelo": "<id>"}` (default: `VISION_MODEL_ID`, or the photo's own `modelo_id` on retry). An unknown or unavailable model returns 400 and nothing is enqueued or changed. Each photo stores the model in `FotoInspeccion.modelo_id` (exposed as `modelo` in the photo dict and SSE events) and the worker runs `run_inference(..., model_id=foto.modelo_id)`. On completion the worker also stores `FotoInspeccion.modelo_version` and `taxonomia_version` from the `analyze()` result (`model_version`, `taxonomy_version`; null when absent or for photos analyzed before migration `0005`; overwritten by a re-analysis), exposed under the same names in the photo dict and the `foto-updated` SSE event. When no confidence is given each model uses its own calibrated default (`run_inference` no longer forces 0.25).
 - **Taxonomy**: `vision/taxonomia.py` is the only reader of the `core_engine.vision.domain` taxonomy (`CLASSES`, `TAXONOMY_VERSION`). Stored `detecciones` keep `{class_name, count, max_confidence}`; the photo dict and `foto-updated` add `etiqueta`, `tipo` (`anomalia` | `componente`) and `severidad` at read time (`enriquecer_detecciones`). `GET /api/vision/taxonomia/` returns `{version, clases: [{id, nombre, etiqueta, tipo, severidad, color}]}`.
 - **Raw detections (boxes and masks)**: the worker calls `run_inference(..., incluir_mascaras=True)` and stores one JSON file per analysis in photo storage (`inspecciones/detecciones/<foto>_<hex>.json`: `{ancho, alto, detecciones: [{class_id, class_name, confidence, bbox{x1,y1,x2,y2}, mask}]}`, `mask` = uncompressed COCO RLE or null); `FotoInspeccion.detecciones_archivo` (migration `0009`) keeps the key. A re-analysis deletes the previous file once the new key is saved; deleting a photo or an inspection deletes it. `GET /api/vision/fotos/<id>/detecciones/` serves it with the taxonomy per entry (`clase, etiqueta, tipo, severidad, color, confianza, bbox, mascara`); 404 when the photo has none. The photo dict and `foto-updated` expose `detalle_disponible`.
+- **Inspection report** (`vision/reporte.py`, `vision/views_reporte.py`):
+  - **Draft:** stored per inspection in `ReporteInspeccion` (1:1, created on the first `PATCH`: `conclusion`, `observaciones`, `recomendaciones`, `inspector_nombre`, `inspector_cargo`) and per photo in `ValidacionFoto` (1:1 photo, cascade: `descartadas` class names, `nota`), migration `0010`.
+  - **Draft API:** `GET /api/vision/inspecciones/<id>/reporte/` returns the texts, `actualizado` (null until saved) and `fotos` (analyzed photos with anomalies, each with `hallazgos[].descartado` and `nota`). `PATCH` takes the texts and `fotos: [{foto_id, descartadas?, nota?}]` and changes only what is sent. It rejects unknown fields, photos of another inspection or not analyzed, and classes the photo does not have, with 400 `campos`, saving nothing.
+  - **PDF:** `GET .../reporte/pdf/` returns `application/pdf` as `attachment; filename="reporte-inspeccion-<id>.pdf"` (404 when missing) and is built from the draft. Discarded findings leave every count, severity (section and max severity come from the confirmed findings' taxonomy severity, not `foto.severidad`) and the evidence.
+  - **PDF sections:**
+    1. Header, using the draft inspector name over `tomado_por`.
+    2. Executive summary, plus the inspector's conclusion.
+    3. Vessel data.
+    4. Findings per section.
+    5. Evidence: annotated image, which still shows discarded boxes and says so, plus the photo note.
+    6. Sections not inspected.
+    7. Methodology, with a reviewed/not-reviewed notice and the discarded count.
+    8. Observations, recommendations and signature, with blank lines when empty.
+  - **Rendering details:** components are not findings; unknown classes are. An unreadable photo is logged and listed without image. Photos are decoded with JPEG draft + thumbnail before the RGB convert. `_PdfRenderer` lets `Accept: application/pdf` clients through and labels their error bodies `application/json`. Built with ReportLab (pure Python). Timestamps are naive (`USE_TZ=False`), so format them with `_fecha()`.
 - Rate limiting is per IP, Redis-backed and fail-open. Limits: `VISION_RATE_LIMIT_UPLOADS_PER_MINUTE` and `VISION_RATE_LIMIT_MAX_CONCURRENT` in `backend/config/settings.py`.
 
 ---
@@ -242,13 +257,15 @@ pnpm add <pkg>     # add a dependency (pnpm add -D <pkg> for dev)
 | `backend/config/settings.py` | Django settings (DB, apps, CORS, Celery, Redis, vision, rate limits) |
 | `backend/config/urls.py` | Root routing — mounts `vision` and the OpenAPI docs |
 | `backend/config/celery.py` | Celery app definition |
-| `backend/vision/models.py` | `Buque`, `SeccionCasco`, `InspeccionCasco`, `FotoInspeccion`, `NivelSeveridad` + `severidad_max` helpers |
+| `backend/vision/models.py` | `Buque`, `SeccionCasco`, `InspeccionCasco`, `FotoInspeccion`, `ReporteInspeccion`, `ValidacionFoto`, `NivelSeveridad` + `severidad_max` helpers |
 | `backend/vision/views.py` | Vision REST endpoints + SSE stream |
 | `backend/vision/busqueda.py` | Inspection search: declarative filter registry (`FILTROS`) + cursor pagination (`buscar_inspecciones`) |
 | `backend/vision/secciones.py` | `SECCIONES_ESTANDAR` + per-vessel section creation and validation |
 | `backend/vision/views_buques.py` | Buques REST endpoints (`/api/buques/`): list, create, detail, `PATCH` edit |
 | `backend/vision/urls.py` | URL routing for the vision app |
 | `backend/vision/tasks.py` | Celery task `procesar_foto` + dead-letter task |
+| `backend/vision/reporte.py` | PDF inspection report: `datos_reporte()` (summary, findings per section, evidence, coverage, draft applied) + `generar_pdf()` (ReportLab) + `fotos_revisables()` |
+| `backend/vision/views_reporte.py` | Report endpoints: draft `GET`/`PATCH` `/reporte/` and the PDF `/reporte/pdf/` |
 | `backend/vision/taxonomia.py` | Class taxonomy of `core_engine`: read-time enrichment of detections + `/api/vision/taxonomia/` payload |
 | `backend/vision/inference.py` | `run_inference(model_id=...)` adapter over `core_engine.vision.analyze`, model catalog/availability helpers + config validation |
 | `backend/config/almacenamiento.py` | `configurar_storages(env)`: builds `STORAGES` (local or S3) from environment variables |

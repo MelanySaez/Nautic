@@ -335,4 +335,78 @@ describe('HttpInspeccionesRepository', () => {
       message: 'No se pudo conectar con el servidor.',
     })
   })
+
+  describe('urlReporte', () => {
+    it('points at the PDF report of the inspection under the API base', () => {
+      expect(repo.urlReporte(7)).toBe(`${BASE}/api/vision/inspecciones/7/reporte/pdf/`)
+    })
+  })
+
+  describe('reporte', () => {
+    const borradorDto = {
+      conclusion: 'Regular',
+      observaciones: '',
+      recomendaciones: '',
+      inspector_nombre: 'Ana',
+      inspector_cargo: '',
+      actualizado: '2026-11-10T23:00:00',
+      fotos: [
+        {
+          foto_id: 4,
+          seccion: { codigo: 'PRW', nombre: 'Proa' },
+          imagen: 'http://api.test/media/a.jpg',
+          severidad: 'critical',
+          nota: 'Sombra',
+          hallazgos: [
+            { clase: 'corrosion', etiqueta: 'Corrosión', severidad: 'critical', total: 2, confianza_max: 0.9, descartado: true },
+          ],
+        },
+      ],
+    }
+
+    it('gets the draft and maps it to the domain', async () => {
+      fetchMock.mockResolvedValue(respuesta(200, borradorDto))
+
+      const borrador = await repo.obtenerReporte(7)
+
+      expect(String(fetchMock.mock.calls[0][0])).toBe(`${BASE}/api/vision/inspecciones/7/reporte/`)
+      expect(borrador).toEqual({
+        conclusion: 'Regular',
+        observaciones: '',
+        recomendaciones: '',
+        inspectorNombre: 'Ana',
+        inspectorCargo: '',
+        actualizado: '2026-11-10T23:00:00',
+        fotos: [
+          {
+            fotoId: 4,
+            seccion: { codigo: 'PRW', nombre: 'Proa' },
+            imagen: 'http://api.test/media/a.jpg',
+            severidad: 'critical',
+            nota: 'Sombra',
+            hallazgos: [
+              { clase: 'corrosion', etiqueta: 'Corrosión', severidad: 'critical', total: 2, confianzaMaxima: 0.9, descartado: true },
+            ],
+          },
+        ],
+      })
+    })
+
+    it('patches only the given texts and photo reviews in snake_case', async () => {
+      fetchMock.mockResolvedValue(respuesta(200, borradorDto))
+
+      await repo.guardarReporte(7, {
+        inspectorNombre: 'Ana',
+        fotos: [{ fotoId: 4, descartadas: ['corrosion'], nota: 'Sombra' }],
+      })
+
+      const [url, init] = fetchMock.mock.calls[0]
+      expect(String(url)).toBe(`${BASE}/api/vision/inspecciones/7/reporte/`)
+      expect(init?.method).toBe('PATCH')
+      expect(JSON.parse(String(init?.body))).toEqual({
+        inspector_nombre: 'Ana',
+        fotos: [{ foto_id: 4, descartadas: ['corrosion'], nota: 'Sombra' }],
+      })
+    })
+  })
 })
