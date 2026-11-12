@@ -147,9 +147,20 @@ CSRF_COOKIE_SECURE = False
 # Custom user (cuentas.Usuario, login by email). Must be set before the first migration.
 AUTH_USER_MODEL = "cuentas.Usuario"
 
+# Registration is open to anyone, so passwords are validated.
+AUTH_PASSWORD_VALIDATORS = [
+    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
+     "OPTIONS": {"user_attributes": ("email", "nombre")}},
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator", "OPTIONS": {"min_length": 8}},
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
+]
+
 REST_FRAMEWORK = {
     # Session cookie: EventSource (live updates) cannot send an Authorization header.
     "DEFAULT_AUTHENTICATION_CLASSES": ["rest_framework.authentication.SessionAuthentication"],
+    # Login and open registration, per IP (cache-backed: per process with the default LocMemCache).
+    "DEFAULT_THROTTLE_RATES": {"cuentas": "10/min"},
     "DEFAULT_PERMISSION_CLASSES": [],
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }

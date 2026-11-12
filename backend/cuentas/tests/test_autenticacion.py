@@ -1,6 +1,7 @@
 """User accounts and session login (cookie + CSRF)."""
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.core.cache import cache
+from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 
 Usuario = get_user_model()
@@ -9,6 +10,7 @@ URL_CSRF = '/api/auth/csrf/'
 URL_LOGIN = '/api/auth/login/'
 URL_LOGOUT = '/api/auth/logout/'
 URL_YO = '/api/auth/yo/'
+URL_REGISTRO = '/api/auth/registro/'
 
 
 class UsuarioTests(TestCase):
@@ -41,6 +43,7 @@ class UsuarioTests(TestCase):
 
 class SesionTests(TestCase):
     def setUp(self):
+        cache.clear()  # login is throttled per IP
         self.usuario = Usuario.objects.create_user(
             'ana@ejemplo.com', 'secreta-123', nombre='Ana Gómez', cargo='Inspectora',
         )
@@ -97,3 +100,61 @@ class SesionTests(TestCase):
 
         self.assertEqual(respuesta.status_code, 204)
         self.assertEqual(self.cliente.get(URL_YO).status_code, 401)
+
+
+class RegistroTests(TestCase):
+    def setUp(self):
+        cache.clear()  # throttling counters
+        self.cliente = APIClient(enforce_csrf_checks=True)
+
+    def _registrar(self, **datos):
+        self.cliente.get(URL_CSRF)
+        cuerpo = {'email': 'luis@ejemplo.com', 'password': 'Casco-firme-2026', 'nombre': 'Luis Pérez', **datos}
+        return self.cliente.post(URL_REGISTRO, cuerpo, format='json',
+                                 HTTP_X_CSRFTOKEN=self.cliente.cookies['csrftoken'].value)
+
+    def test_crea_la_cuenta_y_abre_la_sesion(self):
+        respuesta = self._registrar(email='  Luis@Ejemplo.com ', cargo='Buzo')
+
+        self.assertEqual(respuesta.status_code, 201)
+        usuario = Usuario.objects.get()
+        self.assertEqual((usuario.email, usuario.nombre, usuario.cargo), ('luis@ejemplo.com', 'Luis Pérez', 'Buzo'))
+        self.assertTrue(usuario.check_password('Casco-firme-2026'))
+        self.assertFalse(usuario.is_staff or usuario.is_superuser)
+        self.assertEqual(respuesta.json()['email'], 'luis@ejemplo.com')
+        self.assertEqual(self.cliente.get(URL_YO).json()['id'], usuario.id)
+
+    def test_datos_invalidos_no_crean_nada(self):
+        Usuario.objects.create_user('ana@ejemplo.com', 'x')
+
+        respuesta = self._registrar(email='ANA@ejemplo.com', password='123', nombre='  ')
+
+        self.assertEqual(respuesta.status_code, 400)
+        self.assertEqual(set(respuesta.json()['campos']), {'email', 'password', 'nombre'})
+        respuesta = self._registrar(email='no-es-un-email')
+        self.assertIn('email', respuesta.json()['campos'])
+        self.assertEqual(Usuario.objects.count(), 1)
+
+    def test_no_permite_elegir_privilegios(self):
+        self._registrar(is_staff=True, is_superuser=True)
+
+        usuario = Usuario.objects.get()
+        self.assertFalse(usuario.is_staff or usuario.is_superuser)
+
+    def test_exige_el_token_csrf(self):
+        self.cliente.get(URL_CSRF)
+        respuesta = self.cliente.post(URL_REGISTRO, {'email': 'a@b.com', 'password': 'Casco-firme-2026',
+                                                     'nombre': 'A'}, format='json')
+
+        self.assertEqual(respuesta.status_code, 403)
+        self.assertFalse(Usuario.objects.exists())
+
+    @override_settings(REST_FRAMEWORK={
+        'DEFAULT_AUTHENTICATION_CLASSES': ['rest_framework.authentication.SessionAuthentication'],
+        'DEFAULT_THROTTLE_RATES': {'cuentas': '3/min'},
+    })
+    def test_limita_los_intentos_por_ip(self):
+        for intento in range(3):
+            self.assertEqual(self._registrar(password='1').status_code, 400, intento)
+
+        self.assertEqual(self._registrar(password='1').status_code, 429)
