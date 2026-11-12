@@ -30,6 +30,9 @@ describe('ReportePage', () => {
     expect(await screen.findByLabelText('Conclusión')).toHaveValue('Regular')
     expect(dependencias.inspecciones.obtenerReporte).toHaveBeenCalledWith(7)
     expect(screen.getByLabelText('Nombre del inspector')).toHaveValue('Ana Gómez')
+    expect(screen.getByLabelText('Nombre del inspector')).toHaveAccessibleDescription(
+      'Se completa con quien tomó la inspección; puedes cambiarlo.',
+    )
     const foto = screen.getByRole('group', { name: 'Foto #4 · KEEL · Quilla' })
     expect(within(foto).getByRole('checkbox', { name: /Corrosión/ })).toBeChecked()
     expect(within(foto).getByRole('checkbox', { name: /Descascaramiento de pintura/ })).not.toBeChecked()

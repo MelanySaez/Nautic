@@ -48,8 +48,10 @@ class ObtenerBorradorTests(BaseReporte):
 
         self.assertEqual(res.status_code, 200)
         body = res.json()
-        for campo in ('conclusion', 'observaciones', 'recomendaciones', 'inspector_nombre', 'inspector_cargo'):
+        for campo in ('conclusion', 'observaciones', 'recomendaciones', 'inspector_cargo'):
             self.assertEqual(body[campo], '')
+        # Known since the inspection was created: suggested, still editable.
+        self.assertEqual(body['inspector_nombre'], 'J. Pérez')
         self.assertIsNone(body['actualizado'])
         self.assertEqual([f['foto_id'] for f in body['fotos']], [self.corroida.id, self.incrustada.id])
         primera = body['fotos'][0]
@@ -60,6 +62,14 @@ class ObtenerBorradorTests(BaseReporte):
             [(h['clase'], h['etiqueta'], h['descartado']) for h in primera['hallazgos']],
             [('corrosion', 'Corrosión', False), ('paint_peel', 'Descascaramiento de pintura', False)],
         )
+
+    def test_el_nombre_guardado_reemplaza_al_de_la_inspeccion(self):
+        self._patch({'inspector_nombre': 'Ana Gómez'})
+        self.assertEqual(self.client.get(self._url()).json()['inspector_nombre'], 'Ana Gómez')
+
+        # Clearing it falls back to who took the inspection again.
+        self._patch({'inspector_nombre': ''})
+        self.assertEqual(self.client.get(self._url()).json()['inspector_nombre'], 'J. Pérez')
 
     def test_inspeccion_inexistente(self):
         self.assertEqual(self.client.get(self._url(999999)).status_code, 404)
@@ -176,6 +186,8 @@ class PdfConBorradorTests(BaseReporte):
         self.assertEqual(datos['inspeccion']['tomado_por'], 'J. Pérez')
         self.assertEqual(datos['metodologia']['revision'], {'revisado': False, 'descartados': 0})
         self.assertEqual(datos['borrador']['conclusion'], '')
+        # The signature line also gets the inspection's inspector.
+        self.assertEqual(datos['borrador']['inspector_nombre'], 'J. Pérez')
 
     def test_el_pdf_se_genera_con_el_borrador(self):
         self._patch({'conclusion': 'Regular <b>&</b>', 'fotos': [{'foto_id': self.corroida.id, 'descartadas': ['corrosion']}]})

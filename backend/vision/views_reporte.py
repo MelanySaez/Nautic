@@ -16,7 +16,7 @@ from rest_framework.response import Response
 
 from .almacenamiento import url_archivo
 from .models import FotoInspeccion, InspeccionCasco, ReporteInspeccion, ValidacionFoto
-from .reporte import borrador_de, clases_anomalia, fotos_revisables, generar_pdf
+from .reporte import borrador_de, clases_anomalia, fotos_revisables, generar_pdf, textos_reporte
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +35,7 @@ _CAMPOS_FOTO = {'foto_id', 'descartadas', 'nota'}
 
 def _borrador_to_dict(inspeccion, request=None):
     borrador = borrador_de(inspeccion)
-    data = {campo: getattr(borrador, campo) if borrador else '' for campo in _TEXTOS}
+    data = textos_reporte(inspeccion, borrador)
     data['actualizado'] = borrador.fecha_modificacion.isoformat() if borrador else None
     data['fotos'] = [
         {
@@ -143,7 +143,8 @@ class _PdfRenderer(BaseRenderer):
     summary='Borrador del reporte de una inspección',
     description=(
         'Textos del inspector (`conclusion`, `observaciones`, `recomendaciones`, `inspector_nombre`, '
-        '`inspector_cargo`; vacíos si nunca se guardó, con `actualizado` nulo) y las fotos analizadas '
+        '`inspector_cargo`; vacíos si nunca se guardó, con `actualizado` nulo, salvo `inspector_nombre`, '
+        'que sin valor guardado toma el `tomado_por` de la inspección) y las fotos analizadas '
         'con anomalías, cada una con sus `hallazgos` (marcados `descartado` si el inspector los '
         'descartó como falsos positivos) y su `nota`.'
     ),
