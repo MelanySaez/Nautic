@@ -3,7 +3,8 @@ import json
 from datetime import datetime
 
 from django.test import TestCase
-from rest_framework.test import APIClient
+
+from vision.tests.utilidades import cliente_admin
 
 from vision.busqueda import (
     BusquedaInvalida,
@@ -28,7 +29,7 @@ def _crear(buque, nombre='', fecha=None, severidad=None):
 
 class BusquedaBase(TestCase):
     def setUp(self):
-        self.client = APIClient()
+        self.client = cliente_admin()
         self.caribe = Buque.objects.create(nombre='ARC Caribe', tipo='Fragata')
         self.gorgona = Buque.objects.create(nombre='ARC Gorgona', tipo='Patrullera')
 

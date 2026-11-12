@@ -1,5 +1,5 @@
 from django.urls import path
-from . import views, views_buques, views_reporte
+from . import views, views_buques, views_miembros, views_reporte
 
 urlpatterns = [
     # Endpoint original — inferencia directa sin persistencia
@@ -19,6 +19,10 @@ urlpatterns = [
 
     # Detalle de inspección + sus fotos
     path('api/vision/inspecciones/<int:inspeccion_id>/', views.api_vision_inspeccion_detalle, name='api_vision_inspeccion_detalle'),
+
+    # Miembros de la inspección (el líder invita y asigna roles)
+    path('api/vision/inspecciones/<int:inspeccion_id>/miembros/', views_miembros.api_vision_miembros, name='api_vision_miembros'),
+    path('api/vision/inspecciones/<int:inspeccion_id>/miembros/<int:miembro_id>/', views_miembros.api_vision_miembro_detalle, name='api_vision_miembro_detalle'),
 
     # Reporte de la inspección: borrador editable y PDF generado a partir de él
     path('api/vision/inspecciones/<int:inspeccion_id>/reporte/', views_reporte.api_vision_inspeccion_reporte, name='api_vision_inspeccion_reporte'),

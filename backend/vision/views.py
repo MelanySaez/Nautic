@@ -7,7 +7,8 @@ import time
 from PIL import Image
 from django.conf import settings
 from django.db import transaction
-from django.http import HttpResponse, StreamingHttpResponse
+from django.contrib.auth import get_user_model
+from django.http import Http404, HttpResponse, JsonResponse, StreamingHttpResponse
 from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
@@ -28,8 +29,9 @@ from .inference import (
 )
 from .models import (
     Buque, SeccionCasco, InspeccionCasco, FotoInspeccion, NivelSeveridad,
-    nombre_por_defecto, recalcular_severidad_max, resumen_detecciones,
+    InspeccionMiembro, nombre_por_defecto, recalcular_severidad_max, resumen_detecciones,
 )
+from .permisos import LIDER, exigir, permisos_de, puede_ver, visibles_para
 from .pubsub import publicar_evento, suscribirse
 from .ratelimit import check_upload_rate, get_client_ip, track_concurrent_start
 from .secciones import seccion_to_dict
@@ -267,7 +269,11 @@ def _foto_to_dict(f, request=None):
     }
 
 
-def _inspeccion_to_dict(insp, include_fotos=False, request=None):
+def _usuario_ref(usuario):
+    return {'id': usuario.id, 'nombre': usuario.nombre, 'email': usuario.email} if usuario else None
+
+
+def _inspeccion_to_dict(insp, include_fotos=False, request=None, con_permisos=False):
     d = {
         'id': insp.id,
         'buque_id': insp.buque_id,
@@ -280,7 +286,12 @@ def _inspeccion_to_dict(insp, include_fotos=False, request=None):
         'fecha_modificacion': insp.fecha_modificacion.isoformat(),
         # `n_fotos` lo anota la búsqueda para evitar una consulta por inspección.
         'total_fotos': insp.n_fotos if hasattr(insp, 'n_fotos') else insp.fotos.count(),
+        'lider': _usuario_ref(insp.lider),
+        'privada': insp.privada,
     }
+    if con_permisos and request is not None:
+        # What the current user may do, so the UI can hide or disable actions.
+        d['mis_permisos'] = permisos_de(request.user, insp)
     if include_fotos:
         fotos_qs = insp.fotos.select_related('seccion').prefetch_related('detecciones').order_by('fecha_creacion')
         d['fotos'] = [_foto_to_dict(f, request) for f in fotos_qs]
@@ -288,7 +299,9 @@ def _inspeccion_to_dict(insp, include_fotos=False, request=None):
 
 
 _NOMBRE_MAX = InspeccionCasco._meta.get_field('nombre').max_length
-_CAMPOS_EDITABLES_INSPECCION = ('nombre', 'descripcion')
+_CAMPOS_EDITABLES_INSPECCION = ('nombre', 'descripcion', 'privada', 'lider_id')
+# Fields only the leader may change.
+_CAMPOS_DEL_LIDER = {'privada', 'lider_id'}
 
 
 def _validar_nombre(valor):
@@ -324,7 +337,34 @@ def _validar_edicion_inspeccion(data):
             limpios['descripcion'] = data['descripcion']
         else:
             errores['descripcion'] = ['Debe ser texto.']
+    if 'privada' in data:
+        if isinstance(data['privada'], bool):
+            limpios['privada'] = data['privada']
+        else:
+            errores['privada'] = ['Debe ser true o false.']
+    if 'lider_id' in data:
+        valor = data['lider_id']
+        nuevo = None
+        if isinstance(valor, int) and not isinstance(valor, bool):
+            nuevo = get_user_model().objects.filter(pk=valor, is_active=True).first()
+        if nuevo is None:
+            errores['lider_id'] = ['Usuario inexistente o inactivo.']
+        else:
+            limpios['lider'] = nuevo
     return limpios, errores
+
+
+def _traspasar_liderazgo(insp, nuevo, usuario):
+    """The new leader stops being a member; the previous one stays as Colaborador."""
+    anterior = insp.lider
+    if anterior is not None and anterior.pk == nuevo.pk:
+        return
+    InspeccionMiembro.objects.filter(inspeccion=insp, usuario=nuevo).delete()
+    if anterior is not None:
+        miembro = InspeccionMiembro(inspeccion=insp, usuario=anterior, agregado_por=usuario)
+        miembro.asignar(InspeccionMiembro.ROLES[InspeccionMiembro.Rol.COLABORADOR])
+        miembro.save()
+    insp.lider = nuevo
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -564,7 +604,8 @@ def api_vision_inspecciones(request):
     """
     if request.method == 'GET':
         try:
-            pagina, siguiente, hay_mas = buscar_inspecciones(request.query_params)
+            base = visibles_para(request.user, InspeccionCasco.objects.select_related('buque', 'lider'))
+            pagina, siguiente, hay_mas = buscar_inspecciones(request.query_params, base=base)
         except BusquedaInvalida as exc:
             return Response({'error': 'Datos inválidos.', 'campos': exc.errores}, status=400)
         return Response({
@@ -589,16 +630,20 @@ def api_vision_inspecciones(request):
     buque = get_object_or_404(Buque, pk=buque_id)
     # El nombre generado necesita el id: se crea y se actualiza en la misma transacción.
     with transaction.atomic():
+        tomado_por = request.data.get('tomado_por', '')
         insp = InspeccionCasco.objects.create(
             buque=buque,
             nombre=nombre,
             descripcion=request.data.get('descripcion', ''),
-            tomado_por=request.data.get('tomado_por', ''),
+            # Who creates it leads it; the name signs by default and stays editable.
+            tomado_por=(tomado_por.strip() if isinstance(tomado_por, str) else '')
+            or request.user.nombre or request.user.email,
+            lider=request.user,
         )
         if not insp.nombre:
             insp.nombre = nombre_por_defecto(insp)
             insp.save(update_fields=['nombre'])
-    return Response(_inspeccion_to_dict(insp, request=request), status=201)
+    return Response(_inspeccion_to_dict(insp, request=request, con_permisos=True), status=201)
 
 
 @extend_schema(
@@ -634,11 +679,13 @@ def api_vision_inspeccion_detalle(request, inspeccion_id):
     DELETE /api/vision/inspecciones/<id>/  → elimina la inspección y todos sus archivos físicos
     """
     insp = get_object_or_404(
-        InspeccionCasco.objects.select_related('buque'),
+        InspeccionCasco.objects.select_related('buque', 'lider'),
         pk=inspeccion_id,
     )
+    exigir(request.user, insp)
 
     if request.method == 'DELETE':
+        exigir(request.user, insp, LIDER)
         for foto in insp.fotos.all():
             borrar_archivo(foto.imagen_original)
             borrar_archivo(foto.imagen_anotada)
@@ -650,18 +697,28 @@ def api_vision_inspeccion_detalle(request, inspeccion_id):
         data = request.data
         if not hasattr(data, 'keys'):
             return Response({'error': 'Se esperaba un objeto JSON.'}, status=400)
+        if _CAMPOS_DEL_LIDER & set(data):
+            exigir(request.user, insp, LIDER)
+        if set(data) - _CAMPOS_DEL_LIDER:
+            exigir(request.user, insp, 'editar_inspeccion')
         limpios, errores = _validar_edicion_inspeccion(data)
         if errores:
             return Response({'error': 'Datos inválidos.', 'campos': errores}, status=400)
-        if 'nombre' in limpios:
-            insp.nombre = limpios['nombre'] or nombre_por_defecto(insp)
-        if 'descripcion' in limpios:
-            insp.descripcion = limpios['descripcion']
-        if limpios:
-            insp.save(update_fields=[*limpios.keys(), 'fecha_modificacion'])
-        return Response(_inspeccion_to_dict(insp, include_fotos=True, request=request))
+        with transaction.atomic():
+            if 'nombre' in limpios:
+                insp.nombre = limpios['nombre'] or nombre_por_defecto(insp)
+            if 'descripcion' in limpios:
+                insp.descripcion = limpios['descripcion']
+            if 'privada' in limpios:
+                insp.privada = limpios['privada']
+            if 'lider' in limpios:
+                _traspasar_liderazgo(insp, limpios['lider'], request.user)
+            if limpios:
+                insp.save(update_fields=[*limpios.keys(), 'fecha_modificacion'])
+        insp.__dict__.pop('_membresias', None)
+        return Response(_inspeccion_to_dict(insp, include_fotos=True, request=request, con_permisos=True))
 
-    return Response(_inspeccion_to_dict(insp, include_fotos=True, request=request))
+    return Response(_inspeccion_to_dict(insp, include_fotos=True, request=request, con_permisos=True))
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -708,6 +765,7 @@ def api_vision_subir_foto(request, inspeccion_id):
     Publica el evento SSE `foto-created` en el canal de la inspección.
     """
     insp = get_object_or_404(InspeccionCasco, pk=inspeccion_id)
+    exigir(request.user, insp, 'subir_fotos')
 
     ip = get_client_ip(request)
     ok, err = check_upload_rate(ip)
@@ -781,11 +839,13 @@ def api_vision_foto_detalle(request, foto_id):
     POST   /api/vision/fotos/<id>/  → dispara análisis si estado=pendiente o error
     DELETE /api/vision/fotos/<id>/  → elimina la foto y sus archivos físicos
     """
-    foto = get_object_or_404(FotoInspeccion.objects.select_related('seccion'), pk=foto_id)
+    foto = get_object_or_404(FotoInspeccion.objects.select_related('seccion', 'inspeccion'), pk=foto_id)
+    exigir(request.user, foto.inspeccion)
 
     if request.method == 'GET':
         return Response(_foto_to_dict(foto, request))
 
+    exigir(request.user, foto.inspeccion, 'subir_fotos' if request.method == 'DELETE' else 'analizar')
     if request.method == 'DELETE':
         inspeccion_id = foto.inspeccion_id
         foto_id_borrado = foto.pk
@@ -852,7 +912,8 @@ def api_vision_foto_detecciones(request, foto_id):
     GET /api/vision/fotos/<id>/detecciones/
     Cajas y máscaras de cada detección del último análisis de la foto.
     """
-    foto = get_object_or_404(FotoInspeccion, pk=foto_id)
+    foto = get_object_or_404(FotoInspeccion.objects.select_related('inspeccion'), pk=foto_id)
+    exigir(request.user, foto.inspeccion)
     if not foto.detecciones_archivo:
         return Response({'error': 'La foto no tiene detecciones guardadas.'}, status=404)
     try:
@@ -888,6 +949,7 @@ def api_vision_analizar_inspeccion(request, inspeccion_id):
     con el modelo indicado en `modelo` (opcional; por defecto VISION_MODEL_ID).
     """
     insp = get_object_or_404(InspeccionCasco, pk=inspeccion_id)
+    exigir(request.user, insp, 'analizar')
     modelo, error = _resolver_modelo(request.data)
     if error:
         return error
@@ -945,8 +1007,12 @@ def api_vision_inspeccion_stream(request, inspeccion_id):
     GET /api/vision/inspecciones/<id>/stream/
     Server-Sent Events: empuja eventos de cambio de estado de fotos al frontend.
     """
-    # Verificar que la inspección existe antes de abrir el stream
-    get_object_or_404(InspeccionCasco, pk=inspeccion_id)
+    # Plain Django view: check the session and the right to read before opening the stream.
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'No has iniciado sesión.'}, status=401)
+    insp = get_object_or_404(InspeccionCasco, pk=inspeccion_id)
+    if not puede_ver(request.user, insp):
+        raise Http404
 
     keepalive_seconds = getattr(settings, 'SSE_KEEPALIVE_SECONDS', 15)
 

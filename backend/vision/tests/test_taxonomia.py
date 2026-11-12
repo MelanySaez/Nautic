@@ -2,11 +2,10 @@
 from unittest import mock
 
 from django.test import TestCase, override_settings
-from rest_framework.test import APIClient
 
 from vision.models import Buque, FotoInspeccion, InspeccionCasco, SeccionCasco
 from vision.tasks import _notificar
-from vision.tests.utilidades import STORAGES_EN_MEMORIA, crear_foto
+from vision.tests.utilidades import STORAGES_EN_MEMORIA, cliente_admin, crear_foto
 
 DETECCIONES = [
     {'class_name': 'corrosion', 'count': 2, 'max_confidence': 0.9},
@@ -43,7 +42,7 @@ class DeteccionesConTaxonomiaTests(TestCase):
         )
 
     def test_el_dict_de_la_foto_lleva_la_taxonomia_de_cada_deteccion(self):
-        foto = APIClient().get(f'/api/vision/fotos/{self.foto.id}/').json()
+        foto = cliente_admin().get(f'/api/vision/fotos/{self.foto.id}/').json()
 
         self._comprobar(foto['detecciones'])
 
@@ -58,14 +57,14 @@ class DeteccionesConTaxonomiaTests(TestCase):
         self.foto.estado = FotoInspeccion.Estado.PENDIENTE
         self.foto.save(update_fields=['estado'])
 
-        foto = APIClient().get(f'/api/vision/fotos/{self.foto.id}/').json()
+        foto = cliente_admin().get(f'/api/vision/fotos/{self.foto.id}/').json()
 
         self.assertIsNone(foto['detecciones'])
 
 
 class TaxonomiaEndpointTests(TestCase):
     def test_lista_las_clases_de_la_libreria_con_version_y_color(self):
-        respuesta = APIClient().get('/api/vision/taxonomia/')
+        respuesta = cliente_admin().get('/api/vision/taxonomia/')
 
         self.assertEqual(respuesta.status_code, 200)
         datos = respuesta.json()

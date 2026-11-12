@@ -1,5 +1,6 @@
 from django.test import TestCase
-from rest_framework.test import APIClient
+
+from vision.tests.utilidades import cliente_admin
 
 from vision.models import Buque, InspeccionCasco, SeccionCasco
 from vision.secciones import SECCIONES_ESTANDAR
@@ -13,7 +14,7 @@ def _url_detalle(buque_id):
 
 class CrearBuqueTests(TestCase):
     def setUp(self):
-        self.client = APIClient()
+        self.client = cliente_admin()
 
     def _post(self, payload):
         return self.client.post(URL_LISTA, payload, format='json')
@@ -188,7 +189,7 @@ class CrearBuqueTests(TestCase):
 
 class ListarBuquesTests(TestCase):
     def setUp(self):
-        self.client = APIClient()
+        self.client = cliente_admin()
 
     def test_lista_vacia(self):
         res = self.client.get(URL_LISTA)
@@ -305,7 +306,7 @@ class ListarBuquesTests(TestCase):
 
 class DetalleBuqueTests(TestCase):
     def setUp(self):
-        self.client = APIClient()
+        self.client = cliente_admin()
 
     def test_detalle_completo(self):
         buque = Buque.objects.create(
@@ -335,7 +336,7 @@ class DetalleBuqueTests(TestCase):
 
 class SeccionesDelBuqueTests(TestCase):
     def setUp(self):
-        self.client = APIClient()
+        self.client = cliente_admin()
 
     def _post(self, **extra):
         return self.client.post(URL_LISTA, {'nombre': 'Lancha', 'tipo': 'Patrullera', **extra}, format='json')
@@ -397,7 +398,7 @@ class SeccionesDelBuqueTests(TestCase):
 
 class EditarBuqueTests(TestCase):
     def setUp(self):
-        self.client = APIClient()
+        self.client = cliente_admin()
         self.buque = Buque.objects.create(
             nombre='ARC Caribe', tipo='Fragata', eslora_total_m=110.5, puntal_m=8.0,
         )

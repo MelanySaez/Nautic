@@ -20,7 +20,7 @@ Branch: `feat/login-usuarios` (stacked on `feat/detecciones-normalizadas`, PR #2
 | ID | Specs | Route | Status | Evidence |
 |---|---|---|---|---|
 | T1 | S1, S2 (backend) | inline | done | RED: User() got unexpected kwargs nombre/cargo; GREEN: cuentas 10/10, suite 272 OK |
-| T2 | S3-S5 | inline | pending | — |
+| T2 | S3-S5 | inline | done | RED: ImportError InspeccionMiembro; GREEN: test_permisos 15/15, suite 292 OK |
 | T3 | S6 | inline | pending | — |
 | T4 | S2 (frontend), S7 | inline | pending | — |
 | T5 | docs, dev DB reset | inline | pending | — |
@@ -37,3 +37,4 @@ Branch: `feat/login-usuarios` (stacked on `feat/detecciones-normalizadas`, PR #2
 - L8: T1 done: app `cuentas` (`Usuario`, emails stored lowercase), `AUTH_USER_MODEL`, DRF `SessionAuthentication`, `/api/auth/csrf|login|logout|yo/`; login enforces CSRF explicitly (DRF skips it for anonymous requests). The dev DB now fails `makemigrations --check` with InconsistentMigrationHistory (admin.0001 before cuentas.0001): needs the T5 reset. Permissions still AllowAny until T2.
 - L9 (2026-11-11, user): "Registro abierto: cualquiera se registra desde la pantalla de login."
 - L10: registration done: `POST /api/auth/registro/` (CSRF, case-insensitive unique email, Django password validators added to settings — there were none, nombre required, privileges never taken from the request), per-IP throttle `cuentas` 10/min on login and registration (custom SimpleRateThrottle: ScopedRateThrottle passes everything when the view has no `throttle_scope`). Suite 277 OK.
+- L11: T2 done: `lider`/`privada` + `InspeccionMiembro` (migration 0013, generated with `DB_PORT=1` because the dev DB history is inconsistent until T5), `vision/permisos.py` (`exigir`, `visibles_para`, `permisos_de`), `views_miembros.py` (list/invite/patch/remove, roles derive `personalizado` when adjusted), leadership transfer via PATCH `lider_id` (previous leader stays as Colaborador), `mis_permisos` in detail/create responses, every endpoint requires a session (`cuentas.autenticacion.Sesion` answers 401), stream checks session + visibility. Unreadable -> 404, readable without permission -> 403. Assumption applied: any signed-in user manages vessels. Legacy tests authenticate as superuser (`cliente_admin`); passwordless test users keep the suite fast (10 s).

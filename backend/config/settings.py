@@ -158,10 +158,11 @@ AUTH_PASSWORD_VALIDATORS = [
 
 REST_FRAMEWORK = {
     # Session cookie: EventSource (live updates) cannot send an Authorization header.
-    "DEFAULT_AUTHENTICATION_CLASSES": ["rest_framework.authentication.SessionAuthentication"],
+    "DEFAULT_AUTHENTICATION_CLASSES": ["cuentas.autenticacion.Sesion"],
+    # Every endpoint needs a session unless it opts out (login, registration, CSRF).
+    "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
     # Login and open registration, per IP (cache-backed: per process with the default LocMemCache).
     "DEFAULT_THROTTLE_RATES": {"cuentas": "10/min"},
-    "DEFAULT_PERMISSION_CLASSES": [],
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }
 

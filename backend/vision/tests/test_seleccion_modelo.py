@@ -4,12 +4,11 @@ from unittest import mock
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.test import TestCase, override_settings
-from rest_framework.test import APIClient
 
 from vision import inference
 from vision.models import Buque, FotoInspeccion, InspeccionCasco, SeccionCasco
 from vision.tasks import procesar_foto
-from vision.tests.utilidades import STORAGES_EN_MEMORIA, png_bytes
+from vision.tests.utilidades import STORAGES_EN_MEMORIA, cliente_admin, png_bytes
 
 IDS_CATALOGO = ['yolo-seg', 'yolo-tiled', 'maskrcnn', 'rtdetr']
 
@@ -18,7 +17,7 @@ class _Base(TestCase):
     """Redis, the broker and the real model availability are all stubbed."""
 
     def setUp(self):
-        self.client = APIClient()
+        self.client = cliente_admin()
         self.insp = InspeccionCasco.objects.create(
             buque=Buque.objects.create(nombre='ARC Caribe', tipo='Fragata')
         )

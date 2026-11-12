@@ -5,7 +5,8 @@ from unittest import mock
 from core_engine.vision import ModelAvailability
 from django.conf import settings
 from django.test import SimpleTestCase, override_settings
-from rest_framework.test import APIClient
+
+from vision.tests.utilidades import cliente_admin_sin_bd
 
 from vision import inference
 
@@ -188,7 +189,7 @@ class ListarModelosTests(SimpleTestCase):
 class ApiModelosTests(SimpleTestCase):
     def setUp(self):
         _parchear_disponibilidad(self, _todos_disponibles())
-        self.client = APIClient()
+        self.client = cliente_admin_sin_bd()
 
     def test_lista_los_cuatro_modelos_del_catalogo(self):
         res = self.client.get(URL_MODELOS)

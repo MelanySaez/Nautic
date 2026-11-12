@@ -4,11 +4,10 @@ from unittest import mock
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.test import TestCase, override_settings
-from rest_framework.test import APIClient
 
 from vision.models import Buque, FotoInspeccion, InspeccionCasco, SeccionCasco
 from vision.tasks import procesar_foto
-from vision.tests.utilidades import STORAGES_EN_MEMORIA, png_bytes
+from vision.tests.utilidades import STORAGES_EN_MEMORIA, cliente_admin, png_bytes
 
 
 @override_settings(STORAGES=STORAGES_EN_MEMORIA)
@@ -110,7 +109,7 @@ class VersionesPorFotoTests(TestCase):
 
     def test_el_dict_de_la_foto_expone_las_versiones(self):
         self._procesar(model_version='0.1.0', taxonomy_version='1.0.0')
-        client = APIClient()
+        client = cliente_admin()
 
         detalle = client.get(f'/api/vision/fotos/{self.foto.id}/').json()
         inspeccion = client.get(f'/api/vision/inspecciones/{self.insp.id}/').json()
@@ -120,7 +119,7 @@ class VersionesPorFotoTests(TestCase):
             self.assertEqual(foto['taxonomia_version'], '1.0.0')
 
     def test_el_dict_expone_none_para_fotos_sin_versiones(self):
-        foto = APIClient().get(f'/api/vision/fotos/{self.foto.id}/').json()
+        foto = cliente_admin().get(f'/api/vision/fotos/{self.foto.id}/').json()
 
         self.assertIsNone(foto['modelo_version'])
         self.assertIsNone(foto['taxonomia_version'])

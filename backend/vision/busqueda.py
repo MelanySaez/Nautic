@@ -293,16 +293,18 @@ def _con_total_fotos(qs):
     return qs.annotate(n_fotos=Coalesce(Subquery(fotos), 0))
 
 
-def buscar_inspecciones(params):
+def buscar_inspecciones(params, base=None):
     """
     Busca inspecciones según ``params`` (un QueryDict o dict de strings).
 
+    ``base`` (optional queryset) restricts what can be found.
     Devuelve ``(pagina, siguiente_cursor, hay_mas)``. Lanza ``BusquedaInvalida``
     con los errores de todos los campos inválidos.
     """
     errores = {}
     valores = {}
-    qs = InspeccionCasco.objects.select_related('buque')
+    # ``base`` narrows the search (e.g. to the inspections the user may read).
+    qs = base if base is not None else InspeccionCasco.objects.select_related('buque')
 
     for filtro in FILTROS.values():
         nombre, raw = _leer_parametro(params, filtro)

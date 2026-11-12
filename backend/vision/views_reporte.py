@@ -16,6 +16,7 @@ from rest_framework.response import Response
 
 from .almacenamiento import url_archivo
 from .models import FotoInspeccion, InspeccionCasco, ReporteInspeccion
+from .permisos import exigir
 from .reporte import borrador_de, clases_anomalia, fotos_revisables, generar_pdf, textos_reporte
 
 logger = logging.getLogger(__name__)
@@ -170,6 +171,7 @@ def api_vision_inspeccion_reporte(request, inspeccion_id):
     PATCH /api/vision/inspecciones/<id>/reporte/  → edita textos y validaciones
     """
     inspeccion = get_object_or_404(InspeccionCasco, pk=inspeccion_id)
+    exigir(request.user, inspeccion, None if request.method == 'GET' else 'editar_reporte')
     if request.method == 'GET':
         return Response(_borrador_to_dict(inspeccion, request))
 
@@ -232,6 +234,7 @@ def api_vision_inspeccion_reporte_pdf(request, inspeccion_id):
     GET /api/vision/inspecciones/<id>/reporte/pdf/  → PDF adjunto
     """
     inspeccion = get_object_or_404(InspeccionCasco.objects.select_related('buque'), pk=inspeccion_id)
+    exigir(request.user, inspeccion)
     try:
         pdf = generar_pdf(inspeccion)
     except Exception:

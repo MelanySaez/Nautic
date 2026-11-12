@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib.postgres.indexes import GinIndex
 from django.db import models, transaction
 from django.db.models import Q
@@ -127,6 +128,15 @@ class InspeccionCasco(models.Model):
     )
     descripcion = models.TextField(blank=True, default='')
     tomado_por = models.CharField(max_length=255, blank=True, default='')
+    # Who created it: invites members, sets their permissions, makes it private,
+    # deletes it and can hand over leadership (see ``vision/permisos.py``).
+    lider = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='inspecciones_lideradas',
+    )
+    # Public inspections are readable by every signed-in user; private ones only
+    # by their leader and members.
+    privada = models.BooleanField(default=False)
     fecha_creacion = models.DateTimeField(auto_now_add=True)
     fecha_modificacion = models.DateTimeField(auto_now=True)
 
@@ -328,3 +338,57 @@ def resumen_detecciones(foto):
         {'class_name': f.clase, 'count': f.cantidad, 'max_confidence': f.confianza_max}
         for f in filas
     ]
+
+
+class InspeccionMiembro(models.Model):
+    """
+    A user invited by the inspection's leader, with the permissions they hold.
+    ``rol`` names the template the permissions came from, or ``personalizado``
+    when the leader adjusted them (see ``ROLES``).
+    """
+    class Rol(models.TextChoices):
+        COLABORADOR = 'colaborador', 'Colaborador'
+        REVISOR = 'revisor', 'Revisor'
+        OBSERVADOR = 'observador', 'Observador'
+        PERSONALIZADO = 'personalizado', 'Personalizado'
+
+    PERMISOS = ('subir_fotos', 'analizar', 'editar_reporte', 'editar_inspeccion')
+    # Template roles -> the permissions they grant.
+    ROLES = {
+        Rol.COLABORADOR: {'subir_fotos': True, 'analizar': True, 'editar_reporte': True, 'editar_inspeccion': True},
+        Rol.REVISOR: {'subir_fotos': False, 'analizar': False, 'editar_reporte': True, 'editar_inspeccion': False},
+        Rol.OBSERVADOR: {'subir_fotos': False, 'analizar': False, 'editar_reporte': False, 'editar_inspeccion': False},
+    }
+
+    inspeccion = models.ForeignKey(InspeccionCasco, on_delete=models.CASCADE, related_name='miembros')
+    usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='membresias')
+    rol = models.CharField(max_length=20, choices=Rol.choices)
+    puede_subir_fotos = models.BooleanField(default=False)
+    puede_analizar = models.BooleanField(default=False)
+    puede_editar_reporte = models.BooleanField(default=False)
+    puede_editar_inspeccion = models.BooleanField(default=False)
+    agregado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='+',
+    )
+    fecha_agregado = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'inspeccion_miembro'
+        ordering = ['fecha_agregado', 'id']
+        constraints = [
+            models.UniqueConstraint(fields=['inspeccion', 'usuario'], name='miembro_inspeccion_usuario_uniq'),
+        ]
+
+    def __str__(self):
+        return f"{self.usuario} — {self.rol} en la inspección #{self.inspeccion_id}"
+
+    def permisos(self):
+        return {p: getattr(self, f'puede_{p}') for p in self.PERMISOS}
+
+    def asignar(self, permisos):
+        """Set the four permissions and derive ``rol`` (a template, or ``personalizado``)."""
+        for permiso in self.PERMISOS:
+            setattr(self, f'puede_{permiso}', bool(permisos[permiso]))
+        actuales = self.permisos()
+        self.rol = next((rol for rol, plantilla in self.ROLES.items() if plantilla == actuales),
+                        self.Rol.PERSONALIZADO)

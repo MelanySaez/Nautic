@@ -150,7 +150,7 @@ class RegistroTests(TestCase):
         self.assertFalse(Usuario.objects.exists())
 
     @override_settings(REST_FRAMEWORK={
-        'DEFAULT_AUTHENTICATION_CLASSES': ['rest_framework.authentication.SessionAuthentication'],
+        'DEFAULT_AUTHENTICATION_CLASSES': ['cuentas.autenticacion.Sesion'],
         'DEFAULT_THROTTLE_RATES': {'cuentas': '3/min'},
     })
     def test_limita_los_intentos_por_ip(self):

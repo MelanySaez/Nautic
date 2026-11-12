@@ -5,11 +5,10 @@ from unittest import mock
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.test import TestCase, override_settings
-from rest_framework.test import APIClient
 
 from vision.models import Buque, FotoInspeccion, InspeccionCasco, SeccionCasco, resumen_detecciones
 from vision.tasks import procesar_foto
-from vision.tests.utilidades import STORAGES_EN_MEMORIA, png_bytes
+from vision.tests.utilidades import STORAGES_EN_MEMORIA, cliente_admin, png_bytes
 
 MASCARA = {'size': [2, 2], 'counts': [0, 3, 1]}
 
@@ -47,7 +46,7 @@ class DeteccionesFotoTests(TestCase):
         self.eventos = self._parchear('vision.tasks.publicar_evento')
         self._parchear('vision.tasks.track_concurrent_end')
         self._parchear('vision.views.publicar_evento')
-        self.client = APIClient()
+        self.client = cliente_admin()
 
     def _parchear(self, objetivo):
         patcher = mock.patch(objetivo)
