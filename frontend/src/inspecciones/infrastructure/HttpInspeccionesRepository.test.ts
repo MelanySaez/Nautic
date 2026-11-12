@@ -267,6 +267,19 @@ describe('HttpInspeccionesRepository', () => {
     expect(creada.id).toBe(7)
   })
 
+  it('sends the team invited at creation', async () => {
+    fetchMock.mockResolvedValue(respuesta(201, inspeccionDto))
+
+    await repo.crear({
+      buqueId: 2,
+      tomadoPor: '',
+      descripcion: '',
+      miembros: [{ email: 'ana@nautic.test', rol: 'revisor' }],
+    })
+
+    expect(JSON.parse(String(ultimaLlamada().init.body)).miembros).toEqual([{ email: 'ana@nautic.test', rol: 'revisor' }])
+  })
+
   it('renames an inspection with a PATCH carrying only the name', async () => {
     fetchMock.mockResolvedValue(respuesta(200, { ...inspeccionDto, nombre: 'Casco proa', fotos: [] }))
 

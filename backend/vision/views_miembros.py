@@ -60,6 +60,58 @@ def _validar_permisos(data, base):
     return permisos, errores
 
 
+def validar_invitacion(data, lider_id, ya_es_miembro):
+    """
+    Validate one invitation ``{email, rol, permisos?}`` for an inspection led by ``lider_id``.
+    ``ya_es_miembro(usuario)`` says whether that user is already a member (or earlier in the same list).
+    Returns (usuario|None, permisos|None, errores) with errores keyed by field.
+    """
+    if not hasattr(data, 'get'):
+        return None, None, {'email': ['Cada invitado debe ser un objeto {email, rol}.']}
+    permisos, errores = _validar_permisos(data, base=None)
+    email = data.get('email')
+    usuario = None
+    if not isinstance(email, str) or not email.strip():
+        errores['email'] = ['Este campo es requerido.']
+    else:
+        usuario = get_user_model().objects.filter(email=email.strip().lower(), is_active=True).first()
+        if usuario is None:
+            errores['email'] = ['No hay ninguna cuenta activa con este email.']
+        elif usuario.pk == lider_id:
+            errores['email'] = ['Es el líder de la inspección.']
+        elif ya_es_miembro(usuario):
+            errores['email'] = ['Ya es miembro de la inspección.']
+    return usuario, permisos, errores
+
+
+def validar_equipo(valor, lider_id):
+    """
+    Validate the ``miembros`` list sent when creating an inspection.
+    Returns (``[(usuario, permisos), ...]``, errores) with flat keys ``miembros.<i>.<campo>``
+    (or ``miembros`` when the value is not a list), so the client can place each message.
+    """
+    if not isinstance(valor, list):
+        return [], {'miembros': ['Debe ser una lista de {email, rol}.']}
+    equipo, errores, vistos = [], {}, set()
+    for posicion, item in enumerate(valor):
+        usuario, permisos, errores_item = validar_invitacion(item, lider_id, lambda u: u.pk in vistos)
+        for campo, mensajes in errores_item.items():
+            errores[f'miembros.{posicion}.{campo}'] = mensajes
+        if usuario is not None:
+            vistos.add(usuario.pk)
+        if not errores_item:
+            equipo.append((usuario, permisos))
+    return equipo, errores
+
+
+def crear_miembros(inspeccion, equipo, agregado_por):
+    """Insert the validated ``(usuario, permisos)`` pairs as members of ``inspeccion``."""
+    for usuario, permisos in equipo:
+        miembro = InspeccionMiembro(inspeccion=inspeccion, usuario=usuario, agregado_por=agregado_por)
+        miembro.asignar(permisos)
+        miembro.save()
+
+
 @extend_schema(
     methods=['GET'], tags=['Visión IA'], summary='Miembros de una inspección',
     description='Usuarios invitados por el líder, con su `rol` y sus `permisos`.',
@@ -85,19 +137,9 @@ def api_vision_miembros(request, inspeccion_id):
 
     exigir(request.user, inspeccion, LIDER)
     data = request.data if hasattr(request.data, 'get') else {}
-    permisos, errores = _validar_permisos(data, base=None)
-    email = data.get('email')
-    usuario = None
-    if not isinstance(email, str) or not email.strip():
-        errores['email'] = ['Este campo es requerido.']
-    else:
-        usuario = get_user_model().objects.filter(email=email.strip().lower(), is_active=True).first()
-        if usuario is None:
-            errores['email'] = ['No hay ninguna cuenta activa con este email.']
-        elif usuario.pk == inspeccion.lider_id:
-            errores['email'] = ['Es el líder de la inspección.']
-        elif inspeccion.miembros.filter(usuario=usuario).exists():
-            errores['email'] = ['Ya es miembro de la inspección.']
+    usuario, permisos, errores = validar_invitacion(
+        data, inspeccion.lider_id, lambda u: inspeccion.miembros.filter(usuario=u).exists(),
+    )
     if errores:
         return Response({'error': 'Datos inválidos.', 'campos': errores}, status=400)
 

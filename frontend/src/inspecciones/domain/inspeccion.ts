@@ -1,3 +1,4 @@
+import type { NuevoMiembro } from './miembros'
 export type EstadoFoto = 'pendiente' | 'en_proceso' | 'completada' | 'error'
 
 export type Severidad = 'critical' | 'high' | 'medium' | 'low'
@@ -92,6 +93,8 @@ export interface NuevaInspeccion {
   nombre?: string
   tomadoPor: string
   descripcion: string
+  /** Team invited at creation; the backend creates nothing if any invitation is invalid. */
+  miembros?: NuevoMiembro[]
 }
 
 /** Server-side search criteria; every field is optional and they combine with AND. */

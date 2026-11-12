@@ -81,6 +81,8 @@ export class HttpInspeccionesRepository implements InspeccionesRepository {
       ...(datos.nombre?.trim() ? { nombre: datos.nombre.trim() } : {}),
       tomado_por: datos.tomadoPor,
       descripcion: datos.descripcion,
+      // Omitted when nobody is invited, so the request is unchanged for a solo inspection.
+      ...(datos.miembros?.length ? { miembros: datos.miembros.map(({ email, rol }) => ({ email, rol })) } : {}),
     })
     return aInspeccion(dto)
   }

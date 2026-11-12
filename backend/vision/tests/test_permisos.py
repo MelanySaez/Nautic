@@ -309,3 +309,49 @@ class BuquesConInspeccionesTests(BasePermisos):
         self.assertEqual(self._totales(self.admin), {'ARC Caribe': 2, 'ARC Secreto': 1})
         self.assertTrue(oculta.pk)
 
+
+
+class CrearConEquipoTests(BasePermisos):
+    def _crear(self, miembros, usuario=None):
+        return self._como(usuario or self.extrano).post(
+            '/api/vision/inspecciones/', {'buque_id': self.buque.id, 'miembros': miembros}, format='json',
+        )
+
+    def test_invita_al_equipo_al_crear_la_inspeccion(self):
+        res = self._crear([
+            {'email': 'COLA@x.com', 'rol': 'colaborador'},
+            {'email': 'revi@x.com', 'rol': 'revisor'},
+            {'email': 'obse@x.com', 'rol': 'observador', 'permisos': {'analizar': True}},
+        ])
+
+        self.assertEqual(res.status_code, 201, res.content)
+        insp = InspeccionCasco.objects.get(pk=res.json()['id'])
+        self.assertEqual(insp.lider, self.extrano)
+        filas = {m.usuario.email: (m.rol, m.permisos(), m.agregado_por_id) for m in insp.miembros.all()}
+        self.assertEqual(filas, {
+            'cola@x.com': ('colaborador', TODOS, self.extrano.id),
+            'revi@x.com': ('revisor', {**NINGUNO, 'editar_reporte': True}, self.extrano.id),
+            'obse@x.com': ('personalizado', {**NINGUNO, 'analizar': True}, self.extrano.id),
+        })
+
+    def test_un_invitado_invalido_no_crea_nada(self):
+        antes = InspeccionCasco.objects.count()
+
+        res = self._crear([
+            {'email': 'cola@x.com', 'rol': 'colaborador'},
+            {'email': 'nadie@x.com', 'rol': 'revisor'},     # no account
+            {'email': 'otro@x.com', 'rol': 'revisor'},      # the creator itself
+            {'email': 'COLA@x.com', 'rol': 'observador'},   # repeated in the list
+            {'email': 'revi@x.com', 'rol': 'jefe'},         # unknown role
+        ])
+
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(set(res.json()['campos']),
+                         {'miembros.1.email', 'miembros.2.email', 'miembros.3.email', 'miembros.4.rol'})
+        self.assertEqual(InspeccionCasco.objects.count(), antes)
+
+    def test_miembros_debe_ser_una_lista_de_objetos(self):
+        for valor in ('cola@x.com', [1]):
+            res = self._crear(valor)
+            self.assertEqual(res.status_code, 400, valor)
+            self.assertTrue(any(k.startswith('miembros') for k in res.json()['campos']), valor)

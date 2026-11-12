@@ -34,6 +34,7 @@ from .models import (
 from cuentas.models import referencia_publica
 
 from .permisos import LIDER, exigir, permisos_de, puede_ver, visibles_para
+from .views_miembros import crear_miembros, validar_equipo
 from .pubsub import publicar_evento, suscribirse
 from .ratelimit import check_upload_rate, get_client_ip, track_concurrent_start
 from .secciones import seccion_to_dict
@@ -582,7 +583,7 @@ def api_vision_taxonomia(request):
     methods=['POST'],
     tags=['Inspección IA'],
     summary='Crear inspección de casco',
-    description='Crea una nueva sesión de inspección para un buque.',
+    description='Crea una nueva sesión de inspección para un buque; quien la crea es su líder.',
     request={
         'application/json': {
             'type': 'object',
@@ -595,6 +596,15 @@ def api_vision_taxonomia(request):
                 },
                 'descripcion': {'type': 'string', 'description': 'Descripción de la inspección (opcional)'},
                 'tomado_por': {'type': 'string', 'description': 'Nombre del inspector (opcional)'},
+                'miembros': {
+                    'type': 'array',
+                    'description': (
+                        'Equipo invitado al crear (opcional): `{email, rol, permisos?}` con las mismas reglas '
+                        'que `POST .../miembros/`. Si algún invitado es inválido no se crea nada y los errores '
+                        'llegan en `campos` como `miembros.<i>.email` / `miembros.<i>.rol` / `miembros.<i>.permisos`.'
+                    ),
+                    'items': {'type': 'object', 'required': ['email', 'rol']},
+                },
             },
         }
     },
@@ -632,6 +642,12 @@ def api_vision_inspecciones(request):
             )
 
     buque = get_object_or_404(Buque, pk=buque_id)
+    # Optional team invited at creation: validated as a whole before anything is saved.
+    equipo = []
+    if 'miembros' in request.data:
+        equipo, errores = validar_equipo(request.data['miembros'], lider_id=request.user.pk)
+        if errores:
+            return Response({'error': 'Datos inválidos.', 'campos': errores}, status=400)
     # El nombre generado necesita el id: se crea y se actualiza en la misma transacción.
     with transaction.atomic():
         tomado_por = request.data.get('tomado_por', '')
@@ -647,6 +663,7 @@ def api_vision_inspecciones(request):
         if not insp.nombre:
             insp.nombre = nombre_por_defecto(insp)
             insp.save(update_fields=['nombre'])
+        crear_miembros(insp, equipo, agregado_por=request.user)
     return Response(_inspeccion_to_dict(insp, request=request, con_permisos=True), status=201)
 
 
