@@ -112,7 +112,7 @@ export function unaInspeccion(overrides: Partial<Inspeccion> = {}): Inspeccion {
     fechaCreacion: '2026-10-01T10:00:00Z',
     fechaModificacion: '2026-10-01T10:00:00Z',
     totalFotos: 0,
-    lider: { id: 1, nombre: 'María Pérez', email: 'maria@nautic.test' },
+    lider: { id: 1, nombre: 'María Pérez' },
     privada: false,
     ...overrides,
   }
@@ -184,7 +184,7 @@ export function unDetalle(overrides: Partial<InspeccionDetalle> = {}): Inspeccio
 export function unMiembro(overrides: Partial<Miembro> = {}): Miembro {
   return {
     id: 9,
-    usuario: { id: 4, nombre: 'Ana Ruiz', email: 'ana@nautic.test', cargo: 'Inspectora' },
+    usuario: { id: 4, nombre: 'Ana Ruiz', cargo: 'Inspectora' },
     rol: 'revisor',
     permisos: { subirFotos: false, analizar: false, editarReporte: true, editarInspeccion: false },
     fechaAgregado: '2026-11-01T10:00:00Z',
@@ -230,7 +230,7 @@ export function crearDependenciasFalsas() {
     miembros: {
       listar: vi.fn(async (_inspeccionId: number): Promise<Miembro[]> => []),
       invitar: vi.fn(async (_inspeccionId: number, datos: NuevoMiembro) =>
-        unMiembro({ id: 10, usuario: { id: 5, nombre: 'Luis Sosa', email: datos.email, cargo: '' }, rol: datos.rol }),
+        unMiembro({ id: 10, usuario: { id: 5, nombre: 'Luis Sosa', cargo: '' }, rol: datos.rol }),
       ),
       actualizar: vi.fn(async (_inspeccionId: number, miembroId: number, _cambios: CambiosMiembro) => unMiembro({ id: miembroId })),
       quitar: vi.fn(async (_inspeccionId: number, _miembroId: number) => {}),

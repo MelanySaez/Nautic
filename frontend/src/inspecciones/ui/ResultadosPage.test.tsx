@@ -336,7 +336,8 @@ describe('ResultadosPage team', () => {
 
     expect(within(seccion).getByText('Líder: María Pérez')).toBeInTheDocument()
     const fila = await within(seccion).findByRole('listitem', { name: 'Ana Ruiz' })
-    expect(within(fila).getByText('ana@nautic.test')).toBeInTheDocument()
+    expect(within(fila).getByText('Ana Ruiz')).toBeInTheDocument()
+    expect(within(fila).queryByText('ana@nautic.test')).not.toBeInTheDocument()
     expect(within(fila).getByRole('combobox', { name: 'Rol de Ana Ruiz' })).toHaveValue('revisor')
     expect(within(fila).getByRole('checkbox', { name: 'Editar reporte' })).toBeChecked()
     expect(within(fila).getByRole('checkbox', { name: 'Subir fotos' })).not.toBeChecked()

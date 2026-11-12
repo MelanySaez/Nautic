@@ -33,7 +33,7 @@ export const PERMISOS_MIEMBRO: { clave: keyof PermisosMiembro; etiqueta: string 
 
 export interface Miembro {
   id: number
-  usuario: { id: number; nombre: string; email: string; cargo: string }
+  usuario: { id: number; nombre: string; cargo: string }
   rol: RolMiembro
   permisos: PermisosMiembro
   fechaAgregado: string

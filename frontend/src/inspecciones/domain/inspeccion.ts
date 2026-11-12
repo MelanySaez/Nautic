@@ -49,7 +49,6 @@ export interface Foto {
 export interface UsuarioRef {
   id: number
   nombre: string
-  email: string
 }
 
 /** What the logged-in user may do on one inspection, as the server computed it. */

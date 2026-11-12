@@ -72,7 +72,6 @@ export interface InspeccionDto {
 export interface UsuarioRefDto {
   id: number
   nombre: string
-  email: string
 }
 
 export interface PermisosInspeccionDto {
@@ -181,7 +180,7 @@ export function aInspeccion(dto: InspeccionDto): Inspeccion {
     fechaCreacion: dto.fecha_creacion,
     fechaModificacion: dto.fecha_modificacion,
     totalFotos: dto.total_fotos,
-    lider: dto.lider ? { id: dto.lider.id, nombre: dto.lider.nombre, email: dto.lider.email } : null,
+    lider: dto.lider ? { id: dto.lider.id, nombre: dto.lider.nombre } : null,
     privada: dto.privada ?? false,
   }
 }
@@ -355,7 +354,7 @@ export interface PermisosMiembroDto {
 /** One entry of `GET /api/vision/inspecciones/<id>/miembros/`. */
 export interface MiembroDto {
   id: number
-  usuario: { id: number; nombre: string; email: string; cargo: string }
+  usuario: { id: number; nombre: string; cargo: string }
   rol: RolMiembro
   permisos: PermisosMiembroDto
   fecha_agregado: string
@@ -364,7 +363,7 @@ export interface MiembroDto {
 export function aMiembro(dto: MiembroDto): Miembro {
   return {
     id: dto.id,
-    usuario: { id: dto.usuario.id, nombre: dto.usuario.nombre, email: dto.usuario.email, cargo: dto.usuario.cargo ?? '' },
+    usuario: { id: dto.usuario.id, nombre: dto.usuario.nombre, cargo: dto.usuario.cargo ?? '' },
     rol: dto.rol,
     permisos: {
       subirFotos: dto.permisos.subir_fotos,

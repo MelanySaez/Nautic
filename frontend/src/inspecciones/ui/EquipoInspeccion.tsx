@@ -165,7 +165,6 @@ function FilaMiembro({
     <li aria-label={usuario.nombre} className="flex flex-col gap-3 py-3 sm:flex-row sm:items-start sm:justify-between">
       <div className="min-w-0">
         <p className="truncate font-semibold">{usuario.nombre}</p>
-        <p className="truncate text-sm text-ink-muted">{usuario.email}</p>
         {usuario.cargo && <p className="truncate text-sm text-ink-dim">{usuario.cargo}</p>}
       </div>
       {editable ? (

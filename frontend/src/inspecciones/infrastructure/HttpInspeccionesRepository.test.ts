@@ -16,7 +16,7 @@ const inspeccionDto = {
   fecha_creacion: '2026-10-01T10:00:00Z',
   fecha_modificacion: '2026-10-02T10:00:00Z',
   total_fotos: 1,
-  lider: { id: 3, nombre: 'Juan Gómez', email: 'juan@nautic.test' },
+  lider: { id: 3, nombre: 'Juan Gómez' },
   privada: true,
 }
 const misPermisosDto = {
@@ -91,7 +91,7 @@ describe('HttpInspeccionesRepository', () => {
         fechaCreacion: '2026-10-01T10:00:00Z',
         fechaModificacion: '2026-10-02T10:00:00Z',
         totalFotos: 1,
-        lider: { id: 3, nombre: 'Juan Gómez', email: 'juan@nautic.test' },
+        lider: { id: 3, nombre: 'Juan Gómez' },
         privada: true,
       },
     ])

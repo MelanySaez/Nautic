@@ -3,14 +3,14 @@ import { HttpMiembrosRepository } from './HttpMiembrosRepository'
 
 const miembroDto = {
   id: 9,
-  usuario: { id: 4, nombre: 'Ana Ruiz', email: 'ana@nautic.test', cargo: 'Inspectora' },
+  usuario: { id: 4, nombre: 'Ana Ruiz', cargo: 'Inspectora' },
   rol: 'revisor',
   permisos: { subir_fotos: false, analizar: false, editar_reporte: true, editar_inspeccion: false },
   fecha_agregado: '2026-11-01T10:00:00Z',
 }
 const miembro = {
   id: 9,
-  usuario: { id: 4, nombre: 'Ana Ruiz', email: 'ana@nautic.test', cargo: 'Inspectora' },
+  usuario: { id: 4, nombre: 'Ana Ruiz', cargo: 'Inspectora' },
   rol: 'revisor',
   permisos: { subirFotos: false, analizar: false, editarReporte: true, editarInspeccion: false },
   fechaAgregado: '2026-11-01T10:00:00Z',
@@ -37,7 +37,9 @@ describe('HttpMiembrosRepository', () => {
   it('lists the members of an inspection', async () => {
     fetchMock.mockResolvedValue(respuesta(200, [miembroDto]))
 
-    expect(await repo.listar(7)).toEqual([miembro])
+    const miembros = await repo.listar(7)
+    expect(miembros).toEqual([miembro])
+    expect(miembros[0].usuario).not.toHaveProperty('email')
     expect(ultimaLlamada().url).toBe('http://api.test/api/vision/inspecciones/7/miembros/')
   })
 

@@ -275,7 +275,7 @@ describe('ListaInspeccionesPage', () => {
 })
 
 describe('ListaInspeccionesPage permissions', () => {
-  const AJENA = unaInspeccion({ id: 43, lider: { id: 8, nombre: 'Luis Sosa', email: 'luis@nautic.test' } })
+  const AJENA = unaInspeccion({ id: 43, lider: { id: 8, nombre: 'Luis Sosa' } })
 
   it('offers the deletion only to the leader of the inspection', async () => {
     const { dependencias } = crearDependenciasFalsas()
