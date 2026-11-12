@@ -32,10 +32,11 @@ class _LimiteCuentas(SimpleRateThrottle):
         return super().allow_request(request, view)
 
     def get_cache_key(self, request, view):
-        # REMOTE_ADDR only: DRF's get_ident trusts the client's X-Forwarded-For when
-        # NUM_PROXIES is unset, so rotating that header would bypass the limit.
-        # Behind a reverse proxy, set NUM_PROXIES and use get_ident instead.
-        return self.cache_format % {'scope': self.scope, 'ident': request.META.get('REMOTE_ADDR', '')}
+        # Forwarded addresses are trusted only with an explicit proxy count.
+        # DRF trusts arbitrary X-Forwarded-For values when NUM_PROXIES is unset.
+        ident = (self.get_ident(request) if api_settings.NUM_PROXIES is not None
+                 else request.META.get('REMOTE_ADDR', ''))
+        return self.cache_format % {'scope': self.scope, 'ident': ident}
 
 _CREDENCIALES_INVALIDAS = 'Email o contraseña incorrectos.'
 

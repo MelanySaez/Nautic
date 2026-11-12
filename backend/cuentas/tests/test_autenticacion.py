@@ -264,3 +264,43 @@ class RegistroTests(TestCase):
 
         self.assertEqual(codigos, [400, 400, 400, 429, 429])
 
+
+class LimiteCuentasProxyTests(TestCase):
+    def _intentar(self, url, forwarded):
+        cliente = APIClient(enforce_csrf_checks=True)
+        cliente.get(URL_CSRF)
+        respuesta = cliente.post(
+            url, {'email': 'nadie@ejemplo.com', 'password': '', 'nombre': 'Prueba'},
+            format='json', HTTP_X_CSRFTOKEN=cliente.cookies['csrftoken'].value,
+            REMOTE_ADDR='192.0.2.10', HTTP_X_FORWARDED_FOR=forwarded,
+        )
+        self.assertEqual(cliente.get(URL_YO).status_code, 401)
+        self.assertFalse(Usuario.objects.exists())
+        return respuesta.status_code
+
+    def _configuracion(self, proxies):
+        return override_settings(REST_FRAMEWORK={
+            'DEFAULT_AUTHENTICATION_CLASSES': ['cuentas.autenticacion.Sesion'],
+            'DEFAULT_THROTTLE_RATES': {'cuentas': '3/min'}, 'NUM_PROXIES': proxies,
+        })
+
+    def test_proxies_configurados_separan_clientes_y_comparten_limite_entre_endpoints(self):
+        for proxies in (1, 2):
+            with self.subTest(proxies=proxies), self._configuracion(proxies):
+                cache.clear()
+                cadena = lambda ip: ip if proxies == 1 else f'{ip}, 192.0.2.11'
+                for url in (URL_LOGIN, URL_REGISTRO, URL_LOGIN):
+                    self.assertEqual(self._intentar(url, cadena('198.51.100.1')), 400)
+                self.assertEqual(self._intentar(URL_REGISTRO, cadena('198.51.100.1')), 429)
+                self.assertEqual(self._intentar(URL_LOGIN, cadena('198.51.100.2')), 400)
+                self.assertEqual(self._intentar(URL_REGISTRO, cadena('198.51.100.2')), 400)
+
+    def test_sin_proxies_cabeceras_falsificadas_no_evaden_el_limite(self):
+        for proxies in (None, 0):
+            with self.subTest(proxies=proxies), self._configuracion(proxies):
+                cache.clear()
+                codigos = [self._intentar(url, f'198.51.100.{i}') for i, url in enumerate(
+                    (URL_LOGIN, URL_REGISTRO, URL_LOGIN, URL_REGISTRO), start=1,
+                )]
+                self.assertEqual(codigos, [400, 400, 400, 429])
+
