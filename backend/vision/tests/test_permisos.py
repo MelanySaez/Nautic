@@ -355,3 +355,12 @@ class CrearConEquipoTests(BasePermisos):
             res = self._crear(valor)
             self.assertEqual(res.status_code, 400, valor)
             self.assertTrue(any(k.startswith('miembros') for k in res.json()['campos']), valor)
+
+    def test_la_lista_de_invitados_tiene_tope(self):
+        antes = InspeccionCasco.objects.count()
+
+        res = self._crear([{'email': f'p{i}@x.com', 'rol': 'observador'} for i in range(51)])
+
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(list(res.json()['campos']), ['miembros'])
+        self.assertEqual(InspeccionCasco.objects.count(), antes)

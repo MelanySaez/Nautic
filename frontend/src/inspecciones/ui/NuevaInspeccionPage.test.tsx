@@ -137,4 +137,39 @@ describe('NuevaInspeccionPage', () => {
     expect(screen.getByLabelText('Email de la persona 1')).not.toHaveAttribute('aria-invalid')
     expect(router.state.location.pathname).toBe('/vision')
   })
+
+  it('shows a field error that does not belong to any invited row', async () => {
+    const { dependencias } = crearDependenciasFalsas()
+    dependencias.inspecciones.crear.mockRejectedValue(new ApiError(400, 'Datos inválidos.', {}))
+    renderizar(dependencias)
+    await screen.findByRole('option', { name: 'ARA Libertad · Fragata' })
+    await userEvent.selectOptions(screen.getByLabelText('Buque'), '2')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Iniciar inspección' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Datos inválidos.')
+  })
+
+  it('maps a server error to the right row when a blank row sits between filled ones', async () => {
+    const { dependencias } = crearDependenciasFalsas()
+    // The server only received the two filled rows: index 1 is the third row on screen.
+    dependencias.inspecciones.crear.mockRejectedValue(new ApiError(400, 'Datos inválidos.', {
+      'miembros.1.email': ['Ya es miembro de la inspección.'],
+    }))
+    renderizar(dependencias)
+    await screen.findByRole('option', { name: 'ARA Libertad · Fragata' })
+    await userEvent.selectOptions(screen.getByLabelText('Buque'), '2')
+    for (let i = 0; i < 3; i++) await userEvent.click(screen.getByRole('button', { name: 'Agregar persona' }))
+    await userEvent.type(screen.getByLabelText('Email de la persona 1'), 'ana@nautic.test')
+    await userEvent.type(screen.getByLabelText('Email de la persona 3'), 'luis@nautic.test')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Iniciar inspección' }))
+
+    expect(await screen.findByText('Ya es miembro de la inspección.')).toBeInTheDocument()
+    expect(screen.getByLabelText('Email de la persona 3')).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByLabelText('Email de la persona 2')).not.toHaveAttribute('aria-invalid')
+    expect(dependencias.inspecciones.crear).toHaveBeenCalledWith(expect.objectContaining({
+      miembros: [{ email: 'ana@nautic.test', rol: 'colaborador' }, { email: 'luis@nautic.test', rol: 'colaborador' }],
+    }))
+  })
 })

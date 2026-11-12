@@ -80,7 +80,9 @@ export function NuevaInspeccionPage() {
       if (error instanceof ApiError && error.campos) {
         const { porFila, otros } = erroresPorFila(error.campos, enviadas.map((f) => f.uid))
         setErroresInvitados(porFila)
-        setErrorEnvio(otros.length > 0 ? [error.message, ...otros].join(' · ') : null)
+        // Rows show their own messages; anything else (or an empty `campos`) goes to the alert.
+        const sinFila = otros.length > 0 || Object.keys(porFila).length === 0
+        setErrorEnvio(sinFila ? [mensajeDe(error), ...otros].join(' · ') : null)
       } else {
         setErrorEnvio(mensajeDe(error))
       }

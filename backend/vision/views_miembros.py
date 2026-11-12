@@ -17,6 +17,7 @@ from .models import InspeccionCasco, InspeccionMiembro
 from .permisos import LIDER, exigir
 
 _ROLES_PLANTILLA = {r.value for r in InspeccionMiembro.ROLES}
+MAX_INVITADOS_AL_CREAR = 50
 
 
 def _miembro_to_dict(miembro):
@@ -92,6 +93,10 @@ def validar_equipo(valor, lider_id):
     """
     if not isinstance(valor, list):
         return [], {'miembros': ['Debe ser una lista de {email, rol}.']}
+    # Bounded before any lookup: each entry queries an account, so an unbounded list
+    # would let one request probe many emails.
+    if len(valor) > MAX_INVITADOS_AL_CREAR:
+        return [], {'miembros': [f'Máximo {MAX_INVITADOS_AL_CREAR} personas por inspección al crearla.']}
     equipo, errores, vistos = [], {}, set()
     for posicion, item in enumerate(valor):
         usuario, permisos, errores_item = validar_invitacion(item, lider_id, lambda u: u.pk in vistos)
