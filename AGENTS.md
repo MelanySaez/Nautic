@@ -38,7 +38,8 @@ All endpoints live under `/api/`. The `vision` module needs infrastructure beyon
 │   │   ├── settings.py, urls.py, celery.py, almacenamiento.py
 │   │   ├── wsgi.py, asgi.py
 │   │   └── spectacular_hooks.py
-│   └── vision/                  # the only Django app
+│   ├── cuentas/                 # user accounts: Usuario model, session login, registration
+│   └── vision/                  # inspections, photos, AI analysis, reports, members
 │       ├── models.py, views.py, views_buques.py, views_reporte.py, busqueda.py, secciones.py, taxonomia.py, reporte.py, urls.py, tasks.py
 │       ├── almacenamiento.py
 │       ├── inference.py, pubsub.py, ratelimit.py
@@ -119,6 +120,7 @@ Backend tests live in `backend/vision/tests/` (`test_buques_api.py` for the Buqu
 
 ```bash
 cd backend
+uv run python manage.py test                             # everything (cuentas + vision)
 uv run python manage.py test vision                      # all vision tests
 uv run python manage.py test vision.tests.test_buques_api.CrearBuqueTests  # one class
 uv run python manage.py test vision.tests.test_buques_api.CrearBuqueTests.test_falta_nombre  # one test
@@ -184,6 +186,8 @@ pnpm add <pkg>     # add a dependency (pnpm add -D <pkg> for dev)
 - **Styling**: Tailwind with the semantic tokens in `src/index.css` (`bg-surface`, `text-ink`, `border-line`, `text-critical`, …). They swap in dark mode, so `dark:` variants are rarely needed.
 - **Language**: identifiers follow the Spanish domain (`Inspeccion`, `subirFoto`); UI copy is neutral Spanish; code comments in English.
 - **Inspections history**: `/` (`BuquesConInspeccionesPage`) lists only the vessels that have inspections, by name, with their count (`BuquesRepository.listarConInspecciones()`), plus a client-side vessel name search (case- and accent-insensitive, kept in `?q=`); there are no inspection cards there. Vessel links pass `{buqueNombre, volverA}` in the location state, so the vessel name morphs into the next page's title and the back link restores the search. Each vessel links to `/inspecciones/buque/:id` (`ListaInspeccionesPage`), which shows the vessel name and calls `InspeccionesRepository.buscar({...filtro, buqueId}, cursor?)` (one server page per call, `limit=24`, no walk-all). The vessel comes from the route; the filter bar (`FiltrosInspecciones`: `desde`/`hasta`, minimum severity, name text, no vessel selector) keeps its state in the URL query (`desde`, `hasta`, `severidad_min`, `q`; see `ui/filtroUrl.ts`); the text is debounced (300 ms) and `q` is only sent with 2+ characters. Any filter change restarts from the first page, "Cargar más" appends the next one while `hayMas`, and `useBusquedaInspecciones` drops responses of a previous search. 400 `ApiError.campos` messages are shown next to the matching control. Cards show `nombre` and the `severidadMax` badge, not the vessel; the rename (`renombrar` → `PATCH`) lives on `/inspecciones/:id/resultados`.
+- **Session**: `src/cuentas/` (port `CuentasRepository`, `HttpCuentasRepository`, `SesionProvider`). `RaizSesion` loads the current user; `RequiereSesion` sends every route except `/login` and `/registro` to `/login` (keeping `state.desde` to return). `ApiClient` sends `credentials` and `X-CSRFToken` (cookie `csrftoken`) on unsafe methods, and any 401 triggers `alNoAutorizado` → login; a 403 is shown as a normal error. The app bar shows the user and "Cerrar sesión".
+- **Inspection permissions in the UI**: `Inspeccion.lider`, `privada` and `misPermisos` (all false when the server omits them) hide or disable upload/delete photos, analyze/retry, rename, report editing (read-only form) and delete (list: admin or leader). A "Privada" badge marks private inspections. The results page's "Equipo" section (`EquipoInspeccion`, port `MiembrosInspeccion`) lets the leader invite by email with a role, change role or each permission, remove members and toggle privacy; others see it read-only.
 - **Inspection report**: the results page links to `/inspecciones/:id/reporte` (`ReportePage`). It loads `InspeccionesRepository.obtenerReporte(id)` (`domain/reporte.ts`: `BorradorReporte`, `FotoRevisable`) and edits the inspector texts plus, per photo (`FotoRevision`), a confirm/discard checkbox per anomaly and a note. "Guardar" sends only `cambiosDeReporte(guardado, edicion)` via `guardarReporte` (`PATCH`). "Descargar PDF" is a plain `<a download>` (`AnclaBoton`) to `urlReporte(id)` (`/reporte/pdf/`); it is a disabled button while there are unsaved changes.
 - **Detections**: `Deteccion` carries the backend taxonomy (`etiqueta`, `tipo` `anomalia` | `componente` | null, `severidad`); the DTO mapper falls back to the de-snaked class name when a server omits it. `esAnomalia` / `tieneAnomalias` (`domain/reglas.ts`) treat only components as non-anomalies, so an unknown class is never hidden. Result cards list anomalies (with a severity badge) apart from components, and "Con anomalías" counts photos with at least one anomaly.
 - **Boxes and masks**: `Foto.detalleDisponible` says the server kept the instances of the last analysis; `InspeccionesRepository.obtenerDetecciones(fotoId)` loads them (`domain/detecciones.ts`: `DetallePorInstancia`, `decodificarRle` for the column-major COCO RLE). On `/vision/:id/resultados` the "Mostrar contornos" switch shows the original image with `CapaDetecciones` (a canvas in the image's pixel space: translucent masks plus boxes in the taxonomy color) and a per-class filter ("Clases visibles"); the annotated switch is disabled meanwhile.
@@ -194,7 +198,9 @@ pnpm add <pkg>     # add a dependency (pnpm add -D <pkg> for dev)
 
 ## Architecture Notes
 
-- No authentication in this version (no JWT middleware, no login). Authorship fields such as `tomado_por` are free text.
+- **Accounts and sessions** (`backend/cuentas/`): custom user `cuentas.Usuario` (`AUTH_USER_MODEL`; email login stored lowercase, `nombre`, `cargo`). Session-cookie auth, not JWT, because `EventSource` cannot send an `Authorization` header: `GET /api/auth/csrf/` (sets `csrftoken`), `POST /api/auth/login/`, `POST /api/auth/registro/` (open registration; Django password validators; never grants privileges), `POST /api/auth/logout/`, `GET /api/auth/yo/` (`{id, email, nombre, cargo, es_admin}`). Login and registration enforce CSRF explicitly and are throttled per IP (`DEFAULT_THROTTLE_RATES['cuentas']`). Every other endpoint requires a session: `cuentas.autenticacion.Sesion` answers **401** without one; unsafe requests need `X-CSRFToken`.
+- **Inspection permissions** (`vision/permisos.py`, use `exigir()` in every view that takes an inspection or photo): the creator is `InspeccionCasco.lider`. Public inspections (`privada=false`, default) are readable by every signed-in user; private ones only by the leader and members. Superusers read and do everything (support). `InspeccionMiembro` (migration `0013`) stores invited users with `rol` (`colaborador` = all four permissions, `revisor` = `editar_reporte`, `observador` = none, `personalizado` when adjusted) and `puede_subir_fotos` (upload/delete photos), `puede_analizar` (analyze/retry), `puede_editar_reporte` (report draft), `puede_editar_inspeccion` (name/description). Leader only: `privada`, members (`/api/vision/inspecciones/<id>/miembros/[<miembro_id>/]`), leadership transfer (`PATCH lider_id`; the previous leader stays as Colaborador) and deleting the inspection. Unreadable → **404** (existence not revealed), readable without the permission → **403**. `visibles_para()` filters lists and search; the SSE stream checks session and visibility itself (plain Django view). Detail/create responses carry `lider`, `privada` and `mis_permisos` for the UI.
+- **Traceability** (migration `0014`, all nullable, SET_NULL): `Buque.creado_por` (read-only, exposed as `creado_por`), `FotoInspeccion.subida_por`, `DeteccionFoto.validado_por` (set when the report changes `descartadas`), `ReporteInspeccion.revisado_por`. `tomado_por` stays free text, defaulting to the leader's name.
 - UI and API language: the domain is Spanish; the frontend UI copy is Spanish (no i18n layer yet).
 
 ### Inspections search (`vision/busqueda.py`)
@@ -265,6 +271,9 @@ pnpm add <pkg>     # add a dependency (pnpm add -D <pkg> for dev)
 | `backend/vision/urls.py` | URL routing for the vision app |
 | `backend/vision/tasks.py` | Celery task `procesar_foto` + dead-letter task |
 | `backend/vision/reporte.py` | PDF inspection report: `datos_reporte()` (summary, findings per section, evidence, coverage, draft applied) + `generar_pdf()` (ReportLab) + `fotos_revisables()` |
+| `backend/cuentas/` | `Usuario` model, session auth (`autenticacion.Sesion`), login/registration/logout/current-user endpoints |
+| `backend/vision/permisos.py` | Who may read or change an inspection: `exigir`, `visibles_para`, `permisos_de` |
+| `backend/vision/views_miembros.py` | Members of an inspection: list, invite, change role/permissions, remove |
 | `backend/vision/views_reporte.py` | Report endpoints: draft `GET`/`PATCH` `/reporte/` and the PDF `/reporte/pdf/` |
 | `backend/vision/taxonomia.py` | Class taxonomy of `core_engine`: read-time enrichment of detections + `/api/vision/taxonomia/` payload |
 | `backend/vision/inference.py` | `run_inference(model_id=...)` adapter over `core_engine.vision.analyze`, model catalog/availability helpers + config validation |

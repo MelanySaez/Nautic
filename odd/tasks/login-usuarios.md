@@ -23,7 +23,7 @@ Branch: `feat/login-usuarios` (stacked on `feat/detecciones-normalizadas`, PR #2
 | T2 | S3-S5 | inline | done | RED: ImportError InspeccionMiembro; GREEN: test_permisos 15/15, suite 292 OK |
 | T3 | S6 | inline | done | RED: 3 failing (creado_por, subida_por, validado_por/revisado_por); GREEN: test_trazabilidad 3/3, suite 295 OK |
 | T4 | S2 (frontend), S2b, S7 | delegated (context backstop) | done | writer RED→GREEN per behavior; parent spot check: pnpm test 226/226, lint and build clean, edits inside the allowed surfaces |
-| T5 | docs, dev DB reset | inline | pending | — |
+| T5 | docs, dev DB reset | inline | done | dev DB recreated (L13); AGENTS.md accounts, permissions, traceability, session UI |
 
 ## Log
 
