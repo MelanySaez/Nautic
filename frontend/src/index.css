@@ -32,6 +32,12 @@
   --c-info: #00687a;
   --c-info-bg: #cff4fc;
 
+  /* Hull zones without a severity (3D view); the canvas reads these `--c-*` values directly. */
+  --c-zona-sin-clasificar: #7e22ce;
+  --c-zona-sin-hallazgos: #1d4ed8;
+  --c-zona-sin-analizar: #475569;
+  --c-zona-sin-fotos: #7c8799;
+
   color-scheme: light;
 }
 
@@ -61,6 +67,11 @@
   --c-info: #00d2ff;
   --c-info-bg: #042433;
 
+  --c-zona-sin-clasificar: #c084fc;
+  --c-zona-sin-hallazgos: #60a5fa;
+  --c-zona-sin-analizar: #cbd5e1;
+  --c-zona-sin-fotos: #64748b;
+
   color-scheme: dark;
 }
 
@@ -88,6 +99,10 @@
   --color-low-bg: var(--c-low-bg);
   --color-info: var(--c-info);
   --color-info-bg: var(--c-info-bg);
+  --color-zona-sin-clasificar: var(--c-zona-sin-clasificar);
+  --color-zona-sin-hallazgos: var(--c-zona-sin-hallazgos);
+  --color-zona-sin-analizar: var(--c-zona-sin-analizar);
+  --color-zona-sin-fotos: var(--c-zona-sin-fotos);
 
   --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
