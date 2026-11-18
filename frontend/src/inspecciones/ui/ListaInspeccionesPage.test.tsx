@@ -200,13 +200,24 @@ describe('ListaInspeccionesPage', () => {
     expect(await screen.findByText('Este buque todavía no tiene inspecciones.')).toBeInTheDocument()
   })
 
-  it('navigates to the new inspection form', async () => {
+  it('navigates to the new inspection form with this vessel preselected', async () => {
     const { router } = renderizar()
     await screen.findByText('Este buque todavía no tiene inspecciones.')
 
     await userEvent.click(screen.getAllByRole('link', { name: /Nueva inspección/ })[0])
 
     expect(router.state.location.pathname).toBe('/vision')
+    expect(router.state.location.search).toBe('?buque=1')
+  })
+
+  it('passes the vessel to the new inspection form from the header and the empty state', async () => {
+    renderizar(undefined, '/inspecciones/buque/5')
+    await screen.findByText('Este buque todavía no tiene inspecciones.')
+
+    const enlaces = screen.getAllByRole('link', { name: /Nueva inspección/ })
+
+    expect(enlaces).toHaveLength(2)
+    for (const enlace of enlaces) expect(enlace).toHaveAttribute('href', '/vision?buque=5')
   })
 
   it('opens the results of an inspection', async () => {

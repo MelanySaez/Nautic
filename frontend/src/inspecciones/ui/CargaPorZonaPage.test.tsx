@@ -29,7 +29,7 @@ function preparar() {
   return falsas
 }
 
-function renderizar(dependencias = preparar().dependencias) {
+function renderizar(dependencias = preparar().dependencias, ruta = '/vision/7') {
   const router = renderizarRutas(
     [
       { path: '/vision/:id', element: <CargaPorZonaRuta /> },
@@ -37,7 +37,7 @@ function renderizar(dependencias = preparar().dependencias) {
       { path: '/', element: <p>Listado</p> },
     ],
     dependencias,
-    '/vision/7',
+    ruta,
   )
   return { router, dependencias }
 }
@@ -318,6 +318,52 @@ describe('CargaPorZonaPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Reintentar' }))
 
     expect(await screen.findByRole('heading', { name: 'ARA Libertad' })).toBeInTheDocument()
+  })
+})
+
+describe('CargaPorZonaPage zone in the URL', () => {
+  it('opens with the zone of the URL selected and uploads to it', async () => {
+    const { dependencias } = preparar()
+    renderizar(dependencias, `/vision/7?zona=${SECCION_PROA.id}`)
+
+    expect(await screen.findByRole('button', { name: /^FWD-BTM/ })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('region', { name: 'Zona activa' })).toHaveTextContent('Fondo - Proa')
+
+    await userEvent.upload(screen.getByLabelText('Subir fotos'), imagen('a.jpg'))
+
+    expect(dependencias.inspecciones.subirFoto).toHaveBeenCalledWith(7, SECCION_PROA.id, expect.any(File))
+  })
+
+  it('selects nothing when the zone of the URL is not a section of the vessel', async () => {
+    renderizar(undefined, '/vision/7?zona=99')
+    await screen.findByRole('heading', { name: 'ARA Libertad' })
+
+    const mapa = screen.getByRole('group', { name: 'Zonas del casco' })
+    expect(within(mapa).getAllByRole('button').every((b) => b.getAttribute('aria-pressed') === 'false')).toBe(true)
+    expect(screen.getByLabelText('Subir fotos')).toBeDisabled()
+  })
+
+  it('writes the chosen zone in the URL, replacing the entry and keeping other parameters', async () => {
+    const { router } = renderizar(undefined, `/vision/7?origen=casco&zona=${SECCION_PROA.id}`)
+
+    await elegirZona('KEEL')
+
+    expect(router.state.location.search).toBe(`?origen=casco&zona=${SECCION_QUILLA.id}`)
+    expect(router.state.historyAction).toBe('REPLACE')
+    expect(screen.getByRole('button', { name: /^KEEL/ })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('clears the zone, and drops it from the URL, when the active zone is pressed again', async () => {
+    const { router } = renderizar(undefined, '/vision/7?origen=casco')
+    await elegirZona('KEEL')
+    expect(router.state.location.search).toBe(`?origen=casco&zona=${SECCION_QUILLA.id}`)
+
+    await elegirZona('KEEL')
+
+    expect(router.state.location.search).toBe('?origen=casco')
+    expect(screen.getByRole('button', { name: /^KEEL/ })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByLabelText('Subir fotos')).toBeDisabled()
+    expect(screen.getByText('Selecciona una zona del casco para cargar fotos.')).toBeInTheDocument()
   })
 })
 

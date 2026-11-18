@@ -132,7 +132,7 @@ export function ListaInspeccionesPage({ buqueId }: { buqueId: number }) {
             </h1>
           </div>
         </div>
-        <EnlaceBoton to="/vision">
+        <EnlaceBoton to={`/vision?buque=${buqueId}`}>
           <Icon name="plus" className="size-4" />
           Nueva inspección
         </EnlaceBoton>
@@ -161,7 +161,7 @@ export function ListaInspeccionesPage({ buqueId }: { buqueId: number }) {
           ) : (
             <>
               <p>Este buque todavía no tiene inspecciones.</p>
-              <EnlaceBoton to="/vision" variante="accion">
+              <EnlaceBoton to={`/vision?buque=${buqueId}`} variante="accion">
                 Nueva inspección
               </EnlaceBoton>
             </>

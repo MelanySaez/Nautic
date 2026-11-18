@@ -14,6 +14,7 @@ import type { InspeccionDetalle } from '../domain/inspeccion'
 import { EquipoInspeccion } from './EquipoInspeccion'
 import { FormularioNombre } from './FormularioNombre'
 import { InsigniaPrivada, InsigniaSeveridad } from './Insignias'
+import { useIdEnUrl } from './parametrosUrl'
 import { TarjetaResultado } from './TarjetaResultado'
 import { useModelos } from './useModelos'
 import { useInspeccionEnVivo, type DatosInspeccion } from './useInspeccionEnVivo'
@@ -41,7 +42,7 @@ function Resultados({
 }) {
   const { detalle, secciones } = datos
   const { inspecciones } = useDependencias()
-  const [zonaId, setZonaId] = useState('')
+  const [zonaUrl, fijarZonaUrl] = useIdEnUrl('zona')
   const [nombre, setNombre] = useState(detalle.nombre)
   const [renombrando, setRenombrando] = useState(false)
   const [guardandoNombre, setGuardandoNombre] = useState(false)
@@ -51,7 +52,12 @@ function Resultados({
   const modelos = catalogo.tipo === 'listo' ? catalogo.datos : []
 
   const analizadas = detalle.fotos.filter((f) => f.estado === 'completada')
-  const visibles = zonaId ? analizadas.filter((f) => String(f.seccion.id) === zonaId) : analizadas
+  const zonasConResultados = secciones
+    .filter((s) => analizadas.some((f) => f.seccion.id === s.id))
+    .sort((a, b) => a.orden - b.orden)
+  // `?zona=<seccionId>` filters only while that zone is one of the options; otherwise every zone shows.
+  const zonaId = zonasConResultados.some((s) => s.id === zonaUrl) ? zonaUrl : null
+  const visibles = zonaId === null ? analizadas : analizadas.filter((f) => f.seccion.id === zonaId)
   const progreso = resumirProgreso(detalle.fotos)
   const sinAnalizar = progreso.pendientes + progreso.enProceso
   const maxima = severidadMaxima(analizadas)
@@ -68,10 +74,6 @@ function Resultados({
       setGuardandoNombre(false)
     }
   }
-
-  const zonasConResultados = secciones
-    .filter((s) => analizadas.some((f) => f.seccion.id === s.id))
-    .sort((a, b) => a.orden - b.orden)
 
   return (
     <div className="animar-entrada flex flex-col gap-6">
@@ -150,7 +152,11 @@ function Resultados({
         <>
           <label className="flex items-center gap-3 self-start">
             <span className="label-caps text-ink-muted">Zona</span>
-            <select value={zonaId} onChange={(e) => setZonaId(e.target.value)} className={clasesControlCompacto}>
+            <select
+              value={zonaId ?? ''}
+              onChange={(e) => fijarZonaUrl(e.target.value ? Number(e.target.value) : null)}
+              className={clasesControlCompacto}
+            >
               <option value="">Todas las zonas</option>
               {zonasConResultados.map((s) => (
                 <option key={s.id} value={s.id}>

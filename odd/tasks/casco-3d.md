@@ -190,7 +190,7 @@ The starting values are tuned by eye during T4. Tests check invariants, not thes
 - [x] T2 — Backend `descartada` in detections + tests + docs. Route: inline (one helper + one test).
 - [x] T3 — Frontend zone summary and states + DTO. Route: delegated direct (single writer).
 - [x] T4 — Frontend hull geometry domain. Route: delegated direct (single writer; prototype port).
-- [ ] T5 — Frontend URL params `?buque` / `?zona`. Route: delegated direct (single writer; 4 pages).
+- [x] T5 — Frontend URL params `?buque` / `?zona`. Route: delegated direct (single writer; 4 pages).
 - [ ] T6 — Frontend 3D page without WebGL. Route: delegated direct (single writer).
 - [ ] T7 — Frontend WebGL canvas, transition and docs. Route: delegated direct (single writer).
 
@@ -324,7 +324,7 @@ None. The user approved the document with the "Sin analizar" state and the twin 
   - `feat(buques): model the warship hull archetype, measures and zones`;
   - `feat(buques): generate the hull mesh and side profile per zone`.
 
-  Their hashes are recorded with T5. Route: delegated direct (single writer).
+  Hashes: `1ddcd44` and `9862e1f`. Route: delegated direct (single writer).
   - **New modules** in `frontend/src/buques/domain/casco/` (pure; no React, three.js or DOM):
     - `arquetipo.ts`: `Arquetipo` and `BUQUE_DE_GUERRA`;
     - `dimensiones.ts`: `dimensionesCasco`, with the agreed fallback order. A value counts as missing
@@ -366,6 +366,32 @@ None. The user approved the document with the "Sin analizar" state and the twin 
     was started, because RDD is off. The writer ran on the parent model. Parent spot check
     `pnpm vitest run src/buques/domain/casco` → 4 files, 44 tests passed.
 
+- **Slice 2 complete** (tip `9862e1f`). Slice 3: branch `feat/casco-3d-03-navegacion`.
+- **T5 done.** Commit `feat(inspecciones): deep-link vessel and hull zone through the url`, whose hash
+  is recorded with T6. Route: delegated direct (single writer; 11 paths, 310 changed lines).
+  - New `ui/parametrosUrl.ts`:
+    - `idDeParametro`: only canonical positive safe integers count;
+    - `conParametro`;
+    - `useIdEnUrl(nombre)`: reads and writes with `replace: true`.
+  - `/vision`:
+    - `?buque` preselects the vessel when it is in the fleet; the user's own choice wins.
+    - With `?zona`, creating navigates to `/vision/<id>?zona=<n>`.
+  - `/vision/:id`: the selected zone comes from `?zona`. **Behaviour change:** pressing the active zone
+    button now clears it. Before, there was no way to deselect; the buttons are `aria-pressed` toggles.
+  - Resultados: `?zona` applies only while that section has completed photos; otherwise every zone is
+    shown and the param is left as it is.
+  - Lista: both "Nueva inspección" links go to `/vision?buque=<id>`.
+  - AGENTS.md: two bullets updated.
+  - RED (writer): 9 tests plus 1 suite failed for the expected reasons.
+  - GREEN, as reported by the writer:
+    - the focused tests (5 files) → 108 tests;
+    - `pnpm test` → 30 files, 322 tests;
+    - `pnpm lint` → exit 0;
+    - `pnpm build` → OK.
+  - Verification gate:
+    - `assess` → `medium`, `under_budget`;
+    - parent spot check `pnpm vitest run src/inspecciones/ui` → 7 files, 121 tests passed;
+    - parent readback of `parametrosUrl.ts`.
+
 ## Next step
-T5, the URL params `?buque` and `?zona`, on `feat/casco-3d-03-navegacion`, branched from the tip of
-slice 2.
+T6, the 3D page without WebGL, on `feat/casco-3d-04-vista`, branched from the tip of slice 3.
