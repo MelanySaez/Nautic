@@ -305,6 +305,20 @@ VISION_MODEL_ID = os.getenv("VISION_MODEL_ID", "yolo-seg")
 # Payload: JSON {foto_id, estado, severidad, detecciones, ...}
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
+# "default" sigue siendo la cache local de Django (la usa el throttle de cuentas).
+# "compartida" vive en Redis para que Django y el worker Celery vean lo mismo
+# (hoy: URL firmadas de fotos, ver vision.almacenamiento). Timeouts cortos:
+# quien la usa sigue funcionando sin ella si Redis no responde.
+CACHES = {
+    "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"},
+    "compartida": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": REDIS_URL,
+        "KEY_PREFIX": "nautic",
+        "OPTIONS": {"socket_connect_timeout": 0.5, "socket_timeout": 0.5},
+    }
+}
+
 # Tiempo entre keepalives SSE (comentarios `:\n\n`). Mantiene viva la conexión
 # detrás de proxies/load balancers con timeouts agresivos.
 SSE_KEEPALIVE_SECONDS = int(os.getenv("SSE_KEEPALIVE_SECONDS", "15"))

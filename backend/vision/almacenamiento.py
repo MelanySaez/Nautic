@@ -9,10 +9,12 @@ prefix; URLs are produced at response time by :func:`url_archivo`.
 Never use ``open()`` / ``os.remove()`` / ``os.makedirs()`` on photo paths.
 """
 
+import hashlib
 import logging
 import os
 import uuid
 
+from django.core.cache import caches
 from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 
@@ -21,6 +23,9 @@ logger = logging.getLogger(__name__)
 PREFIJO_ORIGINALES = "inspecciones/originales"
 PREFIJO_ANOTADAS = "inspecciones/anotadas"
 PREFIJO_DETECCIONES = "inspecciones/detecciones"
+
+# Cache shared by Django and the Celery worker (Redis), see settings.CACHES.
+CACHE_COMPARTIDA = "compartida"
 
 
 def clave_original(nombre_archivo: str) -> str:
@@ -89,7 +94,38 @@ def url_archivo(clave, request=None):
     """
     if not clave:
         return None
-    url = default_storage.url(clave)
+    url = _url_firmada(clave) if _vigencia_firma() else default_storage.url(clave)
     if request is not None and url.startswith("/"):
         return request.build_absolute_uri(url)
+    return url
+
+
+def _vigencia_firma():
+    """Lifetime in seconds of the storage's signed URLs, or ``None`` when it does not sign them."""
+    if not getattr(default_storage, "querystring_auth", False):
+        return None
+    return getattr(default_storage, "querystring_expire", None) or None
+
+
+def _url_firmada(clave):
+    """Signed URL of ``clave``, reused while it has at least half its lifetime left.
+
+    A fresh signature on every response changes the URL, so the browser would
+    download the same photo again on every visit. The shared cache (Redis) also
+    covers the URLs the Celery worker puts in SSE events. A cache failure only
+    costs a fresh signature.
+    """
+    llave = "url-firmada:" + hashlib.sha256(clave.encode()).hexdigest()
+    try:
+        url = caches[CACHE_COMPARTIDA].get(llave)
+    except Exception:
+        logger.warning("No se pudo leer la cache de URL firmadas", exc_info=True)
+        url = None
+    if url:
+        return url
+    url = default_storage.url(clave)
+    try:
+        caches[CACHE_COMPARTIDA].set(llave, url, _vigencia_firma() // 2)
+    except Exception:
+        logger.warning("No se pudo guardar la URL firmada en la cache", exc_info=True)
     return url

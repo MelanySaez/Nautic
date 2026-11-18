@@ -64,14 +64,18 @@ def _s3(env: Mapping) -> dict:
             "STORAGE_BACKEND=s3 requiere S3_BUCKET (nombre del bucket)."
         )
 
+    expiracion = _expiracion(env)
     opciones = {
         "bucket_name": bucket,
         # Bucket privado: las fotos se sirven con URL firmadas que expiran.
         "querystring_auth": True,
-        "querystring_expire": _expiracion(env),
+        "querystring_expire": expiracion,
         "default_acl": None,
         "file_overwrite": False,
         "signature_version": "s3v4",
+        # Una clave nunca cambia de contenido; el navegador la guarda mientras
+        # la URL firmada (reutilizada por vision.almacenamiento) siga vigente.
+        "object_parameters": {"CacheControl": f"private, max-age={expiracion}, immutable"},
     }
 
     access_key = _valor(env, "S3_ACCESS_KEY_ID")
