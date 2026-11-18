@@ -966,13 +966,21 @@ def api_vision_foto_detecciones(request, foto_id):
     }), etag)
 
 
+# Bump whenever _deteccion_cruda_to_dict or the detections payload changes shape:
+# it invalidates the copies browsers revalidate with the ETag.
+FORMATO_DETECCIONES = 1
+
+
 def _etag_detecciones(clave):
     """Strong ETag of a detections file as served.
 
-    The file under a key never changes (every analysis writes a new key), and the
-    taxonomy added at read time changes only with its version.
+    The file under a key never changes (every analysis writes a new key), the
+    taxonomy added at read time changes only with its version, and the payload
+    shape only with FORMATO_DETECCIONES.
     """
-    huella = hashlib.sha256(f'{clave}|{version_taxonomia()}'.encode()).hexdigest()[:32]
+    huella = hashlib.sha256(
+        f'{clave}|{version_taxonomia()}|{FORMATO_DETECCIONES}'.encode()
+    ).hexdigest()[:32]
     return f'"{huella}"'
 
 

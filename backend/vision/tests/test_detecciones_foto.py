@@ -142,6 +142,16 @@ class DeteccionesFotoTests(TestCase):
         self.assertNotEqual(respuesta['ETag'], etag)
         self.assertEqual(respuesta.json()['detecciones'][0]['clase'], 'paint_peel')
 
+    def test_un_cambio_de_formato_de_la_respuesta_cambia_el_etag(self):
+        self._procesar(_resultado(_deteccion(4, 'corrosion', 0.91, MASCARA)))
+        etag = self.client.get(self._url())['ETag']
+
+        with mock.patch('vision.views.FORMATO_DETECCIONES', 999):
+            respuesta = self.client.get(self._url(), HTTP_IF_NONE_MATCH=etag)
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertNotEqual(respuesta['ETag'], etag)
+
     def test_el_etag_no_salta_el_permiso_de_una_inspeccion_privada(self):
         from django.contrib.auth import get_user_model
         from rest_framework.test import APIClient

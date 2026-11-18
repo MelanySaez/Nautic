@@ -12,6 +12,7 @@ Never use ``open()`` / ``os.remove()`` / ``os.makedirs()`` on photo paths.
 import hashlib
 import logging
 import os
+import time
 import uuid
 
 from django.core.cache import caches
@@ -26,6 +27,9 @@ PREFIJO_DETECCIONES = "inspecciones/detecciones"
 
 # Cache shared by Django and the Celery worker (Redis), see settings.CACHES.
 CACHE_COMPARTIDA = "compartida"
+# Seconds the shared cache is skipped after a failure (see _pausar_cache).
+PAUSA_CACHE_SEGUNDOS = 30
+_cache_en_pausa_hasta = 0.0
 
 
 def clave_original(nombre_archivo: str) -> str:
@@ -107,6 +111,31 @@ def _vigencia_firma():
     return getattr(default_storage, "querystring_expire", None) or None
 
 
+def _llave_url_firmada(clave):
+    """Cache key of a signed URL: the object key plus everything the signature depends on.
+
+    Changing bucket, endpoint, prefix, lifetime or access key starts from fresh
+    URLs instead of serving ones signed for the previous configuration.
+    """
+    alcance = "|".join(
+        str(getattr(default_storage, atributo, "") or "")
+        for atributo in ("bucket_name", "endpoint_url", "location", "querystring_expire", "access_key")
+    )
+    return "url-firmada:" + hashlib.sha256(f"{alcance}|{clave}".encode()).hexdigest()
+
+
+def _cache_en_pausa():
+    return time.monotonic() < _cache_en_pausa_hasta
+
+
+def _pausar_cache(mensaje):
+    """After a cache failure, skip the cache for a while: an unreachable Redis would
+    otherwise cost its timeout on every URL of a response."""
+    global _cache_en_pausa_hasta
+    logger.warning(mensaje, exc_info=True)
+    _cache_en_pausa_hasta = time.monotonic() + PAUSA_CACHE_SEGUNDOS
+
+
 def _url_firmada(clave):
     """Signed URL of ``clave``, reused while it has at least half its lifetime left.
 
@@ -115,17 +144,19 @@ def _url_firmada(clave):
     covers the URLs the Celery worker puts in SSE events. A cache failure only
     costs a fresh signature.
     """
-    llave = "url-firmada:" + hashlib.sha256(clave.encode()).hexdigest()
+    if _cache_en_pausa():
+        return default_storage.url(clave)
+    llave = _llave_url_firmada(clave)
     try:
         url = caches[CACHE_COMPARTIDA].get(llave)
     except Exception:
-        logger.warning("No se pudo leer la cache de URL firmadas", exc_info=True)
-        url = None
+        _pausar_cache("No se pudo leer la cache de URL firmadas")
+        return default_storage.url(clave)
     if url:
         return url
     url = default_storage.url(clave)
     try:
         caches[CACHE_COMPARTIDA].set(llave, url, _vigencia_firma() // 2)
     except Exception:
-        logger.warning("No se pudo guardar la URL firmada en la cache", exc_info=True)
+        _pausar_cache("No se pudo guardar la URL firmada en la cache")
     return url

@@ -153,6 +153,7 @@ class UrlFirmadaTests(AlmacenamientoBase):
         from django.core.cache import caches
 
         caches['compartida'].clear()
+        self._parchear('vision.almacenamiento._cache_en_pausa_hasta', new=0.0)
         self.firmas = iter(range(1, 100))
         self.firmar = self._parchear_storage(
             'url', side_effect=lambda clave: f'https://bucket.example/{clave}?sig={next(self.firmas)}'
@@ -192,16 +193,41 @@ class UrlFirmadaTests(AlmacenamientoBase):
 
         self.assertEqual(cache.set.call_args.args[1:], (url, 300))
 
-    def test_s3_sin_cache_disponible_firma_igual(self):
+    def test_s3_sin_cache_disponible_firma_igual_y_la_pausa_sin_esperar_a_redis(self):
         self._como_s3()
         with mock.patch('vision.almacenamiento.caches', {'compartida': mock.Mock()}) as caches, \
                 self.assertLogs('vision.almacenamiento', 'WARNING'):
             cache = caches['compartida']
             cache.get.side_effect = ConnectionError('redis caído')
-            cache.set.side_effect = ConnectionError('redis caído')
-            url = almacenamiento.url_archivo('a.jpg')
+            primera = almacenamiento.url_archivo('a.jpg')
+            segunda = almacenamiento.url_archivo('b.jpg')
 
-        self.assertEqual(url, 'https://bucket.example/a.jpg?sig=1')
+        self.assertEqual(primera, 'https://bucket.example/a.jpg?sig=1')
+        self.assertEqual(segunda, 'https://bucket.example/b.jpg?sig=2')
+        self.assertEqual(cache.get.call_count, 1)
+        cache.set.assert_not_called()
+
+    def test_s3_tras_la_pausa_vuelve_a_usar_la_cache(self):
+        self._como_s3()
+        with mock.patch('vision.almacenamiento.caches', {'compartida': mock.Mock()}) as caches, \
+                mock.patch('vision.almacenamiento.time.monotonic', return_value=100.0) as reloj, \
+                self.assertLogs('vision.almacenamiento', 'WARNING'):
+            cache = caches['compartida']
+            cache.get.side_effect = [ConnectionError('redis caído'), None]
+            almacenamiento.url_archivo('a.jpg')
+            reloj.return_value = 100.0 + almacenamiento.PAUSA_CACHE_SEGUNDOS + 1
+            almacenamiento.url_archivo('a.jpg')
+
+        self.assertEqual(cache.get.call_count, 2)
+        cache.set.assert_called_once()
+
+    def test_s3_otro_bucket_no_reutiliza_la_url(self):
+        self._como_s3()
+        self._parchear_storage('bucket_name', new='fotos-viejo')
+        vieja = almacenamiento.url_archivo('a.jpg')
+        self._parchear_storage('bucket_name', new='fotos-nuevo')
+
+        self.assertNotEqual(almacenamiento.url_archivo('a.jpg'), vieja)
 
     def test_storage_local_no_usa_la_cache(self):
         with mock.patch('vision.almacenamiento.caches', {'compartida': mock.Mock()}) as caches:
