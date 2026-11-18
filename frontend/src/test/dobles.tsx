@@ -10,6 +10,7 @@ import type { DetallePorInstancia } from '../inspecciones/domain/detecciones'
 import type { ModeloIA } from '../inspecciones/domain/modelo'
 import type { BorradorReporte, CambiosReporte } from '../inspecciones/domain/reporte'
 import type {
+  Deteccion,
   EventoInspeccion,
   FiltroInspecciones,
   Foto,
@@ -138,6 +139,20 @@ export function unaFoto(overrides: Partial<Foto> = {}): Foto {
     taxonomiaVersion: null,
     detalleDisponible: false,
     fechaCreacion: '2026-10-01T10:05:00Z',
+    ...overrides,
+  }
+}
+
+/** A confirmed critical corrosion finding (one instance). */
+export function unaDeteccion(overrides: Partial<Deteccion> = {}): Deteccion {
+  return {
+    clase: 'corrosion',
+    etiqueta: 'Corrosión',
+    tipo: 'anomalia',
+    severidad: 'critical',
+    cantidad: 1,
+    confianzaMaxima: 0.9,
+    descartada: false,
     ...overrides,
   }
 }

@@ -192,7 +192,10 @@ describe('HttpInspeccionesRepository', () => {
           {
             ...fotoDto,
             detecciones: [
-              { class_name: 'corrosion', count: 2, max_confidence: 0.92, etiqueta: 'Corrosión', tipo: 'anomalia', severidad: 'critical' },
+              {
+                class_name: 'corrosion', count: 2, max_confidence: 0.92, descartada: false,
+                etiqueta: 'Corrosión', tipo: 'anomalia', severidad: 'critical',
+              },
               { class_name: 'sea_chest_grating', count: 1, max_confidence: 0.6 },
             ],
           },
@@ -203,8 +206,41 @@ describe('HttpInspeccionesRepository', () => {
     const detalle = await repo.obtener(7)
 
     expect(detalle.fotos[0].detecciones).toEqual([
-      { clase: 'corrosion', etiqueta: 'Corrosión', tipo: 'anomalia', severidad: 'critical', cantidad: 2, confianzaMaxima: 0.92 },
-      { clase: 'sea_chest_grating', etiqueta: 'sea chest grating', tipo: null, severidad: null, cantidad: 1, confianzaMaxima: 0.6 },
+      {
+        clase: 'corrosion', etiqueta: 'Corrosión', tipo: 'anomalia', severidad: 'critical', cantidad: 2, confianzaMaxima: 0.92,
+        descartada: false,
+      },
+      {
+        clase: 'sea_chest_grating', etiqueta: 'sea chest grating', tipo: null, severidad: null, cantidad: 1, confianzaMaxima: 0.6,
+        descartada: false,
+      },
+    ])
+  })
+
+  it('maps whether the inspector discarded each detection, false when the server omits it', async () => {
+    fetchMock.mockResolvedValue(
+      respuesta(200, {
+        ...inspeccionDto,
+        fotos: [
+          {
+            ...fotoDto,
+            estado: 'completada',
+            detecciones: [
+              { class_name: 'corrosion', count: 2, max_confidence: 0.92, descartada: true },
+              { class_name: 'pitting', count: 1, max_confidence: 0.7, descartada: false },
+              { class_name: 'crack', count: 1, max_confidence: 0.5 },
+            ],
+          },
+        ],
+      }),
+    )
+
+    const detalle = await repo.obtener(7)
+
+    expect(detalle.fotos[0].detecciones.map((d) => [d.clase, d.descartada])).toEqual([
+      ['corrosion', true],
+      ['pitting', false],
+      ['crack', false],
     ])
   })
 

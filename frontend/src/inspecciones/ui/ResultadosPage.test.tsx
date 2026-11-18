@@ -8,6 +8,7 @@ import {
   renderizarRutas,
   SECCION_QUILLA,
   SOLO_LECTURA,
+  unaDeteccion,
   unaFoto,
   unaInspeccion,
   unDetalle,
@@ -27,9 +28,9 @@ const CORROIDA = unaFoto({
   imagenAnotada: 'http://api.test/media/anotadas/21.jpg',
   tiempoInferenciaMs: 1234,
   detecciones: [
-    { clase: 'corrosion', etiqueta: 'Corrosión', tipo: 'anomalia', severidad: 'critical', cantidad: 2, confianzaMaxima: 0.981 },
-    { clase: 'marine_growth', etiqueta: 'Incrustación marina', tipo: 'anomalia', severidad: 'medium', cantidad: 1, confianzaMaxima: 0.85 },
-    { clase: 'ship_hull', etiqueta: 'Casco del buque', tipo: 'componente', severidad: null, cantidad: 1, confianzaMaxima: 0.9 },
+    unaDeteccion({ cantidad: 2, confianzaMaxima: 0.981 }),
+    unaDeteccion({ clase: 'marine_growth', etiqueta: 'Incrustación marina', severidad: 'medium', confianzaMaxima: 0.85 }),
+    unaDeteccion({ clase: 'ship_hull', etiqueta: 'Casco del buque', tipo: 'componente', severidad: null }),
   ],
   detalleDisponible: true,
 })
@@ -52,9 +53,7 @@ const DETALLE_CORROIDA = {
 const SOLO_CASCO = unaFoto({
   id: 26,
   estado: 'completada',
-  detecciones: [
-    { clase: 'ship_hull', etiqueta: 'Casco del buque', tipo: 'componente', severidad: null, cantidad: 1, confianzaMaxima: 0.9 },
-  ],
+  detecciones: [unaDeteccion({ clase: 'ship_hull', etiqueta: 'Casco del buque', tipo: 'componente', severidad: null })],
 })
 
 function renderizar(fotos: Foto[], extra: Partial<InspeccionDetalle> = {}) {
@@ -283,7 +282,7 @@ describe('ResultadosPage', () => {
           fotoId: 25,
           estado: 'completada',
           severidad: 'medium',
-          detecciones: [{ clase: 'barnacles', etiqueta: 'barnacles', tipo: null, severidad: null, cantidad: 3, confianzaMaxima: 0.72 }],
+          detecciones: [unaDeteccion({ clase: 'barnacles', etiqueta: 'barnacles', tipo: null, severidad: null, cantidad: 3, confianzaMaxima: 0.72 })],
           tiempoInferenciaMs: 500,
           imagenAnotada: 'http://api.test/media/anotadas/25.jpg',
           errorDetalle: null,

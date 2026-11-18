@@ -30,6 +30,8 @@ export interface DeteccionDto {
   class_name: string
   count: number
   max_confidence: number
+  /** Discarded in the report review; absent on older servers. */
+  descartada?: boolean
   /** Taxonomy added by the backend at read time; absent on older servers. */
   etiqueta?: string
   tipo?: TipoClase | null
@@ -146,6 +148,7 @@ function aDetecciones(dtos: DeteccionDto[] | null): Deteccion[] {
     severidad: d.severidad ?? null,
     cantidad: d.count,
     confianzaMaxima: d.max_confidence,
+    descartada: d.descartada ?? false,
   }))
 }
 

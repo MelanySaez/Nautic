@@ -188,7 +188,7 @@ The starting values are tuned by eye during T4. Tests check invariants, not thes
 ## Checklist
 - [x] T1 — Docs: scope wording and the 20 → 23 section count. Route: inline (mechanical edits).
 - [x] T2 — Backend `descartada` in detections + tests + docs. Route: inline (one helper + one test).
-- [ ] T3 — Frontend zone summary and states + DTO. Route: delegated direct (single writer).
+- [x] T3 — Frontend zone summary and states + DTO. Route: delegated direct (single writer).
 - [ ] T4 — Frontend hull geometry domain. Route: delegated direct (single writer; prototype port).
 - [ ] T5 — Frontend URL params `?buque` / `?zona`. Route: delegated direct (single writer; 4 pages).
 - [ ] T6 — Frontend 3D page without WebGL. Route: delegated direct (single writer).
@@ -272,8 +272,8 @@ None. The user approved the document with the "Sin analizar" state and the twin 
 - The feature document itself was committed as `ccadf59` (`docs(odd): plan the 3d hull view and
   record t1`).
 
-- **T2 done.** Commit `feat(vision): expose discarded findings on photo detections`, whose hash is
-  recorded with T3. Route: inline.
+- **T2 done.** Commit `26f1e15` `feat(vision): expose discarded findings on photo detections`.
+  Route: inline.
   - `resumen_detecciones` adds `descartada` to every entry. It reaches the photo dict, the inspection
     detail and the `foto-updated` SSE event, all built with this helper.
   - Docs updated: AGENTS.md, VISION_BACKEND.md and INSPECCION_IA.md.
@@ -286,5 +286,30 @@ None. The user approved the document with the "Sin analizar" state and the twin 
     and `test_taxonomia._comprobar`. The migration tests keep their historical JSON on purpose.
   - Check: `manage.py test vision --noinput` → 299 tests OK.
 
+- **T3 done.** Commit `feat(inspecciones): summarize each hull zone with the report rule`, whose hash
+  is recorded with T4. Route: delegated direct (single writer; 11 paths, 356 changed lines).
+  - `Deteccion.descartada` is mapped in `aDetecciones`, the single mapper behind HTTP and SSE, and is
+    false when the server omits it.
+  - `reglas.ts` gains `masSevera`, on which `severidadMaxima` is now built, and `esHallazgo`
+    (anomaly and not discarded).
+  - New `domain/resumenZonas.ts`: `EstadoZona`, `ResumenZona` and `resumirZonas(fotos, secciones)`,
+    one entry per `seccion.id`.
+  - New `unaDeteccion` fake in `dobles.tsx`. AGENTS.md "Detections" bullet updated.
+  - RED (writer): 7 failing tests across 4 files: `./resumenZonas` unresolved, `masSevera` and
+    `esHallazgo` not functions, and `descartada` missing in the HTTP and SSE mappings.
+  - GREEN, as reported by the writer:
+    - focused tests → 53 passed;
+    - `pnpm test` → 25 files, 250 tests passed;
+    - `pnpm lint` → exit 0;
+    - `pnpm build` → OK.
+  - Verification gate (RDD off):
+    - `gentle-ai review assess` → `medium` (`executable_change`: AGENTS.md), `under_budget`. The first
+      run was `unassessable` until the two new files were declared;
+    - the writer ran on the parent model, so its self-verification stands;
+    - parent spot check `pnpm vitest run src/inspecciones/domain src/inspecciones/infrastructure`
+      → 7 files, 67 tests passed;
+    - parent readback of `resumenZonas.ts` matches the colour rule.
+
 ## Next step
-T3: the frontend zone summary and states (plus the `descartada` DTO), on `feat/casco-3d-01-datos`.
+Slice 1 is complete (T1–T3). Next: T4, the hull geometry domain, on `feat/casco-3d-02-geometria`,
+branched from the tip of slice 1.
