@@ -221,6 +221,28 @@ class UrlFirmadaTests(AlmacenamientoBase):
         self.assertEqual(cache.get.call_count, 2)
         cache.set.assert_called_once()
 
+    def test_s3_si_falla_guardar_devuelve_la_firma_y_pausa_la_cache(self):
+        self._como_s3()
+        with mock.patch('vision.almacenamiento.caches', {'compartida': mock.Mock()}) as caches, \
+                self.assertLogs('vision.almacenamiento', 'WARNING'):
+            cache = caches['compartida']
+            cache.get.return_value = None
+            cache.set.side_effect = ConnectionError('redis caído')
+            primera = almacenamiento.url_archivo('a.jpg')
+            almacenamiento.url_archivo('b.jpg')
+
+        self.assertEqual(primera, 'https://bucket.example/a.jpg?sig=1')
+        self.assertEqual((cache.get.call_count, cache.set.call_count), (1, 1))
+
+    def test_s3_cambiar_la_configuracion_de_firma_no_reutiliza_la_url(self):
+        self._como_s3()
+        for atributo in ('custom_domain', 'region_name', 'signature_version', 'addressing_style'):
+            with self.subTest(atributo=atributo):
+                vieja = almacenamiento.url_archivo('a.jpg')
+                self._parchear_storage(atributo, new=f'{atributo}-nuevo')
+
+                self.assertNotEqual(almacenamiento.url_archivo('a.jpg'), vieja)
+
     def test_s3_otro_bucket_no_reutiliza_la_url(self):
         self._como_s3()
         self._parchear_storage('bucket_name', new='fotos-viejo')

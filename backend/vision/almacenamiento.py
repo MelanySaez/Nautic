@@ -30,6 +30,11 @@ CACHE_COMPARTIDA = "compartida"
 # Seconds the shared cache is skipped after a failure (see _pausar_cache).
 PAUSA_CACHE_SEGUNDOS = 30
 _cache_en_pausa_hasta = 0.0
+# S3Storage options a signed URL depends on; part of its cache key.
+_ALCANCE_FIRMA = (
+    "bucket_name", "endpoint_url", "custom_domain", "region_name", "location",
+    "signature_version", "addressing_style", "querystring_expire", "access_key",
+)
 
 
 def clave_original(nombre_archivo: str) -> str:
@@ -114,13 +119,10 @@ def _vigencia_firma():
 def _llave_url_firmada(clave):
     """Cache key of a signed URL: the object key plus everything the signature depends on.
 
-    Changing bucket, endpoint, prefix, lifetime or access key starts from fresh
+    Changing any storage option that shapes the signed URL starts from fresh
     URLs instead of serving ones signed for the previous configuration.
     """
-    alcance = "|".join(
-        str(getattr(default_storage, atributo, "") or "")
-        for atributo in ("bucket_name", "endpoint_url", "location", "querystring_expire", "access_key")
-    )
+    alcance = "|".join(str(getattr(default_storage, atributo, "") or "") for atributo in _ALCANCE_FIRMA)
     return "url-firmada:" + hashlib.sha256(f"{alcance}|{clave}".encode()).hexdigest()
 
 
