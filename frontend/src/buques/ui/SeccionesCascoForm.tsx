@@ -53,7 +53,7 @@ export function SeccionesCascoForm({
       </div>
 
       {modo === 'estandar' ? (
-        <p className="text-sm text-ink-dim">Se crean las 20 zonas estándar del casco.</p>
+        <p className="text-sm text-ink-dim">Se crean las 23 zonas estándar del casco.</p>
       ) : (
         <div className="flex flex-col gap-4">
           <ol className="flex flex-col gap-4">
