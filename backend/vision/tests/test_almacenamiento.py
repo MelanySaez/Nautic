@@ -236,10 +236,18 @@ class UrlFirmadaTests(AlmacenamientoBase):
 
     def test_s3_cambiar_la_configuracion_de_firma_no_reutiliza_la_url(self):
         self._como_s3()
-        for atributo in ('custom_domain', 'region_name', 'signature_version', 'addressing_style'):
+        nuevos = {
+            'custom_domain': 'cdn.nuevo', 'region_name': 'eu-west-1', 'signature_version': 's3',
+            'addressing_style': 'path', 'endpoint_url': 'https://otro.endpoint', 'location': 'prod',
+            'access_key': 'AKIA-ROTADA', 'querystring_expire': 1800,
+        }
+        for atributo, valor in nuevos.items():
             with self.subTest(atributo=atributo):
                 vieja = almacenamiento.url_archivo('a.jpg')
-                self._parchear_storage(atributo, new=f'{atributo}-nuevo')
+                # On the instance: the in-memory test storage sets its own ``location`` there.
+                patcher = mock.patch.object(default_storage._wrapped, atributo, valor, create=True)
+                patcher.start()
+                self.addCleanup(patcher.stop)
 
                 self.assertNotEqual(almacenamiento.url_archivo('a.jpg'), vieja)
 
