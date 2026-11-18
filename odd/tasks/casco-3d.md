@@ -192,25 +192,34 @@ The starting values are tuned by eye during T4. Tests check invariants, not thes
 - [x] T4 — Frontend hull geometry domain. Route: delegated direct (single writer; prototype port).
 - [x] T5 — Frontend URL params `?buque` / `?zona`. Route: delegated direct (single writer; 4 pages).
 - [x] T6 — Frontend 3D page without WebGL. Route: delegated direct (single writer).
-- [ ] T7 — Frontend WebGL canvas, transition and docs. Route: delegated direct (single writer).
+- [x] T7 — Frontend WebGL canvas, transition and docs. Route: delegated direct (single writer).
+      The manual browser checklist is still pending (see Progress).
 
 ## Acceptance criteria
-- [ ] `/inspecciones/buque/:id` has a "Vista 3D" button that opens `/inspecciones/buque/:id/casco`, with
-      the vessel name morphing into the title.
-- [ ] The view shows the most recent inspection by default. Any other one can be chosen, paging with
-      "Cargar más", and the choice survives "back".
+Each box is ticked only for what automated checks observed. Anything only visible in a real WebGL
+browser is marked *(manual)* and stays pending until the browser checklist below is run.
+
+- [x] `/inspecciones/buque/:id` has a "Vista 3D" button that opens `/inspecciones/buque/:id/casco`, with
+      the vessel name morphing into the title. The link and the `viewTransitionName` are tested; the
+      animation itself is *(manual)*.
+- [x] The view shows the most recent inspection by default. Any other one can be chosen, paging with
+      "Cargar más", and the choice survives "back" (`?inspeccion`).
 - [ ] Every standard section is a clickable zone on the hull and an item in the list. Custom sections
       appear only in the list, under "Secciones sin ubicación en el casco".
-- [ ] Zone colours follow the colour rule. Discarding a finding in the report changes the zone colour
-      on the next load, matching the PDF.
-- [ ] Selecting a zone shows its photos and its state, plus "Consultar", "Editar" (only with
+      - List: tested.
+      - Click on the hull: *(manual)*.
+- [x] Zone colours follow the colour rule (`resumirZonas` tests). Discarding a finding in the report
+      changes the zone colour on the next load, matching the PDF (backend `descartada` test plus the
+      domain rule). The rendered hull colours are *(manual)*.
+- [x] Selecting a zone shows its photos and its state, plus "Consultar", "Editar" (only with
       `subirFotos`) and "Nueva inspección", which open their pages already filtered by that zone (and
       vessel).
-- [ ] The hull follows the vessel's measurements. A vessel with missing measurements still renders with
-      warship proportions.
-- [ ] three.js loads only on this page. A silhouette shows while it loads. Nothing animates under
-      `prefers-reduced-motion`.
-- [ ] `AGENTS.md` states the new scope and the 23 standard sections. The UI says "23 zonas estándar".
+- [x] The hull follows the vessel's measurements, and a vessel with missing measurements gets warship
+      proportions (`dimensionesCasco` and `generarCasco` tests). How it looks is *(manual)*.
+- [ ] three.js loads only on this page and a silhouette shows while it loads: verified (the build splits
+      the chunks; `EscenaCasco` tests cover the fallback). Nothing animates under
+      `prefers-reduced-motion`: helper tested, rendered behaviour *(manual)*.
+- [x] `AGENTS.md` states the new scope and the 23 standard sections. The UI says "23 zonas estándar".
 
 ## Delivery
 Forecast: about 2,000 authored lines (T1 ≈ 25, T2 ≈ 50, T3 ≈ 250, T4 ≈ 550, T5 ≈ 250, T6 ≈ 450,
@@ -394,10 +403,8 @@ None. The user approved the document with the "Sin analizar" state and the twin 
 
 - **Slice 3 complete** (tip `c05bdbe`). Slice 4: branch `feat/casco-3d-04-vista`.
 - **T6 done.** Two commits:
-  - `feat(inspecciones): add hull zone states, tokens and 3d view panels`;
-  - `feat(inspecciones): open a 3d hull view from each vessel's inspections`.
-
-  Their hashes are recorded with T7. Route: delegated direct (single writer).
+  - `c9e1aa3` `feat(inspecciones): add hull zone states, tokens and 3d view panels`;
+  - `ed45a0d` `feat(inspecciones): open a 3d hull view from each vessel's inspections`. Route: delegated direct (single writer).
   - **Route** `/inspecciones/buque/:id/casco` → `CascoBuqueRuta` → `CascoBuquePage`, a container with
     a live child for the selected inspection.
   - **Components** in `ui/casco/`: `SelectorInspeccion` ("Cargar más"), `ListaZonasCasco` (with the
@@ -438,5 +445,77 @@ None. The user approved the document with the "Sin analizar" state and the twin 
     about 800 are 7 small presentational files plus the page. The slice is delivered as 2 work-unit
     commits; recommend `size:exception`.
 
+- **Slice 4 complete** (tip `ed45a0d`). Slice 5: branch `feat/casco-3d-05-lienzo`.
+- **T7 done.** Two commits:
+  - `feat(inspecciones): add camera, colour and webgl helpers for the hull scene`;
+  - `feat(inspecciones): render the hull in 3d with a lazy webgl canvas`.
+
+  Route: delegated direct (single writer).
+  - **Dependencies:** `three ^0.187.0`, `@react-three/fiber ^9.8.2`, `@react-three/drei ^10.7.9`, and
+    dev `@types/three ^0.187.0`. React 19.3.1 is inside both peer ranges.
+    - Lockfile: 540 insertions. The machine's pnpm also adds `@pnpm/exe` blocks; those were removed,
+      and a parent check counted 0 `@pnpm/exe` lines in the diff.
+  - **`casco/LienzoCasco.tsx`:** the only module that imports three, R3F or drei.
+    - One geometry per zone. Deck, transom and superstructure block the pointer but are never selected.
+    - Colours come from the `--c-*` tokens and are re-read when the theme changes.
+    - A 5 px drag threshold separates a click from an orbit.
+    - Accent outline on the selected zone; photo badges that hide when their side faces away.
+    - `OrbitControls` (0.25–3 L); presets "3/4", "Babor", "Estribor" and "Fondo" (750 ms);
+      "Mostrar flotación" toggle.
+    - A 1.2 s fly-in from the silhouette's side view, plus a 700 ms colour blend. Under reduced motion,
+      nothing animates and presets jump.
+    - The canvas is `aria-hidden` inside a `role="img"` labelled "Modelo 3D del casco de …".
+  - **`casco/vistaCasco.ts`** and **`casco/coloresZona.ts`:** pure helpers with tests.
+  - **`EscenaCasco`:** `lazy(() => import('./LienzoCasco.tsx'))` with the silhouette as the
+    `Suspense` fallback, plus a WebGL check and an error boundary.
+    - The `.tsx` extension is needed: on Windows, `./LienzoCasco` resolves to `lienzoCasco.ts` (same
+      name apart from case).
+  - **`CascoBuquePage`:** the scene frame no longer has padding.
+  - **AGENTS.md:** the stack line and the "Hull 3D view" bullet.
+  - RED (writer): 3 new test files unresolved; then 4 `EscenaCasco` tests failed with a placeholder
+    canvas.
+  - GREEN, as reported by the writer:
+    - `pnpm test` → 35 files, 390 tests;
+    - `pnpm lint` → exit 0;
+    - `tsc -b` clean;
+    - `pnpm build` OK.
+  - Verification gate (RDD off):
+    - `assess` → `medium` (1,928 lines including the lockfile), `slice_budget_reached`; no review;
+    - parent spot checks:
+      - focused tests → 5 files, 67 tests passed;
+      - `pnpm build` → entry `index-*.js` 439.39 kB (gzip 132.91), lazy `LienzoCasco-*.js` 977.61 kB
+        (gzip 262.04);
+      - `WebGLRenderer`: 0 matches in the entry chunk, 38 in the lazy chunk.
+    - Vite warns that the lazy chunk is over 500 kB. The limit was not raised on purpose, so that
+      growth of the entry chunk stays visible.
+  - **Size exception, slice 5:** about 1,390 authored lines (forecast 450), about 540 of them tests,
+    plus a 540-line lockfile. Delivered as 2 commits; recommend `size:exception`.
+  - **Manual browser checklist** (pending, user; `pnpm dev`, `/inspecciones/buque/:id/casco`):
+    1. The silhouette, then the hull, with the fly-in and the colour fade.
+    2. Colours match the legend and the list in light and dark mode, and recolour when the theme
+       changes.
+    3. Hover gives a highlight and pointer; clicking selects and outlines; clicking again or on empty
+       space clears; dragging does not select.
+    4. Clicking the deck or superstructure never selects the zone behind it.
+    5. Badges show photo counts and hide when their side faces away.
+    6. The presets move the camera, zoom stops at its limits, and the waterline toggle works.
+    7. Under reduced motion there is no fly-in or fade, and the presets jump.
+    8. The `LienzoCasco-*.js` chunk loads only on this page.
+    9. Light intensities: the colours are neither too dark nor washed out.
+
+### Closing state
+- **All 7 tasks done** in 5 slices on local branches; nothing has been pushed.
+- **Size versus forecast:** the forecast was about 2,000 lines; actual authored lines came to about
+  4,700. Slices 2, 4 and 5 are well over 400 lines, and each is delivered as 2 work-unit commits with a
+  `size:exception` recommendation.
+- **Follow-ups (not in scope):**
+  - align `ResultadosPage` severity with the report rule;
+  - live refresh after a report discard;
+  - drop the duplicated severity labels (`Insignias.tsx`);
+  - remove `useInspeccionEnVivo`'s extra `listarSecciones` request;
+  - possibly split the 978 kB three.js chunk further.
+
 ## Next step
-T7, the WebGL canvas, on `feat/casco-3d-05-lienzo`, branched from the tip of slice 4.
+1. The user runs the manual browser checklist.
+2. The user decides on push and PRs: the draft tracker `feat/casco-3d` → `main`, then the child PRs in
+   chain order. The PR boundaries are listed under Delivery.
