@@ -63,9 +63,25 @@ class DeteccionesPorFilaTests(TestCase):
 
         self._procesar(_det(4, 'corrosion', 0.9))
         self.assertEqual(cliente.get(url).json()['detecciones'], [{
-            'class_name': 'corrosion', 'count': 1, 'max_confidence': 0.9,
+            'class_name': 'corrosion', 'count': 1, 'max_confidence': 0.9, 'descartada': False,
             'etiqueta': 'Corrosión', 'tipo': 'anomalia', 'severidad': 'critical',
         }])
+
+    def test_el_detalle_de_la_inspeccion_dice_que_clases_se_descartaron_en_el_reporte(self):
+        cliente = cliente_admin()
+        self._procesar(_det(4, 'corrosion', 0.9), _det(1, 'paint_peel', 0.3))
+
+        res = cliente.patch(
+            f'/api/vision/inspecciones/{self.insp.id}/reporte/',
+            {'fotos': [{'foto_id': self.foto.id, 'descartadas': ['paint_peel']}]}, format='json',
+        )
+
+        self.assertEqual(res.status_code, 200)
+        detecciones = cliente.get(f'/api/vision/inspecciones/{self.insp.id}/').json()['fotos'][0]['detecciones']
+        self.assertEqual(
+            sorted((d['class_name'], d['descartada']) for d in detecciones),
+            [('corrosion', False), ('paint_peel', True)],
+        )
 
     def test_una_foto_ya_analizada_sin_hallazgos_sigue_en_lista_vacia_al_reencolarse(self):
         self._procesar()

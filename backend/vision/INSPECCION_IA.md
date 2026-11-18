@@ -157,9 +157,9 @@ Formato de `detecciones` en la API (`resumen_detecciones()`): una entrada por cl
 
 ```json
 [
-  {"class_name": "corrosion", "count": 3, "max_confidence": 0.92},
-  {"class_name": "marine_growth", "count": 1, "max_confidence": 0.74},
-  {"class_name": "ship_hull", "count": 1, "max_confidence": 0.88}
+  {"class_name": "corrosion", "count": 3, "max_confidence": 0.92, "descartada": false},
+  {"class_name": "marine_growth", "count": 1, "max_confidence": 0.74, "descartada": true},
+  {"class_name": "ship_hull", "count": 1, "max_confidence": 0.88, "descartada": false}
 ]
 ```
 
@@ -167,6 +167,7 @@ Cada entrada incluye:
 - `class_name` — identificador de la clase YOLO
 - `count` — cantidad de veces que esa clase fue detectada en la imagen
 - `max_confidence` — la mayor confianza entre todas las detecciones de esa clase
+- `descartada` — `true` si el inspector la descartó como falso positivo en el reporte (`PATCH .../reporte/`); un nuevo análisis la vuelve a `false`
 
 La API añade a cada entrada, al leer, la taxonomía de `core_engine` (`vision/taxonomia.py`): `etiqueta` (nombre en español), `tipo` (`anomalia` o `componente`) y `severidad` (solo anomalías). `GET /api/vision/taxonomia/` lista todas las clases con su color.
 
@@ -467,8 +468,8 @@ Las decisiones de UI del frontend anterior (componentes, i18n, eliminación opti
   "imagen_original": "http://HOST/media/inspecciones/originales/uuid.jpg",
   "imagen_anotada": "http://HOST/media/inspecciones/anotadas/42_hex.jpg",
   "detecciones": [
-    { "class_name": "corrosion", "count": 3, "max_confidence": 0.92 },
-    { "class_name": "ship_hull", "count": 1, "max_confidence": 0.88 }
+    { "class_name": "corrosion", "count": 3, "max_confidence": 0.92, "descartada": false },
+    { "class_name": "ship_hull", "count": 1, "max_confidence": 0.88, "descartada": false }
   ],
   "tiempo_inferencia_ms": 186.42,
   "severidad": "critical",

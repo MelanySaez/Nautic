@@ -69,8 +69,8 @@ class DeteccionesFotoTests(TestCase):
 
         self.assertTrue(run.call_args.kwargs['incluir_mascaras'])
         self.assertEqual(resumen_detecciones(self.foto), [
-            {'class_name': 'corrosion', 'count': 1, 'max_confidence': 0.91},
-            {'class_name': 'ship_hull', 'count': 1, 'max_confidence': 0.8},
+            {'class_name': 'corrosion', 'count': 1, 'max_confidence': 0.91, 'descartada': False},
+            {'class_name': 'ship_hull', 'count': 1, 'max_confidence': 0.8, 'descartada': False},
         ])
         with default_storage.open(self.foto.detecciones_archivo) as fh:
             guardado = json.load(fh)

@@ -187,7 +187,7 @@ The starting values are tuned by eye during T4. Tests check invariants, not thes
 
 ## Checklist
 - [x] T1 — Docs: scope wording and the 20 → 23 section count. Route: inline (mechanical edits).
-- [ ] T2 — Backend `descartada` in detections + tests + docs. Route: inline (one helper + one test).
+- [x] T2 — Backend `descartada` in detections + tests + docs. Route: inline (one helper + one test).
 - [ ] T3 — Frontend zone summary and states + DTO. Route: delegated direct (single writer).
 - [ ] T4 — Frontend hull geometry domain. Route: delegated direct (single writer; prototype port).
 - [ ] T5 — Frontend URL params `?buque` / `?zona`. Route: delegated direct (single writer; 4 pages).
@@ -269,5 +269,22 @@ None. The user approved the document with the "Sin analizar" state and the twin 
       the T7 chunk check;
     - a repo grep shows no "20 sections" left outside the historical document.
 
+- The feature document itself was committed as `ccadf59` (`docs(odd): plan the 3d hull view and
+  record t1`).
+
+- **T2 done.** Commit `feat(vision): expose discarded findings on photo detections`, whose hash is
+  recorded with T3. Route: inline.
+  - `resumen_detecciones` adds `descartada` to every entry. It reaches the photo dict, the inspection
+    detail and the `foto-updated` SSE event, all built with this helper.
+  - Docs updated: AGENTS.md, VISION_BACKEND.md and INSPECCION_IA.md.
+  - RED: the new test
+    `test_detecciones_normalizadas.DeteccionesPorFilaTests.test_el_detalle_de_la_inspeccion_dice_que_clases_se_descartaron_en_el_reporte`
+    (a report `PATCH` discards `paint_peel`, then the inspection detail is read) failed with
+    `KeyError: 'descartada'`.
+  - GREEN: after the change, the three exact-shape assertions were updated with `descartada: False`:
+    `test_detecciones_foto`, `test_detecciones_normalizadas.test_la_api_conserva_el_formato_de_detecciones`
+    and `test_taxonomia._comprobar`. The migration tests keep their historical JSON on purpose.
+  - Check: `manage.py test vision --noinput` → 299 tests OK.
+
 ## Next step
-T2: `descartada` in the API detections, on `feat/casco-3d-01-datos`.
+T3: the frontend zone summary and states (plus the `descartada` DTO), on `feat/casco-3d-01-datos`.
