@@ -181,17 +181,20 @@ describe('RegistroPage', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Datos inválidos.')
   })
 
-  it('shows and hides the password', async () => {
+  it('shows and hides the password without losing what was typed', async () => {
     const { dependencias } = sinSesion()
     renderizarRutas(rutas, dependencias, '/registro')
     const contrasena = await screen.findByLabelText('Contraseña')
     expect(contrasena).toHaveAttribute('type', 'password')
+    await userEvent.type(contrasena, 'secreta123')
 
     await userEvent.click(screen.getByRole('button', { name: 'Mostrar contraseña' }))
 
     expect(contrasena).toHaveAttribute('type', 'text')
+    expect(contrasena).toHaveValue('secreta123')
     await userEvent.click(screen.getByRole('button', { name: 'Ocultar contraseña' }))
     expect(contrasena).toHaveAttribute('type', 'password')
+    expect(contrasena).toHaveValue('secreta123')
   })
 
   it('links back to the login', async () => {
