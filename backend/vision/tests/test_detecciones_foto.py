@@ -106,6 +106,58 @@ class DeteccionesFotoTests(TestCase):
         self.assertEqual(respuesta.json(), {'error': 'La foto no tiene detecciones guardadas.'})
         self.assertFalse(self.client.get(f'/api/vision/fotos/{self.foto.id}/').json()['detalle_disponible'])
 
+    def _url(self):
+        return f'/api/vision/fotos/{self.foto.id}/detecciones/'
+
+    def test_el_endpoint_permite_revalidar_con_etag_en_cache_privada(self):
+        self._procesar(_resultado(_deteccion(4, 'corrosion', 0.91, MASCARA)))
+
+        respuesta = self.client.get(self._url())
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertTrue(respuesta['ETag'].startswith('"'))
+        self.assertEqual(respuesta['Cache-Control'], 'private, no-cache')
+
+    def test_con_el_etag_vigente_responde_304_sin_leer_el_storage(self):
+        self._procesar(_resultado(_deteccion(4, 'corrosion', 0.91, MASCARA)))
+        etag = self.client.get(self._url())['ETag']
+
+        with mock.patch('vision.views.leer_archivo') as leer:
+            respuesta = self.client.get(self._url(), HTTP_IF_NONE_MATCH=etag)
+
+        self.assertEqual(respuesta.status_code, 304)
+        self.assertEqual(respuesta.content, b'')
+        self.assertEqual(respuesta['ETag'], etag)
+        self.assertEqual(respuesta['Cache-Control'], 'private, no-cache')
+        leer.assert_not_called()
+
+    def test_un_nuevo_analisis_cambia_el_etag_y_devuelve_las_detecciones_nuevas(self):
+        self._procesar(_resultado(_deteccion(4, 'corrosion', 0.91, MASCARA)))
+        etag = self.client.get(self._url())['ETag']
+        self._procesar(_resultado(_deteccion(1, 'paint_peel', 0.7)))
+
+        respuesta = self.client.get(self._url(), HTTP_IF_NONE_MATCH=etag)
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertNotEqual(respuesta['ETag'], etag)
+        self.assertEqual(respuesta.json()['detecciones'][0]['clase'], 'paint_peel')
+
+    def test_el_etag_no_salta_el_permiso_de_una_inspeccion_privada(self):
+        from django.contrib.auth import get_user_model
+        from rest_framework.test import APIClient
+
+        self._procesar(_resultado(_deteccion(4, 'corrosion', 0.91, MASCARA)))
+        etag = self.client.get(self._url())['ETag']
+        self.insp.privada = True
+        self.insp.save(update_fields=['privada'])
+        ajeno = APIClient()
+        ajeno.force_authenticate(get_user_model().objects.create_user('ajeno@pruebas.local', None, nombre='Ajeno'))
+
+        respuesta = ajeno.get(self._url(), HTTP_IF_NONE_MATCH=etag)
+
+        self.assertEqual(respuesta.status_code, 404)
+        self.assertNotIn('ETag', respuesta)
+
     def test_un_nuevo_analisis_reemplaza_el_archivo_y_borrar_la_foto_lo_elimina(self):
         self._procesar(_resultado(_deteccion(4, 'corrosion', 0.91, MASCARA)))
         anterior = self.foto.detecciones_archivo

@@ -1,4 +1,5 @@
 import base64
+import hashlib
 import json
 import logging
 import os
@@ -8,7 +9,8 @@ from PIL import Image
 from django.conf import settings
 from django.db import transaction
 from django.contrib.auth import get_user_model
-from django.http import Http404, HttpResponse, JsonResponse, StreamingHttpResponse
+from django.http import Http404, HttpResponse, HttpResponseNotModified, JsonResponse, StreamingHttpResponse
+from django.utils.http import parse_etags
 from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
@@ -38,7 +40,7 @@ from .views_miembros import crear_miembros, validar_equipo
 from .pubsub import publicar_evento, suscribirse
 from .ratelimit import check_upload_rate, get_client_ip, track_concurrent_start
 from .secciones import seccion_to_dict
-from .taxonomia import color_clase, enriquecer_detecciones, info_clase, listar_taxonomia
+from .taxonomia import color_clase, enriquecer_detecciones, info_clase, listar_taxonomia, version_taxonomia
 from .tasks import procesar_foto
 
 logger = logging.getLogger(__name__)
@@ -945,19 +947,40 @@ def api_vision_foto_detecciones(request, foto_id):
     Cajas y máscaras de cada detección del último análisis de la foto.
     """
     foto = get_object_or_404(FotoInspeccion.objects.select_related('inspeccion'), pk=foto_id)
+    # Permission first: a cached copy is never revalidated for someone who lost access.
     exigir(request.user, foto.inspeccion)
     if not foto.detecciones_archivo:
         return Response({'error': 'La foto no tiene detecciones guardadas.'}, status=404)
+    etag = _etag_detecciones(foto.detecciones_archivo)
+    if etag in parse_etags(request.headers.get('If-None-Match', '')):
+        return _cache_detecciones(HttpResponseNotModified(), etag)
     try:
         crudas = json.loads(leer_archivo(foto.detecciones_archivo))
     except Exception:
         logger.exception('No se pudieron leer las detecciones de la foto %s', foto_id)
         return Response({'error': 'No se pudieron leer las detecciones de la foto.'}, status=500)
-    return Response({
+    return _cache_detecciones(Response({
         'ancho': crudas.get('ancho'),
         'alto': crudas.get('alto'),
         'detecciones': [_deteccion_cruda_to_dict(d) for d in crudas.get('detecciones', [])],
-    })
+    }), etag)
+
+
+def _etag_detecciones(clave):
+    """Strong ETag of a detections file as served.
+
+    The file under a key never changes (every analysis writes a new key), and the
+    taxonomy added at read time changes only with its version.
+    """
+    huella = hashlib.sha256(f'{clave}|{version_taxonomia()}'.encode()).hexdigest()[:32]
+    return f'"{huella}"'
+
+
+def _cache_detecciones(respuesta, etag):
+    # private: per-user permission applies; no-cache: the browser revalidates on every use.
+    respuesta['ETag'] = etag
+    respuesta['Cache-Control'] = 'private, no-cache'
+    return respuesta
 
 
 @extend_schema(
