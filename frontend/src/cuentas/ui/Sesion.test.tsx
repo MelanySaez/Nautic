@@ -113,6 +113,21 @@ describe('LoginPage', () => {
     expect(screen.getByRole('button', { name: 'Ingresando…' })).toBeDisabled()
   })
 
+  it('shows and hides the password without losing what was typed', async () => {
+    const { dependencias } = sinSesion()
+    renderizarRutas(rutas, dependencias, '/login')
+    const contrasena = await screen.findByLabelText('Contraseña')
+    await userEvent.type(contrasena, 'secreta123')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Mostrar contraseña' }))
+
+    expect(contrasena).toHaveAttribute('type', 'text')
+    expect(contrasena).toHaveValue('secreta123')
+    await userEvent.click(screen.getByRole('button', { name: 'Ocultar contraseña' }))
+    expect(contrasena).toHaveAttribute('type', 'password')
+    expect(contrasena).toHaveValue('secreta123')
+  })
+
   it('links to the registration screen', async () => {
     const { dependencias } = sinSesion()
     const router = renderizarRutas(rutas, dependencias, '/login')
@@ -164,6 +179,19 @@ describe('RegistroPage', () => {
       'La contraseña es demasiado corta. La contraseña es demasiado común.',
     )
     expect(screen.getByRole('alert')).toHaveTextContent('Datos inválidos.')
+  })
+
+  it('shows and hides the password', async () => {
+    const { dependencias } = sinSesion()
+    renderizarRutas(rutas, dependencias, '/registro')
+    const contrasena = await screen.findByLabelText('Contraseña')
+    expect(contrasena).toHaveAttribute('type', 'password')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Mostrar contraseña' }))
+
+    expect(contrasena).toHaveAttribute('type', 'text')
+    await userEvent.click(screen.getByRole('button', { name: 'Ocultar contraseña' }))
+    expect(contrasena).toHaveAttribute('type', 'password')
   })
 
   it('links back to the login', async () => {

@@ -7,6 +7,7 @@ import { Campo } from '../../shared/ui/Campo'
 import { CLASES_CONTROL } from '../../shared/ui/clasesControl'
 import { Enlace } from '../../shared/ui/Enlace'
 import { MensajeError } from '../../shared/ui/Estados'
+import { InputContrasena } from '../../shared/ui/InputContrasena'
 import { mensajeDe } from '../../shared/ui/formato'
 import { MarcoCuenta } from './MarcoCuenta'
 import { mensajesDe } from './mensajes'
@@ -54,12 +55,10 @@ export function LoginPage() {
           />
         </Campo>
         <Campo etiqueta="Contraseña" error={mensajesDe(campos, 'password')}>
-          <input
-            type="password"
+          <InputContrasena
             autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className={CLASES_CONTROL}
           />
         </Campo>
         <Boton type="submit" disabled={enviando}>
