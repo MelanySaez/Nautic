@@ -227,7 +227,7 @@ export function crearDependenciasFalsas() {
     },
     inspecciones: {
       buscar: vi.fn(async (_filtro: FiltroInspecciones, _cursor?: string) => unaPagina()),
-      obtener: vi.fn(async () => unDetalle()),
+      obtener: vi.fn(async (_id: number) => unDetalle()),
       crear: vi.fn(async () => unaInspeccion()),
       renombrar: vi.fn(async (_id: number, nombre: string) => unaInspeccion({ nombre })),
       eliminar: vi.fn(async () => {}),

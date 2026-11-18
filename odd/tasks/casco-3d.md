@@ -191,7 +191,7 @@ The starting values are tuned by eye during T4. Tests check invariants, not thes
 - [x] T3 — Frontend zone summary and states + DTO. Route: delegated direct (single writer).
 - [x] T4 — Frontend hull geometry domain. Route: delegated direct (single writer; prototype port).
 - [x] T5 — Frontend URL params `?buque` / `?zona`. Route: delegated direct (single writer; 4 pages).
-- [ ] T6 — Frontend 3D page without WebGL. Route: delegated direct (single writer).
+- [x] T6 — Frontend 3D page without WebGL. Route: delegated direct (single writer).
 - [ ] T7 — Frontend WebGL canvas, transition and docs. Route: delegated direct (single writer).
 
 ## Acceptance criteria
@@ -367,8 +367,7 @@ None. The user approved the document with the "Sin analizar" state and the twin 
     `pnpm vitest run src/buques/domain/casco` → 4 files, 44 tests passed.
 
 - **Slice 2 complete** (tip `9862e1f`). Slice 3: branch `feat/casco-3d-03-navegacion`.
-- **T5 done.** Commit `feat(inspecciones): deep-link vessel and hull zone through the url`, whose hash
-  is recorded with T6. Route: delegated direct (single writer; 11 paths, 310 changed lines).
+- **T5 done.** Commit `c05bdbe` `feat(inspecciones): deep-link vessel and hull zone through the url`. Route: delegated direct (single writer; 11 paths, 310 changed lines).
   - New `ui/parametrosUrl.ts`:
     - `idDeParametro`: only canonical positive safe integers count;
     - `conParametro`;
@@ -393,5 +392,51 @@ None. The user approved the document with the "Sin analizar" state and the twin 
     - parent spot check `pnpm vitest run src/inspecciones/ui` → 7 files, 121 tests passed;
     - parent readback of `parametrosUrl.ts`.
 
+- **Slice 3 complete** (tip `c05bdbe`). Slice 4: branch `feat/casco-3d-04-vista`.
+- **T6 done.** Two commits:
+  - `feat(inspecciones): add hull zone states, tokens and 3d view panels`;
+  - `feat(inspecciones): open a 3d hull view from each vessel's inspections`.
+
+  Their hashes are recorded with T7. Route: delegated direct (single writer).
+  - **Route** `/inspecciones/buque/:id/casco` → `CascoBuqueRuta` → `CascoBuquePage`, a container with
+    a live child for the selected inspection.
+  - **Components** in `ui/casco/`: `SelectorInspeccion` ("Cargar más"), `ListaZonasCasco` (with the
+    "sin ubicación" group), `PanelZona` (the three actions; "Editar" needs `subirFotos`),
+    `LeyendaZonas`, `SiluetaCasco` (SVG `role="img"`), and `EscenaCasco`, the scene slot that shows
+    the silhouette for now.
+  - **`estadosZona.ts`:** the label, classes and CSS variable per state.
+  - **`lienzoCasco.ts`:** `PropsLienzoCasco`, the contract for T7: `nombreBuque`, `dimensiones`,
+    `arquetipo`, `estados`, `fotosPorZona`, `cargando`, `seleccionada` and `onSeleccionar`.
+  - **New tokens** `--c-zona-sin-clasificar|sin-hallazgos|sin-analizar|sin-fotos`, light and dark,
+    each ≥ 3:1 against `bg-surface`, with `--color-zona-*` aliases.
+    - Under Tailwind v4 `@theme inline` the `--color-*` variables are not emitted, so the canvas must
+      read `--c-*`.
+  - **"Vista 3D" button** on `ListaInspeccionesPage`, passing `{buqueNombre, volverA}`.
+  - **AGENTS.md:** sections table row plus a "Hull 3D view" bullet.
+  - **Behaviour decisions** (writer):
+    - the default inspection is never written to the URL;
+    - `?zona` is kept across inspection switches;
+    - an inspection of another vessel is refused;
+    - the scene stays mounted across inspection switches, so T7 keeps its WebGL context.
+  - **Follow-ups:**
+    - the four severity labels are duplicated from `Insignias.tsx` (outside the surface); a test
+      guards them against drift;
+    - `useInspeccionEnVivo` still makes an extra `listarSecciones` request per inspection.
+  - RED (writer): 3 files failed (`./casco/EscenaCasco` and `./estadosZona` unresolved; no "Vista 3D"
+    link).
+  - GREEN, as reported by the writer:
+    - focused tests → 3 files, 50 tests;
+    - `pnpm test` → 32 files, 349 tests;
+    - `pnpm lint` → exit 0;
+    - `pnpm build` → OK. The entry chunk is 435.52 kB (it was 417.43): the page, the silhouette and the
+      hull domain are not lazy. That is acceptable; T7 only has to keep three.js out of it.
+  - Verification gate:
+    - `assess` → `medium`, `slice_budget_reached`; no review, since RDD is off;
+    - parent spot check of the focused tests → 50 tests passed;
+    - parent readback of `lienzoCasco.ts`.
+  - **Size exception, slice 4:** about 1,269 lines (forecast 450), of which 406 are the page test and
+    about 800 are 7 small presentational files plus the page. The slice is delivered as 2 work-unit
+    commits; recommend `size:exception`.
+
 ## Next step
-T6, the 3D page without WebGL, on `feat/casco-3d-04-vista`, branched from the tip of slice 3.
+T7, the WebGL canvas, on `feat/casco-3d-05-lienzo`, branched from the tip of slice 4.
