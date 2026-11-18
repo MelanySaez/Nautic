@@ -189,7 +189,7 @@ The starting values are tuned by eye during T4. Tests check invariants, not thes
 - [x] T1 — Docs: scope wording and the 20 → 23 section count. Route: inline (mechanical edits).
 - [x] T2 — Backend `descartada` in detections + tests + docs. Route: inline (one helper + one test).
 - [x] T3 — Frontend zone summary and states + DTO. Route: delegated direct (single writer).
-- [ ] T4 — Frontend hull geometry domain. Route: delegated direct (single writer; prototype port).
+- [x] T4 — Frontend hull geometry domain. Route: delegated direct (single writer; prototype port).
 - [ ] T5 — Frontend URL params `?buque` / `?zona`. Route: delegated direct (single writer; 4 pages).
 - [ ] T6 — Frontend 3D page without WebGL. Route: delegated direct (single writer).
 - [ ] T7 — Frontend WebGL canvas, transition and docs. Route: delegated direct (single writer).
@@ -233,10 +233,19 @@ main
 | Slice | Branch | Tasks |
 |---|---|---|
 | 1 | `feat/casco-3d-01-datos` | T1, T2, T3 |
-| 2 | `feat/casco-3d-02-geometria` | T4 (above budget: the prototype port plus its tests is one coherent unit) |
+| 2 | `feat/casco-3d-02-geometria` | T4. Actual size is about 1,730 lines (forecast 550). See the size exception below. |
 | 3 | `feat/casco-3d-03-navegacion` | T5 |
 | 4 | `feat/casco-3d-04-vista` | T6 |
 | 5 | `feat/casco-3d-05-lienzo` | T7 |
+
+**Size exception, slice 2.** T4 came out at about 1,730 lines (12 paths). The bulk is the mesh
+generator (`geometria.ts` 424 + `malla.ts` 201 + `forma.ts` 105) and its tests.
+- One slicing pass found no cohesive split under 400. The slice is therefore delivered as two
+  work-unit commits that can be reviewed one after the other:
+  1. archetype, measurements and zones;
+  2. mesh and profile.
+- Recommendation: accept `size:exception` for this PR, or promote the two commits into two PRs; the
+  second would still be about 1,100 lines.
 
 Each child branch starts from the previous slice's tip. Push, PRs (tracker included) and merge stay
 with the user. The user asked to run the tasks back to back without stopping between them.
@@ -286,8 +295,7 @@ None. The user approved the document with the "Sin analizar" state and the twin 
     and `test_taxonomia._comprobar`. The migration tests keep their historical JSON on purpose.
   - Check: `manage.py test vision --noinput` → 299 tests OK.
 
-- **T3 done.** Commit `feat(inspecciones): summarize each hull zone with the report rule`, whose hash
-  is recorded with T4. Route: delegated direct (single writer; 11 paths, 356 changed lines).
+- **T3 done.** Commit `9c9964c` `feat(inspecciones): summarize each hull zone with the report rule`. Route: delegated direct (single writer; 11 paths, 356 changed lines).
   - `Deteccion.descartada` is mapped in `aDetecciones`, the single mapper behind HTTP and SSE, and is
     false when the server omits it.
   - `reglas.ts` gains `masSevera`, on which `severidadMaxima` is now built, and `esHallazgo`
@@ -310,6 +318,54 @@ None. The user approved the document with the "Sin analizar" state and the twin 
       → 7 files, 67 tests passed;
     - parent readback of `resumenZonas.ts` matches the colour rule.
 
+- **Slice 1 complete** (`feat/casco-3d-01-datos`, tip `9c9964c`). Engram mirror synced.
+- **Slice 2:** branch `feat/casco-3d-02-geometria` created from `9c9964c`.
+- **T4 done.** Two commits:
+  - `feat(buques): model the warship hull archetype, measures and zones`;
+  - `feat(buques): generate the hull mesh and side profile per zone`.
+
+  Their hashes are recorded with T5. Route: delegated direct (single writer).
+  - **New modules** in `frontend/src/buques/domain/casco/` (pure; no React, three.js or DOM):
+    - `arquetipo.ts`: `Arquetipo` and `BUQUE_DE_GUERRA`;
+    - `dimensiones.ts`: `dimensionesCasco`, with the agreed fallback order. A value counts as missing
+      when it is null, NaN, Infinity or ≤ 0;
+    - `zonas.ts`: `CODIGOS_ZONA`, the band classification and `ubicarSecciones`, which matches exact
+      codes only;
+    - `forma.ts`: the shape functions ported from the prototype;
+    - `malla.ts`: the mesh builder;
+    - `geometria.ts`: `generarCasco(dim, arquetipo, opciones?)`, which returns 23 zone meshes, the
+      neutral deck and transom, the decorative superstructure and the box. Each `Malla` has positions,
+      smooth normals and indices, with counter-clockwise winding seen from outside;
+    - `perfil.ts`: `perfilLateral`, the SVG path of the side silhouette.
+  - **Coordinates:** x runs from the transom (0) to the stem head (L), y from the keel baseline up, and
+    z is port < 0, starboard > 0.
+  - **Default resolution:**
+    - 181 frames; the step count is rounded up to a multiple of 3, so the thirds fall on frames.
+    - 82 rows per side.
+    - 34,173 vertices and 60,351 triangles, generated in about 29 ms.
+    - Box for 120 m: x 0–120, y 0–26.02 (mast top), z ±7.8.
+  - **Starting values** were kept unchanged. The writer chose the values the brief left open:
+    - full beam over t 0.25–0.5, with a bow taper exponent of 1.6;
+    - aft bottom rise of 0.8 T by t 0.35, for propeller clearance;
+    - forefoot rise of 0.32 D from t 0.84;
+    - stem rake of 0.035 L, only for t > 0.8;
+    - bottom and bilge bands capped at 25% and 75% of the immersed depth, so the bilge never rises
+      above the waterline near the stern;
+    - the keel strip is 10% of the bottom band per side;
+    - superstructure: hangar and deckhouse, upper deckhouse, bridge with wings, funnel, mast, and a gun
+      mount;
+    - the writer checked the shape visually with throwaway PNG renders, then deleted them. The parent
+      confirmed that no stray files were left.
+  - **RED:** 4 test files failed to resolve `./zonas`, `./arquetipo` and the other new modules.
+  - **GREEN, as reported by the writer:**
+    - `pnpm vitest run src/buques/domain/casco` → 4 files, 44 tests;
+    - `pnpm test` → 29 files, 294 tests;
+    - `pnpm lint` → exit 0;
+    - `pnpm build` → OK.
+  - **Verification gate (RDD off):** `assess` → `medium`, `review_due: slice_budget_reached`. No review
+    was started, because RDD is off. The writer ran on the parent model. Parent spot check
+    `pnpm vitest run src/buques/domain/casco` → 4 files, 44 tests passed.
+
 ## Next step
-Slice 1 is complete (T1–T3). Next: T4, the hull geometry domain, on `feat/casco-3d-02-geometria`,
-branched from the tip of slice 1.
+T5, the URL params `?buque` and `?zona`, on `feat/casco-3d-03-navegacion`, branched from the tip of
+slice 2.
