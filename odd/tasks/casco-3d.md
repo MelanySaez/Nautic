@@ -447,8 +447,8 @@ None. The user approved the document with the "Sin analizar" state and the twin 
 
 - **Slice 4 complete** (tip `ed45a0d`). Slice 5: branch `feat/casco-3d-05-lienzo`.
 - **T7 done.** Two commits:
-  - `feat(inspecciones): add camera, colour and webgl helpers for the hull scene`;
-  - `feat(inspecciones): render the hull in 3d with a lazy webgl canvas`.
+  - `3fa728e` `feat(inspecciones): add camera, colour and webgl helpers for the hull scene`;
+  - `5031b12` `feat(inspecciones): render the hull in 3d with a lazy webgl canvas`.
 
   Route: delegated direct (single writer).
   - **Dependencies:** `three ^0.187.0`, `@react-three/fiber ^9.8.2`, `@react-three/drei ^10.7.9`, and
