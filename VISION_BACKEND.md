@@ -40,7 +40,7 @@ SSE endpoint → browser (EventSource)
 ## Modelos de datos (`vision/models.py`)
 
 ### `SeccionCasco`
-Zona física del casco de un buque. Cada buque declara las suyas al crearse (las 20 estándar de `SECCIONES_ESTANDAR` o una lista propia); no existe un catálogo global.
+Zona física del casco de un buque. Cada buque declara las suyas al crearse (las 23 estándar de `SECCIONES_ESTANDAR` o una lista propia); no existe un catálogo global.
 
 | Campo | Tipo | Descripción |
 |---|---|---|

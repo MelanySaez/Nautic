@@ -79,7 +79,7 @@ Django view (stream)  → SUBSCRIBE Redis → StreamingHttpResponse (SSE) → br
 ## 3. Modelos de base de datos
 
 ### `SeccionCasco`
-Zona física del casco de un buque. Cada buque declara las suyas al crearse con `POST /api/buques/`: `secciones` omitido o `"estandar"` crea las 20 de `SECCIONES_ESTANDAR`; una lista `[{nombre, codigo?, descripcion?}]` crea exactamente esas, en ese orden. No depende de ninguna inspección.
+Zona física del casco de un buque. Cada buque declara las suyas al crearse con `POST /api/buques/`: `secciones` omitido o `"estandar"` crea las 23 de `SECCIONES_ESTANDAR`; una lista `[{nombre, codigo?, descripcion?}]` crea exactamente esas, en ese orden. No depende de ninguna inspección.
 
 ```python
 class SeccionCasco(models.Model):

@@ -6,7 +6,7 @@ Guidance for agentic coding agents operating in this repository.
 
 ## Project Overview
 
-Nautic is a hull-inspection system for naval vessels. This repository is a **monorepo root**:
+Nautic is a hull-inspection system primarily for naval (warship) hulls, also applicable to other medium and large steel-hulled vessels. This repository is a **monorepo root**:
 
 - **`backend/`** — a Django project (DRF + Celery) with a single app, `vision`.
 - **`frontend/`** — React + TypeScript SPA (Vite, Tailwind v4, React Router).
@@ -224,7 +224,7 @@ pnpm add <pkg>     # add a dependency (pnpm add -D <pkg> for dev)
 ### Hull sections (`vision/secciones.py`)
 
 - Sections belong to a vessel: `SeccionCasco.buque` (FK, cascade) and `codigo` is unique **per vessel** (`UniqueConstraint(buque, codigo)`). There is no global catalog and no seed command.
-- `POST /api/buques/` takes an optional `secciones`: absent or `"estandar"` creates the 20 sections of `SECCIONES_ESTANDAR`; a non-empty list of `{nombre, codigo?, descripcion?}` creates exactly those, in order (`orden` = position; a blank `codigo` becomes `SEC-01`, `SEC-02`, ...). Invalid lists return 400 `{"error": "Datos inválidos.", "campos": {"secciones": [...]}}` and nothing is created (vessel and sections are saved in one transaction).
+- `POST /api/buques/` takes an optional `secciones`: absent or `"estandar"` creates the 23 sections of `SECCIONES_ESTANDAR`; a non-empty list of `{nombre, codigo?, descripcion?}` creates exactly those, in order (`orden` = position; a blank `codigo` becomes `SEC-01`, `SEC-02`, ...). Invalid lists return 400 `{"error": "Datos inválidos.", "campos": {"secciones": [...]}}` and nothing is created (vessel and sections are saved in one transaction).
 - The vessel sheet (`GET /api/buques/<id>/` and the 201 response) returns `secciones: [{id, codigo, nombre, descripcion, orden}]`. `GET /api/vision/secciones/?buque=<id>` lists them (`buque` required: 400 when missing or invalid, 404 when the vessel does not exist).
 - `POST /api/vision/inspecciones/<id>/fotos/` rejects (400) a `seccion_id` that belongs to another vessel than the inspection's.
 - Sections cannot be edited after creation: `PATCH /api/buques/<id>/` edits the technical sheet only (same validation as create, only the sent fields change, `null` clears a measure; nothing is saved on any error) and rejects `secciones` with 400.
