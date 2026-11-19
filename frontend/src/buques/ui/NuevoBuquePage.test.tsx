@@ -65,9 +65,11 @@ describe('NuevoBuquePage', () => {
     expect(selector).toHaveAccessibleDescription('La imagen no puede superar 5 MB.')
     expect(screen.queryByRole('img', { name: 'Vista previa de la imagen' })).not.toBeInTheDocument()
 
+    // The rejected file is not kept, so the vessel can still be created without an image.
     await rellenarRequeridos()
     await userEvent.click(screen.getByRole('button', { name: 'Crear buque' }))
-    expect(dependencias.buques.crear).not.toHaveBeenCalled()
+    expect(dependencias.buques.crear).toHaveBeenCalledWith({ nombre: 'ARC Caribe', tipo: 'Fragata' })
+    expect(dependencias.buques.subirImagen).not.toHaveBeenCalled()
   })
 
   it('keeps the created vessel and says so on its sheet when the image upload fails', async () => {

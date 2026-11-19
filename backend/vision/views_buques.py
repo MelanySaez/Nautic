@@ -29,8 +29,12 @@ _OFFSET_MAXIMO = 2_147_483_647
 # through the upload endpoint, so a client can never point it at another file.
 _CAMPOS_SOLO_LECTURA = {'id', 'created_at', 'updated_at', 'creado_por', 'imagen'}
 
-# Largest vessel image accepted, in bytes.
+# Largest vessel image accepted, in bytes (whole megabytes: messages name it in MB).
 TAMANO_MAXIMO_IMAGEN = 5 * 1024 * 1024
+
+
+def _mensaje_tamano_imagen():
+    return f'La imagen no puede superar {TAMANO_MAXIMO_IMAGEN // (1024 * 1024)} MB.'
 
 # Fields that must be present and non-blank.
 _CAMPOS_REQUERIDOS = ('nombre', 'tipo')
@@ -405,7 +409,8 @@ def api_buque_detalle(request, buque_id):
     summary='Subir la imagen del buque',
     description=(
         'Recibe un archivo `imagen` (multipart) y lo guarda como imagen del buque, reemplazando '
-        'la anterior. Debe ser una imagen real (jpg, png, bmp, webp, tiff) de hasta 5 MB. '
+        f'la anterior. Debe ser una imagen real (jpg, png, bmp, webp, tiff) de hasta '
+        f'{TAMANO_MAXIMO_IMAGEN // (1024 * 1024)} MB. '
         'Devuelve la ficha del buque con `imagen` como URL.'
     ),
     request={'multipart/form-data': {'type': 'object', 'properties': {'imagen': {'type': 'string', 'format': 'binary'}}}},
@@ -424,24 +429,33 @@ def api_buque_imagen(request, buque_id):
     POST   /api/buques/<id>/imagen/  → sube o reemplaza la imagen (multipart `imagen`)
     DELETE /api/buques/<id>/imagen/  → quita la imagen
     """
-    buque = get_object_or_404(Buque, pk=buque_id)
-    anterior = buque.imagen
+    get_object_or_404(Buque, pk=buque_id)
 
-    if request.method == 'DELETE':
-        buque.imagen = None
-        buque.save(update_fields=['imagen', 'updated_at'])
-    else:
+    nueva = None
+    if request.method == 'POST':
         archivo = request.FILES.get('imagen')
         if archivo is None:
             error = 'Selecciona una imagen.'
         elif archivo.size > TAMANO_MAXIMO_IMAGEN:
-            error = 'La imagen no puede superar 5 MB.'
+            error = _mensaje_tamano_imagen()
         else:
             error = validar_imagen(archivo)[1]
         if error:
             return Response({'error': 'Datos inválidos.', 'campos': {'imagen': [error]}}, status=400)
-        buque.imagen = guardar_imagen_buque(archivo)
-        buque.save(update_fields=['imagen', 'updated_at'])
+        nueva = guardar_imagen_buque(archivo)
+
+    try:
+        # The row lock makes concurrent uploads queue: each one sees, and later deletes,
+        # the file the previous one stored, so none is left orphaned.
+        with transaction.atomic():
+            buque = Buque.objects.select_for_update().get(pk=buque_id)
+            anterior = buque.imagen
+            buque.imagen = nueva
+            buque.save(update_fields=['imagen', 'updated_at'])
+    except Exception:
+        if nueva:
+            borrar_archivo(nueva)
+        raise
 
     # Only files this endpoint stored are deleted, never legacy free text.
     if es_imagen_buque(anterior) and anterior != buque.imagen:

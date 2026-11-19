@@ -8,7 +8,7 @@ import { MensajeError } from '../../shared/ui/Estados'
 import { Icon } from '../../shared/ui/Icon'
 import { mensajeDe } from '../../shared/ui/formato'
 import type { NuevoBuque } from '../domain/buque'
-import { detalleDeError, SIN_CAMBIOS_IMAGEN, type EleccionImagen } from './eleccionImagen'
+import { detalleDeError, useEleccionImagen } from './eleccionImagen'
 import { CamposBuque } from './CamposBuque'
 import {
   aNuevasSecciones,
@@ -56,12 +56,7 @@ export function NuevoBuquePage() {
   const [siguienteUid, setSiguienteUid] = useState(1)
   const [errorEnvio, setErrorEnvio] = useState<string | null>(null)
   const [enviando, setEnviando] = useState(false)
-  const [imagen, setImagen] = useState<EleccionImagen>(SIN_CAMBIOS_IMAGEN)
-
-  function cambiarImagen(eleccion: EleccionImagen, error: string | null) {
-    setImagen(eleccion)
-    setErrores(({ imagen: _anterior, ...resto }) => (error ? { ...resto, imagen: error } : resto))
-  }
+  const [imagen, cambiarImagen] = useEleccionImagen(setErrores)
 
   function cambiar(clave: string, valor: string) {
     setValores((actual) => ({ ...actual, [clave]: valor }))
@@ -107,8 +102,6 @@ export function NuevoBuquePage() {
   async function enviar(evento: FormEvent) {
     evento.preventDefault()
     const invalidos = { ...validar(valores), ...validarSecciones(modoSecciones, filas, REQUERIDO) }
-    // A rejected file stays rejected until another one is picked.
-    if (errores.imagen) invalidos.imagen = errores.imagen
     setErrores(invalidos)
     if (Object.keys(invalidos).length > 0) return
     setErrorEnvio(null)

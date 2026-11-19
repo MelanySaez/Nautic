@@ -158,6 +158,12 @@ describe('EditarBuquePage', () => {
     expect(selector).toHaveAttribute('aria-invalid', 'true')
     expect(router.state.location.pathname).toBe('/buques/7/editar')
     expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeEnabled()
+
+    // The same file can be sent again once the problem is gone.
+    dependencias.buques.subirImagen.mockResolvedValue(unDetalleBuque({ id: 7 }))
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+    expect(dependencias.buques.subirImagen).toHaveBeenCalledTimes(2)
+    expect(router.state.location.pathname).toBe('/buques/7')
   })
 
   it('cancels back to the sheet', async () => {

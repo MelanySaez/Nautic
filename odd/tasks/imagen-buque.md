@@ -42,3 +42,12 @@ Risk: item 2 (file upload and URL exposure) and item 3 (`imagen` stops being wri
     - RED first: 2 repository tests and 11 page tests failed.
     - All 52 `buques` tests pass, plus the shared tests.
     - tsc, lint and build are clean.
+- L4 (2026-11-18): the native review (risk, readability, reliability) of `main..c7e4179` was approved and acknowledged. The risk lens found nothing.
+  - **Fixed:**
+    - A client-rejected file blocked creating without an image, and blocked retrying in edit after a server failure (R3-001, R3-002). Now `useEleccionImagen` is shared and the error is not carried into submit.
+    - The preview broke under StrictMode (R3-004). Now an effect owns the URL.
+    - Concurrent or failed uploads orphaned files (R3-003). Now `select_for_update` is used, and the new file is deleted on failure.
+    - The size messages are derived from the limit.
+    - The misleading retry comment is fixed.
+    - The misplaced AGENTS note is fixed.
+  - **Evidence:** RED first (backend 2, frontend 3). Now `test_imagen_buque` and `test_buques_api` pass, 54 `buques` tests pass, and tsc, lint and build are clean.

@@ -1,17 +1,26 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useState } from 'react'
 import { Boton } from '../../shared/ui/Boton'
 import { Campo } from '../../shared/ui/Campo'
 import { CLASES_CONTROL } from '../../shared/ui/clasesControl'
 import { Icon } from '../../shared/ui/Icon'
-import { errorDeImagen, type EleccionImagen } from './eleccionImagen'
+import { errorDeImagen, MAXIMO_MB_IMAGEN, type EleccionImagen } from './eleccionImagen'
 
-/** Preview URL of a picked file, released when the file changes or the field unmounts. */
+/**
+ * Preview URL of a picked file. It is created and released by the same effect, so StrictMode's
+ * extra mount/unmount cycle never leaves the preview pointing at a released URL.
+ */
 function useUrlDeArchivo(archivo: File | null): string | null {
-  const url = useMemo(() => (archivo ? URL.createObjectURL(archivo) : null), [archivo])
-  useEffect(() => () => {
-    if (url) URL.revokeObjectURL(url)
-  }, [url])
-  return url
+  const [vista, setVista] = useState<{ archivo: File; url: string } | null>(null)
+  useEffect(() => {
+    if (!archivo) return
+    const url = URL.createObjectURL(archivo)
+    // The object URL is an external resource this effect owns: create, publish, release.
+    // oxlint-disable-next-line react/set-state-in-effect
+    setVista({ archivo, url })
+    return () => URL.revokeObjectURL(url)
+  }, [archivo])
+  // Ignore a URL left from a previous file until the effect catches up.
+  return archivo && vista?.archivo === archivo ? vista.url : null
 }
 
 /**
@@ -35,7 +44,7 @@ export function CampoImagen({
 
   return (
     <div className="flex flex-col gap-3">
-      <Campo etiqueta="Imagen" error={error} ayuda="JPG, PNG o WEBP, hasta 5 MB.">
+      <Campo etiqueta="Imagen" error={error} ayuda={`JPG, PNG o WEBP, hasta ${MAXIMO_MB_IMAGEN} MB.`}>
         <input
           type="file"
           accept="image/*"

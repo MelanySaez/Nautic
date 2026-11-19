@@ -194,11 +194,15 @@ pnpm add <pkg>     # add a dependency (pnpm add -D <pkg> for dev)
 - **Boxes and masks**: `Foto.detalleDisponible` says the server kept the instances of the last analysis; `InspeccionesRepository.obtenerDetecciones(fotoId)` loads them (`domain/detecciones.ts`: `DetallePorInstancia`, `decodificarRle` for the column-major COCO RLE). On `/vision/:id/resultados` the "Mostrar contornos" switch shows the original image with `CapaDetecciones` (a canvas in the image's pixel space: translucent masks plus boxes in the taxonomy color) and a per-class filter ("Clases visibles"); the annotated switch is disabled meanwhile.
 - **Hull sections**: the create form (`NuevoBuquePage` + `SeccionesCascoForm`) offers standard or custom sections; standard mode omits `secciones` from the POST (the backend default), custom sends `{nombre, codigo?, descripcion?}[]` in row order. `BuqueDetalle.secciones` feeds the vessel sheet, and `InspeccionesRepository.listarSecciones(buqueId)` requests `?buque=<id>` (the upload page uses the inspection's vessel).
 - **Vessels**: `HttpBuquesRepository` (`buques/infrastructure/`) implements `BuquesRepository` (`listar` walks every page of `GET /api/buques/`, `listarConInspecciones` walks `?con_inspecciones=1`, `obtener`, `crear`, `actualizar` → `PATCH`) and is wired in `composicion.ts`; DTO mapping lives in `buques/infrastructure/dtos.ts`. Field-level 400 errors arrive in `ApiError.campos` (snake_case keys). Screens live in `buques/ui/`: list with client-side search (`/buques`), create form (`/buques/nuevo`, server `campos` errors shown per field) technical sheet (`/buques/:id`, with an "Editar buque" button) and edit form (`/buques/:id/editar`, `EditarBuquePage`: prefilled, sends only the changed fields, sections read-only). Create and edit share `CamposBuque` + `formularioBuque.ts`.
-  - **Image field:** `CampoImagen` is a file picker (`type=file`, `accept="image/*"`) with a preview and "Quitar imagen". Its state is an `EleccionImagen {archivo, quitar}` (`eleccionImagen.ts`), and the client checks the image type and the 5 MB limit.
+  - **Image field:** `CampoImagen` is a file picker (`type=file`, `accept="image/*"`) with a preview and "Quitar imagen".
+    - State: `useEleccionImagen` (`eleccionImagen.ts`) gives both pages their `EleccionImagen {archivo, quitar}`, and keeps its error in the form `errores`.
+    - A file rejected by the client check (image type, `MAXIMO_MB_IMAGEN`) is never kept, so it never blocks submitting.
+    - The preview URL is created and released in the same effect, which keeps it working under StrictMode.
   - **Create:** the vessel is created first, then `subirImagen(id, file)` runs. If the upload fails the vessel is kept, and the sheet opens with `state.aviso`, shown as an alert.
   - **Edit:** the PATCH runs first, then `subirImagen` or `quitarImagen`. An image error is shown under the field.
   - **Sheet:** `Buque.imagen` is the image URL (read-only, never sent in `crear`/`actualizar`); the sheet shows it instead of the ship icon.
-  - **Repository:** `HttpBuquesRepository.subirImagen` posts `FormData` to `/api/buques/<id>/imagen/`, and `quitarImagen` sends `DELETE`. The main nav has a "Buques" link. There is no delete.
+  - **Repository:** `HttpBuquesRepository.subirImagen` posts `FormData` to `/api/buques/<id>/imagen/`, and `quitarImagen` sends `DELETE` (it removes only the image).
+  - The main nav has a "Buques" link. Vessels cannot be deleted.
 
 ---
 
@@ -226,8 +230,9 @@ pnpm add <pkg>     # add a dependency (pnpm add -D <pkg> for dev)
 
 - `GET /api/buques/` returns `{total, offset, limit, resultados}` ordered by `nombre, id`; each result adds `total_inspecciones` (the vessel's inspection count).
 - **Vessel image** (`api_buque_imagen`): `POST /api/buques/<id>/imagen/` (multipart `imagen`) stores or replaces it, and `DELETE` removes it. Both answer with the sheet.
-  - **Validation:** `vision/imagenes.validar_imagen`, shared with photo uploads (extension, content type, PIL), plus at most 5 MB (`TAMANO_MAXIMO_IMAGEN`). Errors return 400 `campos.imagen`.
+  - **Validation:** `vision/imagenes.validar_imagen`, shared with photo uploads (extension, content type, PIL), plus at most 5 MB (`TAMANO_MAXIMO_IMAGEN`, whole MB; messages derive from it). Errors return 400 `campos.imagen`.
   - **Storage:** `guardar_imagen_buque` stores the file under `buques/imagenes/`. A replaced or removed file is deleted.
+  - **Concurrency:** the row is updated under `select_for_update`, so concurrent uploads queue and each one deletes the file before it. If the save fails, the new file is deleted.
   - **Read-only in JSON:** `imagen` is in `_CAMPOS_SOLO_LECTURA`, so a POST/PATCH that sends it gets a 400. This stops a client from pointing it at another file's key.
   - **Responses:** list, sheet and upload expose `imagen` as `url_archivo(key)` only for keys under `buques/imagenes/` (`es_imagen_buque`). Legacy free text is `null`.
 - `?con_inspecciones=1` keeps only vessels with at least one inspection (accepts `true`/`false`/`1`/`0`; anything else is a 400). Absent means every vessel.

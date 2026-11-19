@@ -10,7 +10,7 @@ import { Cargando, MensajeError } from '../../shared/ui/Estados'
 import { Icon } from '../../shared/ui/Icon'
 import { mensajeDe } from '../../shared/ui/formato'
 import type { BuqueDetalle, CambiosBuque } from '../domain/buque'
-import { detalleDeError, SIN_CAMBIOS_IMAGEN, type EleccionImagen } from './eleccionImagen'
+import { detalleDeError, useEleccionImagen } from './eleccionImagen'
 import { CamposBuque } from './CamposBuque'
 import {
   CAMPOS_TECNICOS,
@@ -93,12 +93,7 @@ function FormularioEdicion({ buque }: { buque: BuqueDetalle }) {
   const [errores, setErrores] = useState<Errores>({})
   const [errorEnvio, setErrorEnvio] = useState<string | null>(null)
   const [enviando, setEnviando] = useState(false)
-  const [imagen, setImagen] = useState<EleccionImagen>(SIN_CAMBIOS_IMAGEN)
-
-  function cambiarImagen(eleccion: EleccionImagen, error: string | null) {
-    setImagen(eleccion)
-    setErrores(({ imagen: _anterior, ...resto }) => (error ? { ...resto, imagen: error } : resto))
-  }
+  const [imagen, cambiarImagen] = useEleccionImagen(setErrores)
 
   function cambiar(clave: string, valor: string) {
     setValores((actual) => ({ ...actual, [clave]: valor }))
@@ -108,8 +103,6 @@ function FormularioEdicion({ buque }: { buque: BuqueDetalle }) {
   async function enviar(evento: FormEvent) {
     evento.preventDefault()
     const invalidos = validar(valores, { etapaRequerida: true })
-    // A rejected file stays rejected until another one is picked.
-    if (errores.imagen) invalidos.imagen = errores.imagen
     setErrores(invalidos)
     if (Object.keys(invalidos).length > 0) return
     const cambios = aCambios(iniciales, valores)
@@ -130,7 +123,7 @@ function FormularioEdicion({ buque }: { buque: BuqueDetalle }) {
       if (imagen.archivo) await buques.subirImagen(buque.id, imagen.archivo)
       else if (imagen.quitar) await buques.quitarImagen(buque.id)
     } catch (error) {
-      // The sheet is already saved: only the image is left to retry.
+      // Only the image failed. A retry sends the PATCH again (idempotent) and then the image.
       setErrores({ imagen: detalleDeError(error) })
       setEnviando(false)
       return

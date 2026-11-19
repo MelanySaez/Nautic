@@ -13,6 +13,11 @@ def _url(buque_id):
     return f'/api/buques/{buque_id}/imagen/'
 
 
+def _archivos_de_imagenes():
+    carpeta = 'buques/imagenes'
+    return set(default_storage.listdir(carpeta)[1]) if default_storage.exists(carpeta) else set()
+
+
 def _png(nombre='casco.png'):
     return SimpleUploadedFile(nombre, png_bytes(), content_type='image/png')
 
@@ -70,13 +75,25 @@ class ImagenBuqueTests(TestCase):
         self.assertIn('imagen', res.json()['campos'])
 
     def test_rechaza_una_imagen_demasiado_grande(self):
-        with mock.patch('vision.views_buques.TAMANO_MAXIMO_IMAGEN', 10):
-            res = self._subir(_png())
+        grande = SimpleUploadedFile('grande.png', b'x' * (1024 * 1024 + 1), content_type='image/png')
+        with mock.patch('vision.views_buques.TAMANO_MAXIMO_IMAGEN', 1024 * 1024):
+            res = self._subir(grande)
 
         self.assertEqual(res.status_code, 400)
-        self.assertEqual(res.json()['campos']['imagen'], ['La imagen no puede superar 5 MB.'])
+        # The message follows the limit, whatever it is.
+        self.assertEqual(res.json()['campos']['imagen'], ['La imagen no puede superar 1 MB.'])
         self.buque.refresh_from_db()
         self.assertIsNone(self.buque.imagen)
+
+    def test_si_no_se_puede_guardar_el_buque_borra_el_archivo_nuevo(self):
+        # The in-memory storage lives as long as the class: compare against what was there.
+        antes = _archivos_de_imagenes()
+        self.client.raise_request_exception = False
+        with mock.patch.object(Buque, 'save', side_effect=RuntimeError('db caída')):
+            res = self._subir(_png())
+
+        self.assertEqual(res.status_code, 500)
+        self.assertEqual(_archivos_de_imagenes(), antes)
 
     def test_falta_el_archivo(self):
         res = self.client.post(_url(self.buque.id), {}, format='multipart')
