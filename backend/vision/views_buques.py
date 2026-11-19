@@ -5,9 +5,12 @@ from django.db import models, transaction
 from django.shortcuts import get_object_or_404
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, parser_classes
+from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
 
+from .almacenamiento import borrar_archivo, es_imagen_buque, guardar_imagen_buque, url_archivo
+from .imagenes import validar_imagen
 from .models import Buque
 from cuentas.models import referencia_publica
 
@@ -22,8 +25,16 @@ _LIMIT_MAXIMO = 200
 # Upper bound for offset: keeps int() parsing cheap and the SQL OFFSET in range.
 _OFFSET_MAXIMO = 2_147_483_647
 
-# Fields the client may never send.
-_CAMPOS_SOLO_LECTURA = {'id', 'created_at', 'updated_at', 'creado_por'}
+# Fields the client may never send. `imagen` is a storage key: it only changes
+# through the upload endpoint, so a client can never point it at another file.
+_CAMPOS_SOLO_LECTURA = {'id', 'created_at', 'updated_at', 'creado_por', 'imagen'}
+
+# Largest vessel image accepted, in bytes (whole megabytes: messages name it in MB).
+TAMANO_MAXIMO_IMAGEN = 5 * 1024 * 1024
+
+
+def _mensaje_tamano_imagen():
+    return f'La imagen no puede superar {TAMANO_MAXIMO_IMAGEN // (1024 * 1024)} MB.'
 
 # Fields that must be present and non-blank.
 _CAMPOS_REQUERIDOS = ('nombre', 'tipo')
@@ -46,15 +57,21 @@ _MSG_JSON = {
 _MODELO_CAMPOS = {f.name: f for f in Buque._meta.concrete_fields}
 _CAMPOS_ESCRITURA = [n for n in _MODELO_CAMPOS if n not in _CAMPOS_SOLO_LECTURA]
 
-_CAMPOS_RESUMEN = ('id', 'nombre', 'tipo', 'etapa', 'imagen')
+_CAMPOS_RESUMEN = ('id', 'nombre', 'tipo', 'etapa')
 
 
 def _iso(valor):
     return valor.isoformat() if valor else None
 
 
+def _url_imagen(buque):
+    """URL of the vessel image; legacy free text from before uploads is never served."""
+    return url_archivo(buque.imagen) if es_imagen_buque(buque.imagen) else None
+
+
 def _buque_resumen(buque):
     data = {campo: getattr(buque, campo) for campo in _CAMPOS_RESUMEN}
+    data['imagen'] = _url_imagen(buque)
     data['created_at'] = _iso(buque.created_at)
     data['updated_at'] = _iso(buque.updated_at)
     return data
@@ -64,6 +81,7 @@ def _buque_to_dict(buque):
     data = {'id': buque.id}
     for campo in _CAMPOS_ESCRITURA:
         data[campo] = getattr(buque, campo)
+    data['imagen'] = _url_imagen(buque)
     data['secciones'] = [seccion_to_dict(s) for s in buque.secciones.all()]
     data['creado_por'] = referencia_publica(buque.creado_por)
     data['created_at'] = _iso(buque.created_at)
@@ -236,7 +254,6 @@ def _validar_secciones_buque(data):
                 'tipo': {'type': 'string'},
                 'descripcion': {'type': 'string'},
                 'etapa': {'type': 'string'},
-                'imagen': {'type': 'string', 'nullable': True},
                 'autonomia_horas': {'type': 'integer', 'minimum': 0, 'nullable': True},
                 'vida_diseno_anios': {'type': 'integer', 'minimum': 0, 'nullable': True},
                 'horas_navegacion_anio': {'type': 'integer', 'minimum': 0, 'nullable': True},
@@ -383,4 +400,65 @@ def api_buque_detalle(request, buque_id):
         return Response({'error': 'Datos inválidos.', 'campos': errores}, status=400)
 
     buque.save()
+    return Response(_buque_to_dict(buque))
+
+
+@extend_schema(
+    methods=['POST'],
+    tags=['Buques'],
+    summary='Subir la imagen del buque',
+    description=(
+        'Recibe un archivo `imagen` (multipart) y lo guarda como imagen del buque, reemplazando '
+        f'la anterior. Debe ser una imagen real (jpg, png, bmp, webp, tiff) de hasta '
+        f'{TAMANO_MAXIMO_IMAGEN // (1024 * 1024)} MB. '
+        'Devuelve la ficha del buque con `imagen` como URL.'
+    ),
+    request={'multipart/form-data': {'type': 'object', 'properties': {'imagen': {'type': 'string', 'format': 'binary'}}}},
+    responses={200: OpenApiTypes.OBJECT, 400: OpenApiTypes.OBJECT, 404: OpenApiTypes.OBJECT},
+)
+@extend_schema(
+    methods=['DELETE'],
+    tags=['Buques'],
+    summary='Quitar la imagen del buque',
+    responses={200: OpenApiTypes.OBJECT, 404: OpenApiTypes.OBJECT},
+)
+@api_view(['POST', 'DELETE'])
+@parser_classes([MultiPartParser])
+def api_buque_imagen(request, buque_id):
+    """
+    POST   /api/buques/<id>/imagen/  → sube o reemplaza la imagen (multipart `imagen`)
+    DELETE /api/buques/<id>/imagen/  → quita la imagen
+    """
+    get_object_or_404(Buque, pk=buque_id)
+
+    nueva = None
+    if request.method == 'POST':
+        archivo = request.FILES.get('imagen')
+        if archivo is None:
+            error = 'Selecciona una imagen.'
+        elif archivo.size > TAMANO_MAXIMO_IMAGEN:
+            error = _mensaje_tamano_imagen()
+        else:
+            error = validar_imagen(archivo)[1]
+        if error:
+            return Response({'error': 'Datos inválidos.', 'campos': {'imagen': [error]}}, status=400)
+        nueva = guardar_imagen_buque(archivo)
+
+    try:
+        # The row lock makes concurrent uploads queue: each one sees, and later deletes,
+        # the file the previous one stored, so none is left orphaned.
+        with transaction.atomic():
+            # Still a 404 if the row vanished after the first read (the new file is cleaned up below).
+            buque = get_object_or_404(Buque.objects.select_for_update(), pk=buque_id)
+            anterior = buque.imagen
+            buque.imagen = nueva
+            buque.save(update_fields=['imagen', 'updated_at'])
+    except Exception:
+        if nueva:
+            borrar_archivo(nueva)
+        raise
+
+    # Only files this endpoint stored are deleted, never legacy free text.
+    if es_imagen_buque(anterior) and anterior != buque.imagen:
+        borrar_archivo(anterior)
     return Response(_buque_to_dict(buque))

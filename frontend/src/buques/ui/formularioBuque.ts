@@ -5,8 +5,8 @@ export const REQUERIDO = 'Este campo es requerido.'
 
 export const CAMPOS_TECNICOS = GRUPOS_TECNICOS.flatMap((g) => g.campos)
 
-/** Text fields of the "Datos generales" block. */
-export const CAMPOS_GENERALES = ['nombre', 'tipo', 'etapa', 'descripcion', 'imagen'] as const
+/** Text fields of the "Datos generales" block (the image is a file, kept apart). */
+export const CAMPOS_GENERALES = ['nombre', 'tipo', 'etapa', 'descripcion'] as const
 
 /** Raw input text keyed by form key (general fields plus the camelCase measure keys). */
 export type Valores = Record<string, string>
@@ -18,14 +18,13 @@ export const VALORES_VACIOS: Valores = Object.fromEntries([
   ...CAMPOS_TECNICOS.map((c) => [c.clave, '']),
 ])
 
-/** Form values for an existing sheet: unset measures and image become empty inputs. */
+/** Form values for an existing sheet: unset measures become empty inputs. */
 export function valoresDesde(buque: BuqueDetalle): Valores {
   return {
     nombre: buque.nombre,
     tipo: buque.tipo,
     etapa: buque.etapa,
     descripcion: buque.descripcion,
-    imagen: buque.imagen ?? '',
     ...Object.fromEntries(CAMPOS_TECNICOS.map((c) => [c.clave, buque[c.clave] === null ? '' : String(buque[c.clave])])),
   }
 }

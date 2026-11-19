@@ -268,6 +268,8 @@ export function crearDependenciasFalsas() {
       obtener: vi.fn(async (_id: number) => unDetalleBuque()),
       crear: vi.fn(async (_datos: NuevoBuque) => unDetalleBuque()),
       actualizar: vi.fn(async (_id: number, _cambios: CambiosBuque) => unDetalleBuque()),
+      subirImagen: vi.fn(async (_id: number, _archivo: File) => unDetalleBuque()),
+      quitarImagen: vi.fn(async (_id: number) => unDetalleBuque({ imagen: null })),
     },
   } satisfies Dependencias
   return {

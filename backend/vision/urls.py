@@ -48,4 +48,5 @@ urlpatterns = [
 
     # Ficha técnica de un buque
     path('api/buques/<int:buque_id>/', views_buques.api_buque_detalle, name='api_buque_detalle'),
+    path('api/buques/<int:buque_id>/imagen/', views_buques.api_buque_imagen, name='api_buque_imagen'),
 ]
