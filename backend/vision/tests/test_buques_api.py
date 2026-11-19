@@ -25,7 +25,6 @@ class CrearBuqueTests(TestCase):
             'tipo': 'Fragata',
             'descripcion': 'Buque de prueba',
             'etapa': 'En construcción',
-            'imagen': 'caribe.png',
             'autonomia_horas': 120,
             'eslora_total_m': 110.5,
             'desplazamiento_ton': 1900,
@@ -65,7 +64,7 @@ class CrearBuqueTests(TestCase):
         self.assertEqual(body['descripcion'], '')
 
     def test_acepta_nulos_en_campos_opcionales(self):
-        res = self._post({'nombre': 'A', 'tipo': 'B', 'imagen': None, 'puntal_m': None})
+        res = self._post({'nombre': 'A', 'tipo': 'B', 'puntal_m': None})
 
         self.assertEqual(res.status_code, 201)
 
@@ -212,7 +211,8 @@ class ListarBuquesTests(TestCase):
             set(body['resultados'][0]),
             {'id', 'nombre', 'tipo', 'etapa', 'imagen', 'created_at', 'updated_at', 'total_inspecciones'},
         )
-        self.assertEqual(body['resultados'][0]['imagen'], 'a.png')
+        # A legacy free-text value is not a stored image: it is never served.
+        self.assertIsNone(body['resultados'][0]['imagen'])
 
     def test_nombres_iguales_se_ordenan_por_id(self):
         a = Buque.objects.create(nombre='Igual', tipo='T')

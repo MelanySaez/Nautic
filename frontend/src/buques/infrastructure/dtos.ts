@@ -101,7 +101,6 @@ export function aBuqueDetalle(dto: BuqueDetalleDto): BuqueDetalle {
 const CAMPOS_OPCIONALES = {
   descripcion: 'descripcion',
   etapa: 'etapa',
-  imagen: 'imagen',
   autonomiaHoras: 'autonomia_horas',
   vidaDisenoAnios: 'vida_diseno_anios',
   horasNavegacionAnio: 'horas_navegacion_anio',
@@ -138,7 +137,7 @@ function aNuevaSeccionDto({ nombre, codigo, descripcion }: NuevaSeccion): Record
 /**
  * Builds the POST body. Undefined optionals are omitted so the backend applies its defaults;
  * blank strings are omitted too (the API rejects a blank `etapa`). `null` is kept: it is a
- * valid explicit value for the nullable measures and for `imagen`.
+ * valid explicit value for the nullable measures.
  */
 export function aNuevoBuqueDto(datos: NuevoBuque): Record<string, unknown> {
   const dto: Record<string, unknown> = { nombre: datos.nombre, tipo: datos.tipo }
