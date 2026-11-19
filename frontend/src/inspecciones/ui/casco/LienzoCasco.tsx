@@ -16,12 +16,11 @@ import {
   type PointerEvent as EventoPunteroReact,
   type Ref,
 } from 'react'
-import { Color, DoubleSide, type BufferGeometry, type MeshStandardMaterial, type Vector3 } from 'three'
+import { BufferAttribute, BufferGeometry, Color, DoubleSide, type MeshStandardMaterial, type Vector3 } from 'three'
 import { generarCasco, type CascoGenerado } from '../../../buques/domain/casco/geometria'
 import type { Malla, Vec3 } from '../../../buques/domain/casco/malla'
 import type { CodigoZona } from '../../../buques/domain/casco/zonas'
 import { mezclarColores, useColoresTema, variableDeZona } from './coloresZona'
-import { geometriaDe } from './geometriaThree'
 import { PRESENTACION_ESTADO_ZONA } from './estadosZona'
 import type { PropsLienzoCasco } from './lienzoCasco'
 import {
@@ -72,6 +71,15 @@ interface PiezasEscena {
   zonas: ZonaEscena[]
   /** Deck, transom and superstructure: drawn neutral, never selected. */
   inertes: BufferGeometry[]
+}
+
+function geometriaDe(malla: Malla): BufferGeometry {
+  const geometria = new BufferGeometry()
+  geometria.setAttribute('position', new BufferAttribute(malla.posiciones, 3))
+  geometria.setAttribute('normal', new BufferAttribute(malla.normales, 3))
+  geometria.setIndex(new BufferAttribute(malla.indices, 1))
+  geometria.computeBoundingSphere()
+  return geometria
 }
 
 function piezasDeEscena(casco: CascoGenerado, eslora: number): PiezasEscena {

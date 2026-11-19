@@ -43,3 +43,9 @@ Branch: `feat/tipos-buque` (stacked on `feat/casco-3d-integrado`, which holds th
   - RED first (1 failing). Now 48 tests pass, lint is clean, and the build passes with three.js out of the entry chunk.
   - Docs are in AGENTS.md.
   - Pending: the visual check in a WebGL browser (thumbnails, rotation, hull per type).
+- L6 (2026-11-18): the user said: "no me gusta la idea de colocar los cuadros con el renderizado, mas bien coloca unicamente la lista de los tipos para seleccionar y reservamos el renderizado en si para la zona de inspecciones como ya se venia tratando"
+  - S2 and S3 are dropped: there are no thumbnails and no rotation.
+  - S1 is now a `<select>` "Tipo" with the catalogue. A legacy type shows as "<tipo> (fuera del catálogo)".
+  - Removed: `buques/ui/tipo/` (the grid and thumbnails) and `geometriaThree.ts`, which moved back into `LienzoCasco`. The `LimiteDelLienzo` export is reverted.
+  - The catalogue and the per-type archetypes stay for the inspections 3D view (S4).
+  - Evidence: RED first (12 failing). Now 163 tests pass, lint is clean, and the build passes with no three.js in the entry chunk.

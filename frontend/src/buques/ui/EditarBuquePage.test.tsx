@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { ApiError } from '../../shared/http/apiClient'
@@ -42,7 +42,7 @@ describe('EditarBuquePage', () => {
 
     expect(await screen.findByLabelText('Nombre')).toHaveValue('ARC Caribe')
     expect(dependencias.buques.obtener).toHaveBeenCalledWith(7)
-    expect(screen.getByRole('radio', { name: 'Fragata' })).toBeChecked()
+    expect(screen.getByLabelText('Tipo')).toHaveValue('Fragata')
     expect(screen.getByLabelText('Descripción')).toHaveValue('Buque de prueba')
     expect(screen.getByLabelText('Imagen')).toHaveValue('caribe.png')
     expect(screen.getByLabelText('Eslora total (m)')).toHaveValue(110.5)
@@ -111,7 +111,7 @@ describe('EditarBuquePage', () => {
     dependencias.buques.actualizar.mockReturnValue(new Promise<BuqueDetalle>(() => {}))
     renderizar('/buques/7/editar', dependencias)
 
-    await userEvent.click(await screen.findByRole('radio', { name: 'Corbeta' }))
+    await userEvent.selectOptions(await screen.findByLabelText('Tipo'), 'Corbeta')
     await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
 
     expect(screen.getByRole('button', { name: 'Guardando…' })).toBeDisabled()
@@ -122,8 +122,9 @@ describe('EditarBuquePage', () => {
     dependencias.buques.obtener.mockResolvedValue(unDetalleBuque({ ...BUQUE, tipo: 'Remolcador' }))
     renderizar('/buques/7/editar', dependencias)
 
-    expect(await screen.findByText('Tipo actual: Remolcador. Elige uno de la lista para cambiarlo.')).toBeInTheDocument()
-    expect(screen.getAllByRole('radio').filter((radio) => (radio as HTMLInputElement).checked)).toEqual([])
+    const tipo = await screen.findByLabelText('Tipo')
+    expect(tipo).toHaveValue('Remolcador')
+    expect(within(tipo).getByRole('option', { selected: true })).toHaveTextContent('Remolcador (fuera del catálogo)')
     await userEvent.type(screen.getByLabelText('Puntal (m)'), '1')
     await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
 
@@ -133,7 +134,7 @@ describe('EditarBuquePage', () => {
   it('sends the name of the chosen type', async () => {
     const { dependencias } = renderizar()
 
-    await userEvent.click(await screen.findByRole('radio', { name: 'Patrullera' }))
+    await userEvent.selectOptions(await screen.findByLabelText('Tipo'), 'Patrullera')
     await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
 
     expect(dependencias.buques.actualizar).toHaveBeenCalledWith(7, { tipo: 'Patrullera' })

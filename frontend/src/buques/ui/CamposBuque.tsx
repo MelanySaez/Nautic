@@ -3,7 +3,7 @@ import { CLASES_CONTROL } from '../../shared/ui/clasesControl'
 import { Tarjeta } from '../../shared/ui/Tarjeta'
 import { GRUPOS_TECNICOS } from '../domain/fichaTecnica'
 import { GrupoNumerico } from './GrupoNumerico'
-import { SelectorTipoBuque } from './tipo/SelectorTipoBuque'
+import { TIPOS_BUQUE, tipoBuqueDe } from '../domain/tiposBuque'
 import type { Errores, Valores } from './formularioBuque'
 
 const ETAPAS_SUGERIDAS = ['Activo', 'En construcción']
@@ -32,7 +32,26 @@ export function CamposBuque({
               className={CLASES_CONTROL}
             />
           </Campo>
-          <SelectorTipoBuque valor={valores.tipo} error={errores.tipo} alCambiar={(nombre) => alCambiar('tipo', nombre)} />
+          <Campo etiqueta="Tipo" error={errores.tipo}>
+            <select
+              value={tipoBuqueDe(valores.tipo)?.nombre ?? valores.tipo}
+              onChange={(e) => alCambiar('tipo', e.target.value)}
+              className={CLASES_CONTROL}
+            >
+              <option value="" disabled>
+                Selecciona un tipo
+              </option>
+              {/* A type stored before the catalogue stays selectable until another one is chosen. */}
+              {valores.tipo.trim() !== '' && !tipoBuqueDe(valores.tipo) && (
+                <option value={valores.tipo}>{valores.tipo} (fuera del catálogo)</option>
+              )}
+              {TIPOS_BUQUE.map((tipo) => (
+                <option key={tipo.id} value={tipo.nombre}>
+                  {tipo.nombre}
+                </option>
+              ))}
+            </select>
+          </Campo>
           <Campo etiqueta="Etapa" error={errores.etapa} ayuda={ayudaEtapa}>
             <input
               value={valores.etapa}

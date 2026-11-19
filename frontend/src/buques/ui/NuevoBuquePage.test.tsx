@@ -21,15 +21,16 @@ function renderizar(dependencias = crearDependenciasFalsas().dependencias) {
 
 async function rellenarRequeridos() {
   await userEvent.type(screen.getByLabelText('Nombre'), '  ARC Caribe ')
-  await userEvent.click(screen.getByRole('radio', { name: 'Fragata' }))
+  await userEvent.selectOptions(screen.getByLabelText('Tipo'), 'Fragata')
 }
 
 describe('NuevoBuquePage', () => {
-  it('offers the vessel types as a grid of cards, each with its hull thumbnail and name', () => {
+  it('offers the vessel types as a list to choose from, with none chosen yet', () => {
     renderizar()
 
-    const tipos = screen.getByRole('radiogroup', { name: 'Tipo' })
-    expect(within(tipos).getAllByRole('radio').map((radio) => radio.getAttribute('value'))).toEqual([
+    const tipo = screen.getByRole('combobox', { name: 'Tipo' })
+    expect(within(tipo).getAllByRole('option').map((opcion) => opcion.textContent)).toEqual([
+      'Selecciona un tipo',
       'Fragata',
       'Corbeta',
       'Patrullera',
@@ -37,9 +38,8 @@ describe('NuevoBuquePage', () => {
       'Buque anfibio',
       'Buque logístico',
     ])
-    expect(within(tipos).getByRole('radio', { name: 'Buque anfibio' })).not.toBeChecked()
-    // Without WebGL (jsdom) each card falls back to the side silhouette of its own hull.
-    expect(tipos.querySelectorAll('svg path')).toHaveLength(6)
+    expect(tipo).toHaveValue('')
+    expect(document.querySelector('canvas, svg[aria-label^="Silueta"]')).toBeNull()
   })
 
   it('requires choosing a type before calling the port', async () => {
@@ -48,7 +48,7 @@ describe('NuevoBuquePage', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Crear buque' }))
 
-    expect(screen.getByRole('radiogroup', { name: 'Tipo' })).toHaveAccessibleDescription('Este campo es requerido.')
+    expect(screen.getByLabelText('Tipo')).toHaveAccessibleDescription('Este campo es requerido.')
     expect(dependencias.buques.crear).not.toHaveBeenCalled()
   })
 
