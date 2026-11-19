@@ -25,7 +25,7 @@ from datetime import date, datetime, time, timedelta
 from typing import Any, Callable, Optional
 
 from django.conf import settings
-from django.db.models import CharField, Count, Lookup, OuterRef, Q, Subquery
+from django.db.models import CharField, Count, Exists, Lookup, OuterRef, Q, Subquery
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
@@ -162,6 +162,12 @@ def _aplicar_hasta(qs, dia):
     return qs.filter(fecha_creacion__lt=_inicio_del_dia(siguiente))
 
 
+def _aplicar_seccion(qs, seccion_id):
+    # Exists keeps one row per inspection however many photos it has in the section.
+    fotos = FotoInspeccion.objects.filter(inspeccion=OuterRef('pk'), seccion_id=seccion_id)
+    return qs.filter(Exists(fotos))
+
+
 FILTROS = {
     f.nombre: f
     for f in (
@@ -206,6 +212,13 @@ FILTROS = {
             ),
             parsear=_parsear_texto,
             aplicar=lambda qs, texto: qs.filter(nombre__contiene_ilike=texto),
+        ),
+        Filtro(
+            nombre='seccion',
+            tipo='entero',
+            descripcion='ID de una sección del casco: inspecciones con al menos una foto en ella.',
+            parsear=_parsear_entero_positivo,
+            aplicar=_aplicar_seccion,
         ),
     )
 }

@@ -211,7 +211,7 @@ pnpm add <pkg>     # add a dependency (pnpm add -D <pkg> for dev)
 ### Inspections search (`vision/busqueda.py`)
 
 - `GET /api/vision/inspecciones/` returns `{resultados, siguiente, hay_mas}` (no `total`). Order is fixed: `-fecha_creacion, -id`.
-- Filters (combined with AND): `buque` (alias `buque_id`), `desde` / `hasta` (`YYYY-MM-DD`, `hasta` inclusive), `severidad_min` (`low|medium|high|critical`), `q` (2-100 chars, case-insensitive match on `nombre`). Plus `limit` (1-100, default 20) and `cursor` (the opaque `siguiente` of the previous page).
+- Filters (combined with AND): `buque` (alias `buque_id`), `desde` / `hasta` (`YYYY-MM-DD`, `hasta` inclusive), `severidad_min` (`low|medium|high|critical`), `q` (2-100 chars, case-insensitive match on `nombre`), `seccion` (a hull section id: inspections with at least one photo in that section, each listed once). Plus `limit` (1-100, default 20) and `cursor` (the opaque `siguiente` of the previous page).
 - Invalid parameters return 400 `{"error": "Datos inválidos.", "campos": {...}}`, with every invalid field reported at once. **Unknown query parameters are ignored**, not rejected.
 - To add a criterion, add one `Filtro` entry (parser + `aplicar`) to `FILTROS`; the view does not change. `describir_filtros()` exposes the registry as JSON so a future natural-language interpreter can derive its schema.
 - `InspeccionCasco.severidad_max` (`NivelSeveridad`, 1=low .. 4=critical) is denormalized from the photos: the Celery task raises it with a conditional UPDATE and the photo delete view recomputes it. Never write it from anywhere else.
