@@ -49,8 +49,9 @@ export function useBusquedaInspecciones(filtro: FiltroInspecciones, { activa = t
     inspecciones.buscar(JSON.parse(consulta) as FiltroInspecciones).then(
       (pagina) => responder({ clave, tipo: 'listo', ...pagina, cargandoMas: false, errorMas: null }),
       (error: unknown) => {
-        // Not worth keeping: coming back to this search tries it again.
-        pedida.current = null
+        // Not worth keeping: coming back to this search tries it again. A late failure of a
+        // search already replaced must not erase the mark of the current one.
+        if (pedida.current === clave) pedida.current = null
         responder({
           clave,
           tipo: 'error',

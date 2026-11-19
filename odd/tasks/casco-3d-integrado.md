@@ -47,3 +47,6 @@ Branch: `feat/casco-3d-integrado` (from `main`, merges `feat/casco-3d-05-lienzo`
   - A new test covers a search dropped while in flight.
   - The hover label stays a manual check.
   - Evidence: RED first (3 failing). After the fix, 46 tests pass, and lint and build pass.
+- L10 (2026-11-18): the review of 159f2f0 was approved and acknowledged.
+  - **Fixed** (R2-001/R3-001): a late rejection of a replaced search cleared the in-flight/answered mark of the current one. It now clears it only when the mark still holds its own `clave`.
+  - **Evidence:** RED first (`keeps the current search when an older one fails late` failed on its last assertion). After the fix, 47 tests pass across `ListaInspeccionesPage` and `VistaCascoBuque`; the 92 earlier also included `ui/casco`. Lint and build pass.

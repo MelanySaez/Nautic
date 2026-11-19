@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { ApiError } from '../../shared/http/apiClient'
@@ -397,6 +397,33 @@ describe('ListaInspeccionesPage list / 3D switch', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Lista' }))
 
     expect(await screen.findByText('Grave')).toBeInTheDocument()
+  })
+
+  it('keeps the current search when an older one fails late', async () => {
+    const dependencias = conBuque()
+    let rechazarVieja: (motivo: Error) => void = () => {}
+    dependencias.inspecciones.buscar.mockImplementation((filtro, cursor) => {
+      if (filtro.severidadMin === 'low') return new Promise((_, rechazar) => (rechazarVieja = rechazar))
+      if (!filtro.severidadMin) return Promise.resolve(unaPagina())
+      return Promise.resolve(
+        cursor
+          ? unaPagina([unaInspeccion({ id: 2, nombre: 'Segunda' })])
+          : unaPagina([unaInspeccion({ id: 1, nombre: 'Primera' })], { siguiente: 'c1', hayMas: true }),
+      )
+    })
+    renderizar(dependencias, `${RUTA}?severidad_min=low`)
+    await screen.findByText('Cargando inspecciones…')
+    await userEvent.selectOptions(screen.getByLabelText('Severidad mínima'), 'high')
+    await userEvent.click(await screen.findByRole('button', { name: 'Cargar más' }))
+    expect(await screen.findByText('Segunda')).toBeInTheDocument()
+
+    await act(async () => rechazarVieja(new Error('Tarde')))
+    await userEvent.click(screen.getByRole('button', { name: 'Vista 3D' }))
+    await screen.findByRole('group', { name: /^Lista de secciones/ })
+    await userEvent.click(screen.getByRole('button', { name: 'Lista' }))
+
+    expect(await screen.findByText('Segunda')).toBeInTheDocument()
+    expect(dependencias.inspecciones.buscar).toHaveBeenCalledTimes(4) // low, high, next page, 3D
   })
 
   it('runs the filtered search when a page opened in 3D switches to the list', async () => {
