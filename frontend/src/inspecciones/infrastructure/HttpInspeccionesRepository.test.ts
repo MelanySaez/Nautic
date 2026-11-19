@@ -140,6 +140,16 @@ describe('HttpInspeccionesRepository', () => {
     expect(detalle.privada).toBe(false)
   })
 
+  it('sends the hull section filter as seccion', async () => {
+    fetchMock.mockResolvedValue(respuesta(200, { resultados: [], siguiente: null, hay_mas: false }))
+
+    await repo.buscar({ buqueId: 1, seccionId: 12 })
+
+    const url = new URL(ultimaLlamada().url)
+    expect(url.searchParams.get('buque')).toBe('1')
+    expect(url.searchParams.get('seccion')).toBe('12')
+  })
+
   it('passes the cursor untouched to get the next page and omits blank filters', async () => {
     fetchMock.mockResolvedValue(respuesta(200, { resultados: [], siguiente: null, hay_mas: false }))
 

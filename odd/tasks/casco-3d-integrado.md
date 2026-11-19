@@ -16,9 +16,11 @@ Branch: `feat/casco-3d-integrado` (from `main`, merges `feat/casco-3d-05-lienzo`
 
 ## Tasks
 - [x] T1 — S4 backend: `seccion` filter + tests + docs. Route: inline.
-- [ ] T2 — S1–S5 frontend: switch, embedded 3D view, two-option zone menu, section filter in the list. Route: inline.
+- [x] T2 — S1–S5 frontend: switch, embedded 3D view, two-option zone menu, section filter in the list. Route: inline.
 
 ## Log
 - L1 (2026-11-18): "necesito entonces integrar esta idea que viene de las ramas que tratan el modelado 3d dentro de la vista de inspecciones asociadas a una embarcación [Image #1], de modo que tenga una opcion que me permita cambiar al modelado 3d segun requiera, la intencion seria que al seleccionar una seccion concreta de ese modelo permita desplegar un menu de 2 opciones, una que permita ir a generar una inspeccion nueva (obviamente siendo ya un atajo a la seccion de casco particular que ya se seleccionó) y otra opcion que me permita ver las inspecciones directas ya existentes  con el filtro aplicado de la seccion particular"
 - L2 (2026-11-18): colour rule answer: "Última inspección (Recomendado)".
 - L3: the merge of `feat/casco-3d-05-lienzo` had a conflict only in `AGENTS.md`, resolved by keeping both sides.
+- L4: T1 GREEN: `test_busqueda_inspecciones` OK (RED first: 3 failures). Commit e1f8447.
+- L5: T2 GREEN: Vitest `VistaCascoBuque`, `ListaInspeccionesPage`, `HttpInspeccionesRepository`, the router tests and `ui/casco` all pass (RED first: 13 failures). `pnpm lint` passes. `pnpm build` passes, and the entry chunk has no `WebGLRenderer`. The `/casco` route and `SelectorInspeccion` are removed. Pending: a manual check in a WebGL browser.

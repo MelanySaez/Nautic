@@ -1,4 +1,5 @@
 import type { FiltroInspecciones, Severidad } from '../domain/inspeccion'
+import { idDeParametro } from './parametrosUrl'
 
 export const NIVELES_SEVERIDAD: Severidad[] = ['low', 'medium', 'high', 'critical']
 
@@ -20,5 +21,7 @@ export function filtroDesdeParametros(parametros: URLSearchParams): FiltroInspec
   if (NIVELES_SEVERIDAD.some((nivel) => nivel === severidad)) filtro.severidadMin = severidad as Severidad
   const q = parametros.get('q')?.trim()
   if (q && q.length >= MIN_CARACTERES_BUSQUEDA) filtro.q = q
+  const seccionId = idDeParametro(parametros, 'seccion')
+  if (seccionId !== null) filtro.seccionId = seccionId
   return filtro
 }

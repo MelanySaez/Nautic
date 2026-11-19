@@ -1,4 +1,3 @@
-import { useId } from 'react'
 import { Boton, EnlaceBoton } from '../../../shared/ui/Boton'
 import { Icon } from '../../../shared/ui/Icon'
 import { PRESENTACION_ESTADO_ZONA } from './estadosZona'
@@ -9,35 +8,24 @@ const INSIGNIA =
   'inline-flex items-center rounded-sm px-2 py-0.5 font-mono text-[11px] font-medium tracking-wider uppercase'
 
 /**
- * The selected zone: its state and counts in the selected inspection, plus the ways to act on
- * it. Without an inspection only a new one can be started.
+ * The selected zone: its state and counts in the latest inspection, plus its two actions:
+ * start a new inspection on it, or list the existing inspections with photos of it.
  */
 export function PanelZona({
   zona,
   buqueId,
-  inspeccionId,
-  puedeEditar,
+  alVerInspecciones,
 }: {
   zona: ZonaListada | null
   buqueId: number
-  inspeccionId: number | null
-  /** The user may upload photos to the selected inspection (`misPermisos.subirFotos`). */
-  puedeEditar: boolean
+  alVerInspecciones: (seccionId: number) => void
 }) {
-  const idMotivo = useId()
-
   return (
     <section aria-label="Zona seleccionada" className="rounded-lg border border-line bg-surface p-4">
       {zona ? (
-        <ZonaElegida
-          zona={zona}
-          buqueId={buqueId}
-          inspeccionId={inspeccionId}
-          puedeEditar={puedeEditar}
-          idMotivo={idMotivo}
-        />
+        <ZonaElegida zona={zona} buqueId={buqueId} alVerInspecciones={alVerInspecciones} />
       ) : (
-        <p className="text-sm text-ink-muted">Selecciona una zona del casco o de la lista para ver su estado.</p>
+        <p className="text-sm text-ink-muted">Selecciona una zona del casco o de la lista.</p>
       )}
     </section>
   )
@@ -46,18 +34,13 @@ export function PanelZona({
 function ZonaElegida({
   zona: { seccion, resumen },
   buqueId,
-  inspeccionId,
-  puedeEditar,
-  idMotivo,
+  alVerInspecciones,
 }: {
   zona: ZonaListada
   buqueId: number
-  inspeccionId: number | null
-  puedeEditar: boolean
-  idMotivo: string
+  alVerInspecciones: (seccionId: number) => void
 }) {
   const { texto, insignia } = PRESENTACION_ESTADO_ZONA[resumen.estado]
-  const conZona = `zona=${seccion.id}`
   const conteos: Array<[string, number]> = [
     ['Fotos', resumen.fotos],
     ['Analizadas', resumen.analizadas],
@@ -84,36 +67,16 @@ function ZonaElegida({
         ))}
       </dl>
 
-      <div className="flex flex-wrap gap-2">
-        {inspeccionId !== null && (
-          <>
-            <EnlaceBoton to={`/inspecciones/${inspeccionId}/resultados?${conZona}`} variante="secundario">
-              <Icon name="results" className="size-4" />
-              Consultar
-            </EnlaceBoton>
-            {puedeEditar ? (
-              <EnlaceBoton to={`/vision/${inspeccionId}?${conZona}`} variante="secundario">
-                <Icon name="edit" className="size-4" />
-                Editar
-              </EnlaceBoton>
-            ) : (
-              <Boton variante="secundario" disabled aria-describedby={idMotivo}>
-                <Icon name="edit" className="size-4" />
-                Editar
-              </Boton>
-            )}
-          </>
-        )}
-        <EnlaceBoton to={`/vision?buque=${buqueId}&${conZona}`}>
+      <div role="group" aria-label="Acciones de la zona" className="flex flex-wrap gap-2">
+        <EnlaceBoton to={`/vision?buque=${buqueId}&zona=${seccion.id}`}>
           <Icon name="plus" className="size-4" />
-          Nueva inspección
+          Nueva inspección en esta sección
         </EnlaceBoton>
+        <Boton variante="secundario" onClick={() => alVerInspecciones(seccion.id)}>
+          <Icon name="search" className="size-4" />
+          Ver inspecciones de esta sección
+        </Boton>
       </div>
-      {inspeccionId !== null && !puedeEditar && (
-        <p id={idMotivo} className="text-xs text-ink-muted">
-          No tienes permiso para subir fotos en esta inspección.
-        </p>
-      )}
     </div>
   )
 }

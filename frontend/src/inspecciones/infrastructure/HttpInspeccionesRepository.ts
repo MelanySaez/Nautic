@@ -65,6 +65,7 @@ export class HttpInspeccionesRepository implements InspeccionesRepository {
     if (filtro.hasta) consulta.set('hasta', filtro.hasta)
     if (filtro.severidadMin) consulta.set('severidad_min', filtro.severidadMin)
     if (filtro.q?.trim()) consulta.set('q', filtro.q.trim())
+    if (filtro.seccionId !== undefined) consulta.set('seccion', String(filtro.seccionId))
     consulta.set('limit', String(TAMANO_PAGINA))
     if (cursor) consulta.set('cursor', cursor)
     return aPagina(await this.api.get<ListaInspeccionesDto>(`/api/vision/inspecciones/?${consulta}`))

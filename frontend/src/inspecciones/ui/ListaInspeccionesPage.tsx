@@ -14,9 +14,12 @@ import { filtroDesdeParametros, MIN_CARACTERES_BUSQUEDA } from './filtroUrl'
 import { TarjetaInspeccion } from './TarjetaInspeccion'
 import { transicionNombreBuque } from '../../shared/ui/transiciones'
 import { useBusquedaInspecciones } from './useBusquedaInspecciones'
+import { conParametro, idDeParametro } from './parametrosUrl'
+import { VistaCascoBuque } from './VistaCascoBuque'
 
 const RETARDO_TEXTO_MS = 300
 const CAMPOS_CON_CONTROL = ['q', 'desde', 'hasta', 'severidad_min']
+const VISTA_3D = '3d'
 
 /** Route entry: keys the page by vessel so switching vessels starts from a clean state. */
 export function ListaInspeccionesRuta() {
@@ -24,13 +27,21 @@ export function ListaInspeccionesRuta() {
   return <ListaInspeccionesPage key={id} buqueId={Number(id)} />
 }
 
-/** Inspections of one vessel, with the date, severity and name filters kept in the URL query. */
+/**
+ * Inspections of one vessel, with the date, severity, name and hull section filters kept in the
+ * URL query, or (`?vista=3d`) its hull in 3D with the selected zone (`?zona=<seccionId>`).
+ */
 export function ListaInspeccionesPage({ buqueId }: { buqueId: number }) {
   const { inspecciones: repo, buques } = useDependencias()
   const usuario = useUsuarioActual()
   const [parametros, setParametros] = useSearchParams()
   const filtroUrl = useMemo(() => filtroDesdeParametros(parametros), [parametros])
-  const filtro = useMemo(() => ({ ...filtroUrl, buqueId }), [filtroUrl, buqueId])
+  // Keyed by content: the view and zone params change the query without changing the search.
+  const claveFiltro = JSON.stringify(filtroUrl)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const filtro = useMemo(() => ({ ...filtroUrl, buqueId }), [claveFiltro, buqueId])
+  const en3d = parametros.get('vista') === VISTA_3D
+  const zonaId = idDeParametro(parametros, 'zona')
   const { estado, cargarMas, quitar, reintentar } = useBusquedaInspecciones(filtro)
   const cargarBuque = useCallback(() => buques.obtener(buqueId), [buques, buqueId])
   const buque = useRecurso(cargarBuque).estado
@@ -79,6 +90,21 @@ export function ListaInspeccionesPage({ buqueId }: { buqueId: number }) {
     }, RETARDO_TEXTO_MS)
   }
 
+  function mostrar3d(activar: boolean) {
+    setParametros((previos) => conParametro(conParametro(previos, 'zona', null), 'vista', activar ? VISTA_3D : null))
+  }
+
+  function elegirZona(seccionId: number | null) {
+    setParametros((previos) => conParametro(previos, 'zona', seccionId), { replace: true })
+  }
+
+  function verInspeccionesDeSeccion(seccionId: number) {
+    setParametros((previos) => {
+      const siguientes = conParametro(conParametro(previos, 'vista', null), 'zona', null)
+      return conParametro(siguientes, 'seccion', seccionId)
+    })
+  }
+
   function limpiar() {
     clearTimeout(temporizador.current)
     setTexto('')
@@ -96,6 +122,10 @@ export function ListaInspeccionesPage({ buqueId }: { buqueId: number }) {
   const errorSinControl =
     estado.tipo === 'error' && !(campos && Object.keys(campos).some((c) => CAMPOS_CON_CONTROL.includes(c)))
   const hayFiltros = Object.keys(filtroUrl).length > 0
+  const seccionFiltrada =
+    filtroUrl.seccionId === undefined
+      ? null
+      : ((buque.tipo === 'listo' ? buque.datos.secciones.find((s) => s.id === filtroUrl.seccionId) : undefined) ?? null)
 
   async function eliminar(inspeccion: Inspeccion) {
     const confirmado = window.confirm(
@@ -135,15 +165,25 @@ export function ListaInspeccionesPage({ buqueId }: { buqueId: number }) {
           </div>
         </div>
         <div className="flex flex-wrap gap-3">
-          {/* The name morphs into the 3D view title, whose back link returns to these filters. */}
-          <EnlaceBoton
-            to={`/inspecciones/buque/${buqueId}/casco`}
-            state={{ buqueNombre: nombreConocido, volverA: `${ubicacion.pathname}${ubicacion.search}` }}
-            variante="secundario"
-          >
-            <Icon name="ship" className="size-4" />
-            Vista 3D
-          </EnlaceBoton>
+          <div role="group" aria-label="Vista" className="flex rounded border border-line p-0.5">
+            {[
+              { etiqueta: 'Lista', activa: !en3d, icono: 'results' as const },
+              { etiqueta: 'Vista 3D', activa: en3d, icono: 'ship' as const },
+            ].map(({ etiqueta, activa, icono }) => (
+              <button
+                key={etiqueta}
+                type="button"
+                aria-pressed={activa}
+                onClick={() => !activa && mostrar3d(etiqueta === 'Vista 3D')}
+                className={`label-caps flex items-center gap-2 rounded-sm px-3 py-2 ${
+                  activa ? 'bg-surface-2 text-ink' : 'text-ink-muted hover:text-ink'
+                }`}
+              >
+                <Icon name={icono} className="size-4" />
+                {etiqueta}
+              </button>
+            ))}
+          </div>
           <EnlaceBoton to={`/vision?buque=${buqueId}`}>
             <Icon name="plus" className="size-4" />
             Nueva inspección
@@ -151,55 +191,88 @@ export function ListaInspeccionesPage({ buqueId }: { buqueId: number }) {
         </div>
       </header>
 
-      <FiltrosInspecciones
-        valores={{
-          desde: parametros.get('desde') ?? '',
-          hasta: parametros.get('hasta') ?? '',
-          severidadMin: parametros.get('severidad_min') ?? '',
-          texto,
-        }}
-        errores={errores}
-        hayFiltros={hayFiltros || texto.trim().length > 0}
-        alCambiar={(campo, valor) => fijarParametro(campo, valor)}
-        alEscribir={escribir}
-        alLimpiar={limpiar}
-      />
-      {errorAccion && <MensajeError mensaje={errorAccion} />}
-      {estado.tipo === 'cargando' && <Cargando texto="Cargando inspecciones…" />}
-      {errorSinControl && estado.tipo === 'error' && <MensajeError mensaje={estado.mensaje} alReintentar={reintentar} />}
-      {estado.tipo === 'listo' && estado.resultados.length === 0 && (
-        <Vacio>
-          {hayFiltros ? (
-            <p>Ninguna inspección coincide con los filtros.</p>
-          ) : (
-            <>
-              <p>Este buque todavía no tiene inspecciones.</p>
-              <EnlaceBoton to={`/vision?buque=${buqueId}`} variante="accion">
-                Nueva inspección
-              </EnlaceBoton>
-            </>
-          )}
-        </Vacio>
-      )}
-      {estado.tipo === 'listo' && estado.resultados.length > 0 && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {estado.resultados.map((inspeccion) => (
-            <TarjetaInspeccion
-              key={inspeccion.id}
-              className="animar-entrada"
-              inspeccion={inspeccion}
-              puedeEliminar={!!usuario && (usuario.esAdmin || inspeccion.lider?.id === usuario.id)}
-              eliminando={eliminandoId === inspeccion.id}
-              alEliminar={() => eliminar(inspeccion)}
+      {en3d ? (
+        <>
+          {buque.tipo === 'cargando' && <Cargando texto="Cargando buque…" />}
+          {buque.tipo === 'error' && <MensajeError mensaje={buque.mensaje} />}
+          {buque.tipo === 'listo' && (
+            <VistaCascoBuque
+              buque={buque.datos}
+              zonaId={zonaId}
+              alElegirZona={elegirZona}
+              alVerInspecciones={verInspeccionesDeSeccion}
             />
-          ))}
-        </div>
-      )}
-      {estado.tipo === 'listo' && estado.errorMas && <MensajeError mensaje={estado.errorMas} />}
-      {estado.tipo === 'listo' && estado.hayMas && (
-        <Boton variante="secundario" onClick={cargarMas} disabled={estado.cargandoMas} className="self-center">
-          {estado.cargandoMas ? 'Cargando…' : 'Cargar más'}
-        </Boton>
+          )}
+        </>
+      ) : (
+        <>
+        <FiltrosInspecciones
+          valores={{
+            desde: parametros.get('desde') ?? '',
+            hasta: parametros.get('hasta') ?? '',
+            severidadMin: parametros.get('severidad_min') ?? '',
+            texto,
+          }}
+          errores={errores}
+          hayFiltros={hayFiltros || texto.trim().length > 0}
+          alCambiar={(campo, valor) => fijarParametro(campo, valor)}
+          alEscribir={escribir}
+          alLimpiar={limpiar}
+        />
+        {filtroUrl.seccionId !== undefined && (
+          <div className="flex flex-wrap items-center gap-3 self-start rounded border border-line bg-surface px-3 py-2 text-sm">
+            <span>
+              {seccionFiltrada
+                ? `Sección: ${seccionFiltrada.codigo} · ${seccionFiltrada.nombre}`
+                : `Sección #${filtroUrl.seccionId}`}
+            </span>
+            <button
+              type="button"
+              onClick={() => fijarParametro('seccion', '')}
+              className="font-semibold text-accent-ink hover:underline"
+            >
+              Quitar filtro de sección
+            </button>
+          </div>
+        )}
+        {errorAccion && <MensajeError mensaje={errorAccion} />}
+        {estado.tipo === 'cargando' && <Cargando texto="Cargando inspecciones…" />}
+        {errorSinControl && estado.tipo === 'error' && <MensajeError mensaje={estado.mensaje} alReintentar={reintentar} />}
+        {estado.tipo === 'listo' && estado.resultados.length === 0 && (
+          <Vacio>
+            {hayFiltros ? (
+              <p>Ninguna inspección coincide con los filtros.</p>
+            ) : (
+              <>
+                <p>Este buque todavía no tiene inspecciones.</p>
+                <EnlaceBoton to={`/vision?buque=${buqueId}`} variante="accion">
+                  Nueva inspección
+                </EnlaceBoton>
+              </>
+            )}
+          </Vacio>
+        )}
+        {estado.tipo === 'listo' && estado.resultados.length > 0 && (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {estado.resultados.map((inspeccion) => (
+              <TarjetaInspeccion
+                key={inspeccion.id}
+                className="animar-entrada"
+                inspeccion={inspeccion}
+                puedeEliminar={!!usuario && (usuario.esAdmin || inspeccion.lider?.id === usuario.id)}
+                eliminando={eliminandoId === inspeccion.id}
+                alEliminar={() => eliminar(inspeccion)}
+              />
+            ))}
+          </div>
+        )}
+        {estado.tipo === 'listo' && estado.errorMas && <MensajeError mensaje={estado.errorMas} />}
+        {estado.tipo === 'listo' && estado.hayMas && (
+          <Boton variante="secundario" onClick={cargarMas} disabled={estado.cargandoMas} className="self-center">
+            {estado.cargandoMas ? 'Cargando…' : 'Cargar más'}
+          </Boton>
+        )}
+        </>
       )}
     </div>
   )
