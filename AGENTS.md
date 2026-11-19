@@ -220,6 +220,11 @@ pnpm add <pkg>     # add a dependency (pnpm add -D <pkg> for dev)
 ### Vessels API (`vision/views_buques.py`)
 
 - `GET /api/buques/` returns `{total, offset, limit, resultados}` ordered by `nombre, id`; each result adds `total_inspecciones` (the vessel's inspection count).
+- **Vessel image** (`api_buque_imagen`): `POST /api/buques/<id>/imagen/` (multipart `imagen`) stores or replaces it, and `DELETE` removes it. Both answer with the sheet.
+  - **Validation:** `vision/imagenes.validar_imagen`, shared with photo uploads (extension, content type, PIL), plus at most 5 MB (`TAMANO_MAXIMO_IMAGEN`). Errors return 400 `campos.imagen`.
+  - **Storage:** `guardar_imagen_buque` stores the file under `buques/imagenes/`. A replaced or removed file is deleted.
+  - **Read-only in JSON:** `imagen` is in `_CAMPOS_SOLO_LECTURA`, so a POST/PATCH that sends it gets a 400. This stops a client from pointing it at another file's key.
+  - **Responses:** list, sheet and upload expose `imagen` as `url_archivo(key)` only for keys under `buques/imagenes/` (`es_imagen_buque`). Legacy free text is `null`.
 - `?con_inspecciones=1` keeps only vessels with at least one inspection (accepts `true`/`false`/`1`/`0`; anything else is a 400). Absent means every vessel.
 
 ### Hull sections (`vision/secciones.py`)

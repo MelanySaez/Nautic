@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 PREFIJO_ORIGINALES = "inspecciones/originales"
 PREFIJO_ANOTADAS = "inspecciones/anotadas"
 PREFIJO_DETECCIONES = "inspecciones/detecciones"
+PREFIJO_IMAGENES_BUQUE = "buques/imagenes"
 
 # Cache shared by Django and the Celery worker (Redis), see settings.CACHES.
 CACHE_COMPARTIDA = "compartida"
@@ -60,6 +61,22 @@ def guardar_original(archivo) -> str:
     (e.g. to avoid a collision).
     """
     return default_storage.save(clave_original(archivo.name), archivo)
+
+
+def clave_imagen_buque(nombre_archivo: str) -> str:
+    """Key for a new vessel image; keeps the (lower-cased) extension of the upload."""
+    extension = os.path.splitext(nombre_archivo or "")[1].lower() or ".jpg"
+    return f"{PREFIJO_IMAGENES_BUQUE}/{uuid.uuid4().hex}{extension}"
+
+
+def es_imagen_buque(clave) -> bool:
+    """Whether ``clave`` is a vessel image this module stored (not legacy free text)."""
+    return bool(clave) and clave.startswith(f"{PREFIJO_IMAGENES_BUQUE}/")
+
+
+def guardar_imagen_buque(archivo) -> str:
+    """Stream a vessel image to storage and return the key actually stored."""
+    return default_storage.save(clave_imagen_buque(archivo.name), archivo)
 
 
 def guardar_anotada(foto_id: int, contenido: bytes) -> str:
