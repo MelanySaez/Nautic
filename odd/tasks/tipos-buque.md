@@ -22,7 +22,7 @@ Branch: `feat/tipos-buque` (stacked on `feat/casco-3d-integrado`, which holds th
 ## Tasks
 - [x] T1 — S1, S2, S4 domain: archetypes per type, the `TIPOS_BUQUE` catalogue, and type matching, with tests. Route: inline.
 - [x] T2 — S1-S3 UI: `SelectorTipoBuque` grid plus `MiniaturaCasco` (lazy WebGL, rotating), in the create and edit forms. Route: inline.
-- [ ] T3 — S4: the inspections 3D view uses the type's archetype; docs. Route: inline.
+- [x] T3 — S4: the inspections 3D view uses the type's archetype; docs. Route: inline.
 
 ## Log
 - L1 (2026-11-18): "me gustaria que para la vista de creacion del buque se cambie el campo de escritura libre por unas cuadriculas que tengan tipos de embarcaciones definidos, en ella aparezcan renderizados en miniatura de ese tipo debajo aparezca el nombre del mismo, ademas me gustaria que el modelo 3d en miniatura este girando levemente"
@@ -38,3 +38,8 @@ Branch: `feat/tipos-buque` (stacked on `feat/casco-3d-integrado`, which holds th
   - Also fixed the lint warning about reading a ref during render in the hover label.
   - RED first: 13 failing. Now 162 tests pass (`buques`, `ui/casco`, `VistaCascoBuque`), lint is clean, and the build passes with no `WebGLRenderer` in the entry chunk.
   - Thumbnails and rotation need WebGL and are checked by hand.
+- L5: T3 GREEN.
+  - `VistaCascoBuque` shapes the hull with `arquetipoDeBuque(buque.tipo)`.
+  - RED first (1 failing). Now 48 tests pass, lint is clean, and the build passes with three.js out of the entry chunk.
+  - Docs are in AGENTS.md.
+  - Pending: the visual check in a WebGL browser (thumbnails, rotation, hull per type).

@@ -12,6 +12,7 @@ import {
   unDetalleBuque,
 } from '../../test/dobles'
 import type { InspeccionDetalle, SeccionCasco } from '../domain/inspeccion'
+import { BUQUE_DE_GUERRA, PATRULLERA } from '../../buques/domain/casco/arquetipo'
 import { EscenaCasco } from './casco/EscenaCasco'
 import type { PropsLienzoCasco } from './casco/lienzoCasco'
 import { ListaInspeccionesRuta } from './ListaInspeccionesPage'
@@ -325,6 +326,22 @@ describe('VistaCascoBuque canvas slot', () => {
       ]),
     )
     expect(props.seleccionada).toBeNull()
+  })
+
+  it("shapes the hull with the archetype of the vessel's type, or the generic warship", async () => {
+    const { dependencias } = preparar()
+    dependencias.buques.obtener.mockResolvedValue(
+      unDetalleBuque({ id: 1, nombre: 'ARA Libertad', tipo: 'Patrullera', secciones: SECCIONES }),
+    )
+    renderizar(dependencias)
+    await waitFor(() => expect(propsDelLienzo().arquetipo).toBe(PATRULLERA))
+
+    dependencias.buques.obtener.mockResolvedValue(
+      unDetalleBuque({ id: 2, nombre: 'Viejo', tipo: 'Remolcador', secciones: SECCIONES }),
+    )
+    vi.mocked(EscenaCasco).mockClear()
+    renderizar(dependencias, '/inspecciones/buque/2?vista=3d')
+    await waitFor(() => expect(propsDelLienzo().arquetipo).toBe(BUQUE_DE_GUERRA))
   })
 
   it('selects the section placed on a zone picked in the scene', async () => {
