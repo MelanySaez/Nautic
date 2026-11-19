@@ -7,6 +7,7 @@ import { Campo } from '../../shared/ui/Campo'
 import { CLASES_CONTROL } from '../../shared/ui/clasesControl'
 import { Enlace } from '../../shared/ui/Enlace'
 import { MensajeError } from '../../shared/ui/Estados'
+import { InputContrasena } from '../../shared/ui/InputContrasena'
 import { mensajeDe } from '../../shared/ui/formato'
 import type { DatosRegistro } from '../domain/usuario'
 import { MarcoCuenta } from './MarcoCuenta'
@@ -42,14 +43,14 @@ export function RegistroPage() {
     }
   }
 
-  const campo = (clave: keyof DatosRegistro, etiqueta: string, tipo: string, autoComplete: string) => (
+  const campo = (clave: Exclude<keyof DatosRegistro, 'password'>, etiqueta: string, tipo: string, autoComplete: string) => (
     <Campo etiqueta={etiqueta} error={mensajesDe(campos, clave)}>
       <input
         type={tipo}
         autoComplete={autoComplete}
         value={datos[clave]}
         onChange={(e) => setDatos((actual) => ({ ...actual, [clave]: e.target.value }))}
-        maxLength={clave === 'password' ? undefined : 255}
+        maxLength={255}
         className={CLASES_CONTROL}
       />
     </Campo>
@@ -62,7 +63,13 @@ export function RegistroPage() {
         {campo('nombre', 'Nombre', 'text', 'name')}
         {campo('email', 'Email', 'email', 'email')}
         {campo('cargo', 'Cargo (opcional)', 'text', 'organization-title')}
-        {campo('password', 'Contraseña', 'password', 'new-password')}
+        <Campo etiqueta="Contraseña" error={mensajesDe(campos, 'password')}>
+          <InputContrasena
+            autoComplete="new-password"
+            value={datos.password}
+            onChange={(e) => setDatos((actual) => ({ ...actual, password: e.target.value }))}
+          />
+        </Campo>
         <Boton type="submit" disabled={enviando}>
           {enviando ? 'Creando cuenta…' : 'Crear cuenta'}
         </Boton>
