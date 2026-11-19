@@ -448,7 +448,8 @@ def api_buque_imagen(request, buque_id):
         # The row lock makes concurrent uploads queue: each one sees, and later deletes,
         # the file the previous one stored, so none is left orphaned.
         with transaction.atomic():
-            buque = Buque.objects.select_for_update().get(pk=buque_id)
+            # Still a 404 if the row vanished after the first read (the new file is cleaned up below).
+            buque = get_object_or_404(Buque.objects.select_for_update(), pk=buque_id)
             anterior = buque.imagen
             buque.imagen = nueva
             buque.save(update_fields=['imagen', 'updated_at'])
