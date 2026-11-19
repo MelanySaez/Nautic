@@ -3,6 +3,7 @@ import { CLASES_CONTROL } from '../../shared/ui/clasesControl'
 import { Tarjeta } from '../../shared/ui/Tarjeta'
 import { GRUPOS_TECNICOS } from '../domain/fichaTecnica'
 import { GrupoNumerico } from './GrupoNumerico'
+import { SelectorTipoBuque } from './tipo/SelectorTipoBuque'
 import type { Errores, Valores } from './formularioBuque'
 
 const ETAPAS_SUGERIDAS = ['Activo', 'En construcción']
@@ -31,15 +32,7 @@ export function CamposBuque({
               className={CLASES_CONTROL}
             />
           </Campo>
-          <Campo etiqueta="Tipo" error={errores.tipo}>
-            <input
-              value={valores.tipo}
-              onChange={(e) => alCambiar('tipo', e.target.value)}
-              maxLength={255}
-              placeholder="Fragata, patrullera…"
-              className={CLASES_CONTROL}
-            />
-          </Campo>
+          <SelectorTipoBuque valor={valores.tipo} error={errores.tipo} alCambiar={(nombre) => alCambiar('tipo', nombre)} />
           <Campo etiqueta="Etapa" error={errores.etapa} ayuda={ayudaEtapa}>
             <input
               value={valores.etapa}

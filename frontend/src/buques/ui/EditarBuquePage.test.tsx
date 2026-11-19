@@ -42,7 +42,7 @@ describe('EditarBuquePage', () => {
 
     expect(await screen.findByLabelText('Nombre')).toHaveValue('ARC Caribe')
     expect(dependencias.buques.obtener).toHaveBeenCalledWith(7)
-    expect(screen.getByLabelText('Tipo')).toHaveValue('Fragata')
+    expect(screen.getByRole('radio', { name: 'Fragata' })).toBeChecked()
     expect(screen.getByLabelText('Descripción')).toHaveValue('Buque de prueba')
     expect(screen.getByLabelText('Imagen')).toHaveValue('caribe.png')
     expect(screen.getByLabelText('Eslora total (m)')).toHaveValue(110.5)
@@ -80,15 +80,14 @@ describe('EditarBuquePage', () => {
     expect(router.state.location.pathname).toBe('/buques/7')
   })
 
-  it('requires name, type and stage before calling the port', async () => {
+  it('requires name and stage before calling the port', async () => {
     const { dependencias } = renderizar()
 
     await userEvent.clear(await screen.findByLabelText('Nombre'))
-    await userEvent.clear(screen.getByLabelText('Tipo'))
     await userEvent.clear(screen.getByLabelText('Etapa'))
     await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
 
-    expect(screen.getAllByText('Este campo es requerido.')).toHaveLength(3)
+    expect(screen.getAllByText('Este campo es requerido.')).toHaveLength(2)
     expect(dependencias.buques.actualizar).not.toHaveBeenCalled()
   })
 
@@ -112,10 +111,32 @@ describe('EditarBuquePage', () => {
     dependencias.buques.actualizar.mockReturnValue(new Promise<BuqueDetalle>(() => {}))
     renderizar('/buques/7/editar', dependencias)
 
-    await userEvent.type(await screen.findByLabelText('Tipo'), ' ligera')
+    await userEvent.click(await screen.findByRole('radio', { name: 'Corbeta' }))
     await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
 
     expect(screen.getByRole('button', { name: 'Guardando…' })).toBeDisabled()
+  })
+
+  it('keeps a type from before the catalogue until another one is chosen', async () => {
+    const dependencias = conBuque()
+    dependencias.buques.obtener.mockResolvedValue(unDetalleBuque({ ...BUQUE, tipo: 'Remolcador' }))
+    renderizar('/buques/7/editar', dependencias)
+
+    expect(await screen.findByText('Tipo actual: Remolcador. Elige uno de la lista para cambiarlo.')).toBeInTheDocument()
+    expect(screen.getAllByRole('radio').filter((radio) => (radio as HTMLInputElement).checked)).toEqual([])
+    await userEvent.type(screen.getByLabelText('Puntal (m)'), '1')
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+
+    expect(dependencias.buques.actualizar).toHaveBeenCalledWith(7, { puntalM: 81 })
+  })
+
+  it('sends the name of the chosen type', async () => {
+    const { dependencias } = renderizar()
+
+    await userEvent.click(await screen.findByRole('radio', { name: 'Patrullera' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+
+    expect(dependencias.buques.actualizar).toHaveBeenCalledWith(7, { tipo: 'Patrullera' })
   })
 
   it('cancels back to the sheet', async () => {

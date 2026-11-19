@@ -16,11 +16,12 @@ import {
   type PointerEvent as EventoPunteroReact,
   type Ref,
 } from 'react'
-import { BufferAttribute, BufferGeometry, Color, DoubleSide, type MeshStandardMaterial, type Vector3 } from 'three'
+import { Color, DoubleSide, type BufferGeometry, type MeshStandardMaterial, type Vector3 } from 'three'
 import { generarCasco, type CascoGenerado } from '../../../buques/domain/casco/geometria'
 import type { Malla, Vec3 } from '../../../buques/domain/casco/malla'
 import type { CodigoZona } from '../../../buques/domain/casco/zonas'
 import { mezclarColores, useColoresTema, variableDeZona } from './coloresZona'
+import { geometriaDe } from './geometriaThree'
 import { PRESENTACION_ESTADO_ZONA } from './estadosZona'
 import type { PropsLienzoCasco } from './lienzoCasco'
 import {
@@ -71,15 +72,6 @@ interface PiezasEscena {
   zonas: ZonaEscena[]
   /** Deck, transom and superstructure: drawn neutral, never selected. */
   inertes: BufferGeometry[]
-}
-
-function geometriaDe(malla: Malla): BufferGeometry {
-  const geometria = new BufferGeometry()
-  geometria.setAttribute('position', new BufferAttribute(malla.posiciones, 3))
-  geometria.setAttribute('normal', new BufferAttribute(malla.normales, 3))
-  geometria.setIndex(new BufferAttribute(malla.indices, 1))
-  geometria.computeBoundingSphere()
-  return geometria
 }
 
 function piezasDeEscena(casco: CascoGenerado, eslora: number): PiezasEscena {
@@ -481,9 +473,12 @@ export default function LienzoCasco({
       {encima && (
         // The outer box sits on the pointer; the inner one floats up and to the right of it.
         <div
-          ref={etiqueta}
+          ref={(nodo) => {
+            etiqueta.current = nodo
+            // Starts where the pointer already is; later moves update it through `seguirPuntero`.
+            nodo?.style.setProperty('translate', puntero.current)
+          }}
           aria-hidden="true"
-          style={{ translate: puntero.current }}
           className="pointer-events-none absolute top-0 left-0 z-20 select-none"
         >
           <div className="-mt-3 ml-4 -translate-y-full rounded border border-line bg-surface/95 px-2.5 py-1.5 shadow-md">

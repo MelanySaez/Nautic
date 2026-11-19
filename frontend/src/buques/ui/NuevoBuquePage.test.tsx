@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { ApiError } from '../../shared/http/apiClient'
@@ -21,10 +21,37 @@ function renderizar(dependencias = crearDependenciasFalsas().dependencias) {
 
 async function rellenarRequeridos() {
   await userEvent.type(screen.getByLabelText('Nombre'), '  ARC Caribe ')
-  await userEvent.type(screen.getByLabelText('Tipo'), 'Fragata')
+  await userEvent.click(screen.getByRole('radio', { name: 'Fragata' }))
 }
 
 describe('NuevoBuquePage', () => {
+  it('offers the vessel types as a grid of cards, each with its hull thumbnail and name', () => {
+    renderizar()
+
+    const tipos = screen.getByRole('radiogroup', { name: 'Tipo' })
+    expect(within(tipos).getAllByRole('radio').map((radio) => radio.getAttribute('value'))).toEqual([
+      'Fragata',
+      'Corbeta',
+      'Patrullera',
+      'Destructor',
+      'Buque anfibio',
+      'Buque logístico',
+    ])
+    expect(within(tipos).getByRole('radio', { name: 'Buque anfibio' })).not.toBeChecked()
+    // Without WebGL (jsdom) each card falls back to the side silhouette of its own hull.
+    expect(tipos.querySelectorAll('svg path')).toHaveLength(6)
+  })
+
+  it('requires choosing a type before calling the port', async () => {
+    const { dependencias } = renderizar()
+    await userEvent.type(screen.getByLabelText('Nombre'), 'ARC Caribe')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Crear buque' }))
+
+    expect(screen.getByRole('radiogroup', { name: 'Tipo' })).toHaveAccessibleDescription('Este campo es requerido.')
+    expect(dependencias.buques.crear).not.toHaveBeenCalled()
+  })
+
   it('creates the vessel with trimmed values, only the filled fields, and opens its sheet', async () => {
     const { dependencias } = crearDependenciasFalsas()
     dependencias.buques.crear.mockResolvedValue(unDetalleBuque({ id: 9 }))

@@ -8,7 +8,7 @@ import { webglDisponible } from './vistaCasco'
 const LienzoCasco = lazy(() => import('./LienzoCasco.tsx'))
 
 /** Shows `alternativa` instead of a canvas that failed to load or to start (e.g. a lost WebGL context). */
-class LimiteDelLienzo extends Component<{ alternativa: ReactNode; children: ReactNode }, { fallo: boolean }> {
+export class LimiteDelLienzo extends Component<{ alternativa: ReactNode; children: ReactNode }, { fallo: boolean }> {
   state = { fallo: false }
 
   static getDerivedStateFromError() {
