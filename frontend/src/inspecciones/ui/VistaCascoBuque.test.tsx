@@ -109,31 +109,7 @@ beforeEach(() => {
   vi.mocked(EscenaCasco).mockClear()
 })
 
-function busquedaRapida() {
-  return screen.queryByLabelText('Buscar por nombre')
-}
-
-describe('ListaInspeccionesPage list / 3D switch', () => {
-  it('switches to the 3D hull and back to the list, keeping the choice in the URL', async () => {
-    const { router } = renderizar(preparar().dependencias, '/inspecciones/buque/1')
-    const vista3d = await screen.findByRole('button', { name: 'Vista 3D' })
-    expect(vista3d).toHaveAttribute('aria-pressed', 'false')
-    expect(screen.getByRole('button', { name: 'Lista' })).toHaveAttribute('aria-pressed', 'true')
-
-    await userEvent.click(vista3d)
-
-    expect(router.state.location.search).toBe('?vista=3d')
-    expect(await zonasDelCasco()).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Vista 3D' })).toHaveAttribute('aria-pressed', 'true')
-    expect(busquedaRapida()).not.toBeInTheDocument()
-
-    await userEvent.click(screen.getByRole('button', { name: 'Lista' }))
-
-    expect(router.state.location.search).toBe('')
-    expect(await screen.findByLabelText('Buscar por nombre')).toBeInTheDocument()
-    expect(screen.queryByRole('group', { name: 'Zonas del casco' })).not.toBeInTheDocument()
-  })
-
+describe('VistaCascoBuque', () => {
   it('draws the hull silhouette of the vessel and the legend of every state', async () => {
     renderizar()
 

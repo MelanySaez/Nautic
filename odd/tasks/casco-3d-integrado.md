@@ -24,3 +24,11 @@ Branch: `feat/casco-3d-integrado` (from `main`, merges `feat/casco-3d-05-lienzo`
 - L3: the merge of `feat/casco-3d-05-lienzo` had a conflict only in `AGENTS.md`, resolved by keeping both sides.
 - L4: T1 GREEN: `test_busqueda_inspecciones` OK (RED first: 3 failures). Commit e1f8447.
 - L5: T2 GREEN: Vitest `VistaCascoBuque`, `ListaInspeccionesPage`, `HttpInspeccionesRepository`, the router tests and `ui/casco` all pass (RED first: 13 failures). `pnpm lint` passes. `pnpm build` passes, and the entry chunk has no `WebGLRenderer`. The `/casco` route and `SelectorInspeccion` are removed. Pending: a manual check in a WebGL browser.
+- L6 (2026-11-18): the Gentle AI review was approved, with advisory findings. The user said: "adelante con las correcciones". The fixes:
+  - `useBusquedaInspecciones` compares the filter by content and takes `activa`, so the list does not search while 3D is shown;
+  - the vessel error in 3D offers "Reintentar";
+  - the switch is driven by a `vista3d` flag, not by its label;
+  - the switch and section-chip tests moved to `ListaInspeccionesPage.test.tsx`;
+  - a filter round-trip test was added.
+
+  The retry and hidden-search tests failed before the fix (RED) and pass now.

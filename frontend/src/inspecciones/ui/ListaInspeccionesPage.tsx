@@ -36,15 +36,15 @@ export function ListaInspeccionesPage({ buqueId }: { buqueId: number }) {
   const usuario = useUsuarioActual()
   const [parametros, setParametros] = useSearchParams()
   const filtroUrl = useMemo(() => filtroDesdeParametros(parametros), [parametros])
-  // Keyed by content: the view and zone params change the query without changing the search.
-  const claveFiltro = JSON.stringify(filtroUrl)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const filtro = useMemo(() => ({ ...filtroUrl, buqueId }), [claveFiltro, buqueId])
   const en3d = parametros.get('vista') === VISTA_3D
   const zonaId = idDeParametro(parametros, 'zona')
-  const { estado, cargarMas, quitar, reintentar } = useBusquedaInspecciones(filtro)
+  // The list is not on screen in 3D: its (filtered) search waits until it is shown again.
+  const { estado, cargarMas, quitar, reintentar } = useBusquedaInspecciones(
+    { ...filtroUrl, buqueId },
+    { activa: !en3d },
+  )
   const cargarBuque = useCallback(() => buques.obtener(buqueId), [buques, buqueId])
-  const buque = useRecurso(cargarBuque).estado
+  const { estado: buque, reintentar: reintentarBuque } = useRecurso(cargarBuque)
   // The vessel list passes the name along so the title is there from the first frame of the transition.
   const ubicacion = useLocation()
   const desdeLista = ubicacion.state as { buqueNombre?: string; volverA?: string } | null
@@ -167,22 +167,25 @@ export function ListaInspeccionesPage({ buqueId }: { buqueId: number }) {
         <div className="flex flex-wrap gap-3">
           <div role="group" aria-label="Vista" className="flex rounded border border-line p-0.5">
             {[
-              { etiqueta: 'Lista', activa: !en3d, icono: 'results' as const },
-              { etiqueta: 'Vista 3D', activa: en3d, icono: 'ship' as const },
-            ].map(({ etiqueta, activa, icono }) => (
-              <button
-                key={etiqueta}
-                type="button"
-                aria-pressed={activa}
-                onClick={() => !activa && mostrar3d(etiqueta === 'Vista 3D')}
-                className={`label-caps flex items-center gap-2 rounded-sm px-3 py-2 ${
-                  activa ? 'bg-surface-2 text-ink' : 'text-ink-muted hover:text-ink'
-                }`}
-              >
-                <Icon name={icono} className="size-4" />
-                {etiqueta}
-              </button>
-            ))}
+              { etiqueta: 'Lista', vista3d: false, icono: 'results' as const },
+              { etiqueta: 'Vista 3D', vista3d: true, icono: 'ship' as const },
+            ].map(({ etiqueta, vista3d, icono }) => {
+              const activa = vista3d === en3d
+              return (
+                <button
+                  key={etiqueta}
+                  type="button"
+                  aria-pressed={activa}
+                  onClick={() => !activa && mostrar3d(vista3d)}
+                  className={`label-caps flex items-center gap-2 rounded-sm px-3 py-2 ${
+                    activa ? 'bg-surface-2 text-ink' : 'text-ink-muted hover:text-ink'
+                  }`}
+                >
+                  <Icon name={icono} className="size-4" />
+                  {etiqueta}
+                </button>
+              )
+            })}
           </div>
           <EnlaceBoton to={`/vision?buque=${buqueId}`}>
             <Icon name="plus" className="size-4" />
@@ -194,7 +197,7 @@ export function ListaInspeccionesPage({ buqueId }: { buqueId: number }) {
       {en3d ? (
         <>
           {buque.tipo === 'cargando' && <Cargando texto="Cargando buque…" />}
-          {buque.tipo === 'error' && <MensajeError mensaje={buque.mensaje} />}
+          {buque.tipo === 'error' && <MensajeError mensaje={buque.mensaje} alReintentar={reintentarBuque} />}
           {buque.tipo === 'listo' && (
             <VistaCascoBuque
               buque={buque.datos}

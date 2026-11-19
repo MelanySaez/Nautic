@@ -22,16 +22,20 @@ type Registro = EstadoBusqueda & { clave: string }
 /**
  * Runs the server-side search for `filtro` and accumulates pages. Any change of filter (or a retry)
  * starts again from the first page, and responses that belong to a previous search are discarded.
+ * The filter is compared by content, so callers may pass a new object on every render.
+ * While `activa` is false nothing is requested (e.g. a list that is not on screen).
  */
-export function useBusquedaInspecciones(filtro: FiltroInspecciones) {
+export function useBusquedaInspecciones(filtro: FiltroInspecciones, { activa = true }: { activa?: boolean } = {}) {
   const { inspecciones } = useDependencias()
   const [intento, setIntento] = useState(0)
   const [registro, setRegistro] = useState<Registro | null>(null)
-  const clave = `${intento}:${JSON.stringify(filtro)}`
+  const consulta = JSON.stringify(filtro)
+  const clave = `${intento}:${consulta}`
 
   useEffect(() => {
+    if (!activa) return
     let vigente = true
-    inspecciones.buscar(filtro).then(
+    inspecciones.buscar(JSON.parse(consulta) as FiltroInspecciones).then(
       (pagina) => vigente && setRegistro({ clave, tipo: 'listo', ...pagina, cargandoMas: false, errorMas: null }),
       (error: unknown) =>
         vigente &&
@@ -45,7 +49,7 @@ export function useBusquedaInspecciones(filtro: FiltroInspecciones) {
     return () => {
       vigente = false
     }
-  }, [inspecciones, filtro, clave])
+  }, [inspecciones, activa, consulta, clave])
 
   const estado = useMemo<EstadoBusqueda>(
     () => (registro?.clave === clave ? registro : { tipo: 'cargando' }),

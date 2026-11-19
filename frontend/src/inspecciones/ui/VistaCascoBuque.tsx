@@ -30,9 +30,9 @@ export interface PropsVistaCascoBuque {
  * zone and its two actions. It lives inside the vessel's inspections page (`?vista=3d`).
  */
 export function VistaCascoBuque(props: PropsVistaCascoBuque) {
-  // Unfiltered on purpose: the colours always follow the latest inspection of the vessel.
-  const filtro = useMemo(() => ({ buqueId: props.buque.id }), [props.buque.id])
-  const { estado, reintentar } = useBusquedaInspecciones(filtro)
+  // Unfiltered on purpose, apart from the list's own search: the colours always follow the
+  // latest inspection of the vessel, whatever filters the list has.
+  const { estado, reintentar } = useBusquedaInspecciones({ buqueId: props.buque.id })
 
   if (estado.tipo === 'cargando') return <Cargando texto="Cargando inspecciones…" />
   if (estado.tipo === 'error') return <MensajeError mensaje={estado.mensaje} alReintentar={reintentar} />

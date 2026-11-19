@@ -285,6 +285,84 @@ describe('ListaInspeccionesPage', () => {
   })
 })
 
+describe('ListaInspeccionesPage list / 3D switch', () => {
+  const FONDO = { id: 12, codigo: 'MID-BTM', nombre: 'Fondo - Centro', descripcion: '', orden: 1 }
+
+  function conBuque() {
+    const falsas = crearDependenciasFalsas()
+    falsas.dependencias.buques.obtener.mockResolvedValue(
+      unDetalleBuque({ id: 1, nombre: 'ARA Libertad', secciones: [FONDO] }),
+    )
+    return falsas.dependencias
+  }
+
+  it('switches to the 3D hull and back to the list, keeping the choice in the URL', async () => {
+    const { router } = renderizar(conBuque())
+    const vista3d = await screen.findByRole('button', { name: 'Vista 3D' })
+    expect(vista3d).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByRole('button', { name: 'Lista' })).toHaveAttribute('aria-pressed', 'true')
+
+    await userEvent.click(vista3d)
+
+    expect(router.state.location.search).toBe('?vista=3d')
+    expect(await screen.findByRole('group', { name: 'Zonas del casco' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Vista 3D' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByLabelText('Buscar por nombre')).not.toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Lista' }))
+
+    expect(router.state.location.search).toBe('')
+    expect(await screen.findByLabelText('Buscar por nombre')).toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: 'Zonas del casco' })).not.toBeInTheDocument()
+  })
+
+  it('keeps the list filters through a round trip to 3D', async () => {
+    const { router } = renderizar(conBuque(), `${RUTA}?severidad_min=high&q=casco`)
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Vista 3D' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Lista' }))
+
+    expect(new URLSearchParams(router.state.location.search)).toEqual(
+      new URLSearchParams({ severidad_min: 'high', q: 'casco' }),
+    )
+    expect(await screen.findByLabelText('Buscar por nombre')).toHaveValue('casco')
+  })
+
+  it('does not run the filtered list search while the 3D hull is shown', async () => {
+    const dependencias = conBuque()
+    renderizar(dependencias, `${RUTA}?vista=3d&severidad_min=high`)
+
+    expect(await screen.findByRole('group', { name: 'Zonas del casco' })).toBeInTheDocument()
+    expect(dependencias.inspecciones.buscar).toHaveBeenCalledWith({ buqueId: 1 })
+    expect(dependencias.inspecciones.buscar).not.toHaveBeenCalledWith(expect.objectContaining({ severidadMin: 'high' }))
+  })
+
+  it('retries loading the vessel from the 3D view', async () => {
+    const dependencias = conBuque()
+    dependencias.buques.obtener.mockRejectedValueOnce(new Error('Sin conexión'))
+    renderizar(dependencias, `${RUTA}?vista=3d`)
+
+    await userEvent.click(await screen.findByRole('button', { name: /Reintentar/ }))
+
+    expect(await screen.findByRole('group', { name: 'Zonas del casco' })).toBeInTheDocument()
+    expect(dependencias.buques.obtener).toHaveBeenCalledTimes(2)
+  })
+
+  it('searches by hull section and shows the filter until it is removed', async () => {
+    const dependencias = conBuque()
+    const { router } = renderizar(dependencias, `${RUTA}?seccion=12&severidad_min=high`)
+
+    expect(await screen.findByText('Sección: MID-BTM · Fondo - Centro')).toBeInTheDocument()
+    expect(dependencias.inspecciones.buscar).toHaveBeenCalledWith({ buqueId: 1, severidadMin: 'high', seccionId: 12 })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Quitar filtro de sección' }))
+
+    expect(router.state.location.search).toBe('?severidad_min=high')
+    await waitFor(() => expect(dependencias.inspecciones.buscar).toHaveBeenLastCalledWith({ buqueId: 1, severidadMin: 'high' }))
+    expect(screen.queryByText(/^Sección:/)).not.toBeInTheDocument()
+  })
+})
+
 describe('ListaInspeccionesPage permissions', () => {
   const AJENA = unaInspeccion({ id: 43, lider: { id: 8, nombre: 'Luis Sosa' } })
 
