@@ -17,8 +17,14 @@ describe('TIPOS_BUQUE', () => {
       'Buque anfibio',
       'Buque logístico',
     ])
-    expect(new Set(TIPOS_BUQUE.map((tipo) => tipo.id)).size).toBe(6)
-    for (const tipo of TIPOS_BUQUE) expect(tipo.id).toBe(tipo.arquetipo.id)
+    expect(TIPOS_BUQUE.map((tipo) => tipo.id)).toEqual([
+      'fragata',
+      'corbeta',
+      'patrullera',
+      'destructor',
+      'buque-anfibio',
+      'buque-logistico',
+    ])
   })
 
   it.each(TIPOS_BUQUE.map((tipo) => [tipo.nombre, tipo] as const))('builds a valid hull for %s', (_, tipo) => {
