@@ -357,6 +357,48 @@ describe('ListaInspeccionesPage list / 3D switch', () => {
     expect(dependencias.inspecciones.buscar).toHaveBeenCalledTimes(3) // list, next page, 3D
   })
 
+  it('asks again for a list search dropped while it was in flight', async () => {
+    const dependencias = conBuque()
+    let primera = true
+    dependencias.inspecciones.buscar.mockImplementation((filtro) => {
+      if (!filtro.severidadMin) return Promise.resolve(unaPagina())
+      if (primera) {
+        primera = false
+        return new Promise(() => {})
+      }
+      return Promise.resolve(unaPagina([unaInspeccion({ id: 4, nombre: 'Grave' })]))
+    })
+    renderizar(dependencias, `${RUTA}?severidad_min=high`)
+    await screen.findByText('Cargando inspecciones…')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Vista 3D' }))
+    await screen.findByRole('group', { name: /^Lista de secciones/ })
+    await userEvent.click(screen.getByRole('button', { name: 'Lista' }))
+
+    expect(await screen.findByText('Grave')).toBeInTheDocument()
+  })
+
+  it('searches again after a failed list search when coming back from 3D', async () => {
+    const dependencias = conBuque()
+    let primera = true
+    dependencias.inspecciones.buscar.mockImplementation((filtro) => {
+      if (!filtro.severidadMin) return Promise.resolve(unaPagina())
+      if (primera) {
+        primera = false
+        return Promise.reject(new Error('Sin conexión'))
+      }
+      return Promise.resolve(unaPagina([unaInspeccion({ id: 4, nombre: 'Grave' })]))
+    })
+    renderizar(dependencias, `${RUTA}?severidad_min=high`)
+    expect(await screen.findByText('Sin conexión')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Vista 3D' }))
+    await screen.findByRole('group', { name: /^Lista de secciones/ })
+    await userEvent.click(screen.getByRole('button', { name: 'Lista' }))
+
+    expect(await screen.findByText('Grave')).toBeInTheDocument()
+  })
+
   it('runs the filtered search when a page opened in 3D switches to the list', async () => {
     const dependencias = conBuque()
     dependencias.inspecciones.buscar.mockImplementation(async (filtro) =>

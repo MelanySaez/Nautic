@@ -139,7 +139,7 @@ describe('VistaCascoBuque layout', () => {
     expect(plegable).not.toHaveAttribute('open')
     expect(screen.queryByRole('heading', { name: 'Secciones del casco' })).not.toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Zona seleccionada' })).toHaveTextContent(
-      'Pasa el cursor por el casco para ver cada sección y haz clic para elegirla.',
+      'Pasa el cursor por el casco y haz clic en una sección, o elígela en la «Lista de secciones».',
     )
   })
 
@@ -235,7 +235,7 @@ describe('VistaCascoBuque zones', () => {
   it('opens the two-option menu of the selected zone; selecting it again closes it', async () => {
     const { router } = renderizar()
     await zonasDelCasco()
-    expect(panel()).toHaveTextContent('Pasa el cursor por el casco para ver cada sección y haz clic para elegirla.')
+    expect(panel()).toHaveTextContent('Pasa el cursor por el casco y haz clic en una sección, o elígela en la «Lista de secciones».')
 
     await userEvent.click(await zona('MID-BTM'))
 
@@ -258,7 +258,7 @@ describe('VistaCascoBuque zones', () => {
     await userEvent.click(await zona('MID-BTM'))
 
     expect(router.state.location.search).toBe('?vista=3d')
-    expect(panel()).toHaveTextContent('Pasa el cursor por el casco para ver cada sección y haz clic para elegirla.')
+    expect(panel()).toHaveTextContent('Pasa el cursor por el casco y haz clic en una sección, o elígela en la «Lista de secciones».')
   })
 
   it('goes to the new inspection form with the vessel and the zone preselected', async () => {

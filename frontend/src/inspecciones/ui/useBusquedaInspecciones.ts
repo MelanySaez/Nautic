@@ -24,7 +24,8 @@ type Registro = EstadoBusqueda & { clave: string }
  * starts again from the first page, and responses that belong to a previous search are discarded.
  * The filter is compared by content, so callers may pass a new object on every render.
  * While `activa` is false nothing is requested (e.g. a list that is not on screen); turning it back
- * on keeps an answered search, with every page loaded so far, instead of asking again.
+ * on keeps a successful search, with every page loaded so far, instead of asking again. A failed
+ * or dropped one is asked for again.
  */
 export function useBusquedaInspecciones(filtro: FiltroInspecciones, { activa = true }: { activa?: boolean } = {}) {
   const { inspecciones } = useDependencias()
@@ -33,7 +34,7 @@ export function useBusquedaInspecciones(filtro: FiltroInspecciones, { activa = t
   const consulta = JSON.stringify(filtro)
   const clave = `${intento}:${consulta}`
 
-  // The search already answered (or still in flight) for `clave`.
+  // The search already answered successfully (or still in flight) for `clave`.
   const pedida = useRef<string | null>(null)
 
   useEffect(() => {
@@ -47,13 +48,16 @@ export function useBusquedaInspecciones(filtro: FiltroInspecciones, { activa = t
     }
     inspecciones.buscar(JSON.parse(consulta) as FiltroInspecciones).then(
       (pagina) => responder({ clave, tipo: 'listo', ...pagina, cargandoMas: false, errorMas: null }),
-      (error: unknown) =>
+      (error: unknown) => {
+        // Not worth keeping: coming back to this search tries it again.
+        pedida.current = null
         responder({
           clave,
           tipo: 'error',
           mensaje: mensajeDe(error),
           campos: error instanceof ApiError ? error.campos : undefined,
-        }),
+        })
+      },
     )
     return () => {
       vigente = false

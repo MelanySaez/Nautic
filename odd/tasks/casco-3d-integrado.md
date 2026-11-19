@@ -41,3 +41,9 @@ Branch: `feat/casco-3d-integrado` (from `main`, merges `feat/casco-3d-05-lienzo`
   - Hovering a zone shows a label with its code, name and state.
   - The section list is kept only as a folded `<details>` under the hull, as the keyboard and screen-reader path.
   - Evidence: RED first (12 failing against the previous code). After the change, 92 tests pass, and lint and build pass. The hover label itself needs WebGL, so it is checked by hand.
+- L9 (2026-11-18): the review of 8efab35 and f48aa12 was approved and acknowledged, with advisories. The user replied "adelante" to fixing 1-3.
+  - The panel hint now also points to the "Lista de secciones".
+  - A failed list search is asked for again after a 3D round trip.
+  - A new test covers a search dropped while in flight.
+  - The hover label stays a manual check.
+  - Evidence: RED first (3 failing). After the fix, 46 tests pass, and lint and build pass.
