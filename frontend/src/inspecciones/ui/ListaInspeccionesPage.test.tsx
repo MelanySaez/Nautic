@@ -19,6 +19,7 @@ function renderizar(dependencias = crearDependenciasFalsas().dependencias, ruta 
     [
       { path: '/', element: <p>Embarcaciones</p> },
       { path: '/inspecciones/buque/:id', element: <ListaInspeccionesRuta /> },
+      { path: '/inspecciones/buque/:id/casco', element: <p>Vista 3D del casco</p> },
       { path: '/vision', element: <p>Formulario nuevo</p> },
       { path: '/vision/:id', element: <p>Carga de fotos</p> },
       { path: '/inspecciones/:id/resultados', element: <p>Resultados</p> },
@@ -200,13 +201,41 @@ describe('ListaInspeccionesPage', () => {
     expect(await screen.findByText('Este buque todavía no tiene inspecciones.')).toBeInTheDocument()
   })
 
-  it('navigates to the new inspection form', async () => {
+  it('navigates to the new inspection form with this vessel preselected', async () => {
     const { router } = renderizar()
     await screen.findByText('Este buque todavía no tiene inspecciones.')
 
     await userEvent.click(screen.getAllByRole('link', { name: /Nueva inspección/ })[0])
 
     expect(router.state.location.pathname).toBe('/vision')
+    expect(router.state.location.search).toBe('?buque=1')
+  })
+
+  it('passes the vessel to the new inspection form from the header and the empty state', async () => {
+    renderizar(undefined, '/inspecciones/buque/5')
+    await screen.findByText('Este buque todavía no tiene inspecciones.')
+
+    const enlaces = screen.getAllByRole('link', { name: /Nueva inspección/ })
+
+    expect(enlaces).toHaveLength(2)
+    for (const enlace of enlaces) expect(enlace).toHaveAttribute('href', '/vision?buque=5')
+  })
+
+  it('opens the 3D hull view with the vessel name and the way back to these filters', async () => {
+    const { dependencias } = crearDependenciasFalsas()
+    dependencias.buques.obtener.mockResolvedValue(unDetalleBuque({ id: 1, nombre: 'ARA Libertad' }))
+    const { router } = renderizar(dependencias, `${RUTA}?severidad_min=high`)
+    await screen.findByRole('heading', { level: 1, name: 'ARA Libertad' })
+
+    const enlace = screen.getByRole('link', { name: 'Vista 3D' })
+    expect(enlace).toHaveAttribute('href', '/inspecciones/buque/1/casco')
+    await userEvent.click(enlace)
+
+    expect(router.state.location.pathname).toBe('/inspecciones/buque/1/casco')
+    expect(router.state.location.state).toEqual({
+      buqueNombre: 'ARA Libertad',
+      volverA: '/inspecciones/buque/1?severidad_min=high',
+    })
   })
 
   it('opens the results of an inspection', async () => {

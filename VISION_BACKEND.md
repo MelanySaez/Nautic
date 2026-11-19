@@ -40,7 +40,7 @@ SSE endpoint → browser (EventSource)
 ## Modelos de datos (`vision/models.py`)
 
 ### `SeccionCasco`
-Zona física del casco de un buque. Cada buque declara las suyas al crearse (las 20 estándar de `SECCIONES_ESTANDAR` o una lista propia); no existe un catálogo global.
+Zona física del casco de un buque. Cada buque declara las suyas al crearse (las 23 estándar de `SECCIONES_ESTANDAR` o una lista propia); no existe un catálogo global.
 
 | Campo | Tipo | Descripción |
 |---|---|---|
@@ -101,10 +101,11 @@ pendiente → en_proceso → completada
 **Detecciones agrupadas (`DeteccionFoto`, migraciones `0011`/`0012`):** una fila por clase y foto (`foto.detecciones`): `clase`, `cantidad`, `confianza_max`, `descartada` (falso positivo descartado por el inspector en el reporte); única por `(foto, clase)`, índice `(clase, foto)`. El worker reemplaza las filas en cada análisis. La API las expone con `resumen_detecciones(foto)` en este formato:
 ```json
 [
-  {"class_name": "corrosion", "count": 2, "max_confidence": 0.924},
-  {"class_name": "paint_peel", "count": 1, "max_confidence": 0.761}
+  {"class_name": "corrosion", "count": 2, "max_confidence": 0.924, "descartada": false},
+  {"class_name": "paint_peel", "count": 1, "max_confidence": 0.761, "descartada": true}
 ]
 ```
+`descartada` refleja la revisión del reporte: así quien lee el detalle puede excluir los falsos positivos igual que el PDF.
 
 En la API (dict de la foto y evento `foto-updated`) cada entrada sale además con `etiqueta`, `tipo` (`anomalia` | `componente`) y `severidad` (solo anomalías), calculados al leer desde la taxonomía de `core_engine` (`vision/taxonomia.py`, `enriquecer_detecciones`). La base guarda solo las tres claves de arriba, así que las fotos antiguas también salen con la taxonomía. Una clase que la taxonomía instalada no conoce sale con el nombre sin `_`, `tipo` y `severidad` en `null`.
 

@@ -35,8 +35,10 @@ export function ListaInspeccionesPage({ buqueId }: { buqueId: number }) {
   const cargarBuque = useCallback(() => buques.obtener(buqueId), [buques, buqueId])
   const buque = useRecurso(cargarBuque).estado
   // The vessel list passes the name along so the title is there from the first frame of the transition.
-  const desdeLista = useLocation().state as { buqueNombre?: string; volverA?: string } | null
-  const nombreBuque = buque.tipo === 'listo' ? buque.datos.nombre : (desdeLista?.buqueNombre ?? 'Embarcación')
+  const ubicacion = useLocation()
+  const desdeLista = ubicacion.state as { buqueNombre?: string; volverA?: string } | null
+  const nombreConocido = buque.tipo === 'listo' ? buque.datos.nombre : desdeLista?.buqueNombre
+  const nombreBuque = nombreConocido ?? 'Embarcación'
   const [texto, setTexto] = useState(parametros.get('q') ?? '')
   // Follow URL changes made elsewhere (nav link, history); our own debounced writes already match.
   const qUrl = parametros.get('q') ?? ''
@@ -132,10 +134,21 @@ export function ListaInspeccionesPage({ buqueId }: { buqueId: number }) {
             </h1>
           </div>
         </div>
-        <EnlaceBoton to="/vision">
-          <Icon name="plus" className="size-4" />
-          Nueva inspección
-        </EnlaceBoton>
+        <div className="flex flex-wrap gap-3">
+          {/* The name morphs into the 3D view title, whose back link returns to these filters. */}
+          <EnlaceBoton
+            to={`/inspecciones/buque/${buqueId}/casco`}
+            state={{ buqueNombre: nombreConocido, volverA: `${ubicacion.pathname}${ubicacion.search}` }}
+            variante="secundario"
+          >
+            <Icon name="ship" className="size-4" />
+            Vista 3D
+          </EnlaceBoton>
+          <EnlaceBoton to={`/vision?buque=${buqueId}`}>
+            <Icon name="plus" className="size-4" />
+            Nueva inspección
+          </EnlaceBoton>
+        </div>
       </header>
 
       <FiltrosInspecciones
@@ -161,7 +174,7 @@ export function ListaInspeccionesPage({ buqueId }: { buqueId: number }) {
           ) : (
             <>
               <p>Este buque todavía no tiene inspecciones.</p>
-              <EnlaceBoton to="/vision" variante="accion">
+              <EnlaceBoton to={`/vision?buque=${buqueId}`} variante="accion">
                 Nueva inspección
               </EnlaceBoton>
             </>

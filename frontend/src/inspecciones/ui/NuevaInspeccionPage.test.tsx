@@ -2,10 +2,10 @@ import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { ApiError } from '../../shared/http/apiClient'
-import { crearDependenciasFalsas, renderizarRutas, unaInspeccion } from '../../test/dobles'
+import { crearDependenciasFalsas, renderizarRutas, unaInspeccion, unBuque } from '../../test/dobles'
 import { NuevaInspeccionPage } from './NuevaInspeccionPage'
 
-function renderizar(dependencias = crearDependenciasFalsas().dependencias) {
+function renderizar(dependencias = crearDependenciasFalsas().dependencias, ruta = '/vision') {
   const router = renderizarRutas(
     [
       { path: '/', element: <p>Listado</p> },
@@ -13,7 +13,7 @@ function renderizar(dependencias = crearDependenciasFalsas().dependencias) {
       { path: '/vision/:id', element: <p>Carga de fotos</p> },
     ],
     dependencias,
-    '/vision',
+    ruta,
   )
   return { router, dependencias }
 }
@@ -186,5 +186,65 @@ describe('NuevaInspeccionPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Iniciar inspección' }))
 
     expect(dependencias.inspecciones.crear).toHaveBeenCalledWith(expect.objectContaining({ buqueId: 2, privada: true }))
+  })
+})
+
+describe('NuevaInspeccionPage deep links', () => {
+  it('preselects the vessel given in the URL', async () => {
+    const { dependencias } = crearDependenciasFalsas()
+    dependencias.buques.listar.mockResolvedValue([
+      unBuque(),
+      unBuque({ id: 7, nombre: 'ARA Libertad', tipo: 'Fragata' }),
+    ])
+    renderizar(dependencias, '/vision?buque=7')
+
+    await screen.findByRole('option', { name: 'ARA Libertad · Fragata' })
+
+    expect(screen.getByLabelText('Buque')).toHaveValue('7')
+  })
+
+  it('ignores a vessel of the URL that is not in the fleet', async () => {
+    renderizar(undefined, '/vision?buque=99')
+
+    await screen.findByRole('option', { name: 'ARA Libertad · Fragata' })
+
+    expect(screen.getByLabelText('Buque')).toHaveValue('')
+  })
+
+  it('lets the user choose another vessel than the preselected one', async () => {
+    const { dependencias } = crearDependenciasFalsas()
+    renderizar(dependencias, '/vision?buque=1')
+    await screen.findByRole('option', { name: 'ARA Libertad · Fragata' })
+
+    await userEvent.selectOptions(screen.getByLabelText('Buque'), '2')
+    await userEvent.click(screen.getByRole('button', { name: 'Iniciar inspección' }))
+
+    expect(dependencias.inspecciones.crear).toHaveBeenCalledWith(expect.objectContaining({ buqueId: 2 }))
+  })
+
+  it('creates the inspection for the preselected vessel and opens the zone of the URL', async () => {
+    const { dependencias } = crearDependenciasFalsas()
+    dependencias.inspecciones.crear.mockResolvedValue(unaInspeccion({ id: 42 }))
+    const { router } = renderizar(dependencias, '/vision?buque=2&zona=3')
+    await screen.findByRole('option', { name: 'ARA Libertad · Fragata' })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Iniciar inspección' }))
+
+    expect(dependencias.inspecciones.crear).toHaveBeenCalledWith(expect.objectContaining({ buqueId: 2 }))
+    expect(router.state.location.pathname).toBe('/vision/42')
+    expect(router.state.location.search).toBe('?zona=3')
+  })
+
+  it('opens the photo upload without a zone when the URL zone is not an id', async () => {
+    const { dependencias } = crearDependenciasFalsas()
+    dependencias.inspecciones.crear.mockResolvedValue(unaInspeccion({ id: 42 }))
+    const { router } = renderizar(dependencias, '/vision?zona=proa')
+    await screen.findByRole('option', { name: 'ARA Libertad · Fragata' })
+    await userEvent.selectOptions(screen.getByLabelText('Buque'), '2')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Iniciar inspección' }))
+
+    expect(router.state.location.pathname).toBe('/vision/42')
+    expect(router.state.location.search).toBe('')
   })
 })

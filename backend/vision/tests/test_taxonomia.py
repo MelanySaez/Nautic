@@ -29,7 +29,7 @@ class DeteccionesConTaxonomiaTests(TestCase):
     def _comprobar(self, detecciones):
         corrosion, casco, desconocida = detecciones
         self.assertEqual(corrosion, {
-            'class_name': 'corrosion', 'count': 2, 'max_confidence': 0.9,
+            'class_name': 'corrosion', 'count': 2, 'max_confidence': 0.9, 'descartada': False,
             'etiqueta': 'Corrosión', 'tipo': 'anomalia', 'severidad': 'critical',
         })
         self.assertEqual(

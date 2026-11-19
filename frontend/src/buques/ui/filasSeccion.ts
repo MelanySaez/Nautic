@@ -1,6 +1,6 @@
 import type { NuevaSeccion } from '../domain/buque'
 
-/** Which hull sections the new vessel gets: the 20 standard ones or a list declared by the user. */
+/** Which hull sections the new vessel gets: the 23 standard ones or a list declared by the user. */
 export type ModoSecciones = 'estandar' | 'propias'
 
 /** One editable row of the custom list; `uid` keeps the row identity while rows move or disappear. */

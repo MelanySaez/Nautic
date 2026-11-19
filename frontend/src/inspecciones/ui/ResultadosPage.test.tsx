@@ -8,6 +8,7 @@ import {
   renderizarRutas,
   SECCION_QUILLA,
   SOLO_LECTURA,
+  unaDeteccion,
   unaFoto,
   unaInspeccion,
   unDetalle,
@@ -27,9 +28,9 @@ const CORROIDA = unaFoto({
   imagenAnotada: 'http://api.test/media/anotadas/21.jpg',
   tiempoInferenciaMs: 1234,
   detecciones: [
-    { clase: 'corrosion', etiqueta: 'Corrosión', tipo: 'anomalia', severidad: 'critical', cantidad: 2, confianzaMaxima: 0.981 },
-    { clase: 'marine_growth', etiqueta: 'Incrustación marina', tipo: 'anomalia', severidad: 'medium', cantidad: 1, confianzaMaxima: 0.85 },
-    { clase: 'ship_hull', etiqueta: 'Casco del buque', tipo: 'componente', severidad: null, cantidad: 1, confianzaMaxima: 0.9 },
+    unaDeteccion({ cantidad: 2, confianzaMaxima: 0.981 }),
+    unaDeteccion({ clase: 'marine_growth', etiqueta: 'Incrustación marina', severidad: 'medium', confianzaMaxima: 0.85 }),
+    unaDeteccion({ clase: 'ship_hull', etiqueta: 'Casco del buque', tipo: 'componente', severidad: null }),
   ],
   detalleDisponible: true,
 })
@@ -52,12 +53,10 @@ const DETALLE_CORROIDA = {
 const SOLO_CASCO = unaFoto({
   id: 26,
   estado: 'completada',
-  detecciones: [
-    { clase: 'ship_hull', etiqueta: 'Casco del buque', tipo: 'componente', severidad: null, cantidad: 1, confianzaMaxima: 0.9 },
-  ],
+  detecciones: [unaDeteccion({ clase: 'ship_hull', etiqueta: 'Casco del buque', tipo: 'componente', severidad: null })],
 })
 
-function renderizar(fotos: Foto[], extra: Partial<InspeccionDetalle> = {}) {
+function renderizar(fotos: Foto[], extra: Partial<InspeccionDetalle> = {}, ruta = '/vision/7/resultados') {
   const falsas = crearDependenciasFalsas()
   falsas.dependencias.inspecciones.obtener.mockResolvedValue(unDetalle({ id: 7, buqueNombre: 'ARA Libertad', fotos, ...extra }))
   falsas.dependencias.inspecciones.listarSecciones.mockResolvedValue([SECCION_QUILLA, SECCION_PROA])
@@ -65,11 +64,12 @@ function renderizar(fotos: Foto[], extra: Partial<InspeccionDetalle> = {}) {
   const router = renderizarRutas(
     [
       { path: '/vision/:id/resultados', element: <ResultadosRuta /> },
+      { path: '/inspecciones/:id/resultados', element: <ResultadosRuta /> },
       { path: '/vision/:id', element: <p>Carga de fotos</p> },
       { path: '/inspecciones/:id/reporte', element: <p>Editor del reporte</p> },
     ],
     falsas.dependencias,
-    '/vision/7/resultados',
+    ruta,
   )
   return { ...falsas, router }
 }
@@ -283,7 +283,7 @@ describe('ResultadosPage', () => {
           fotoId: 25,
           estado: 'completada',
           severidad: 'medium',
-          detecciones: [{ clase: 'barnacles', etiqueta: 'barnacles', tipo: null, severidad: null, cantidad: 3, confianzaMaxima: 0.72 }],
+          detecciones: [unaDeteccion({ clase: 'barnacles', etiqueta: 'barnacles', tipo: null, severidad: null, cantidad: 3, confianzaMaxima: 0.72 })],
           tiempoInferenciaMs: 500,
           imagenAnotada: 'http://api.test/media/anotadas/25.jpg',
           errorDetalle: null,
@@ -304,6 +304,56 @@ describe('ResultadosPage', () => {
     await userEvent.click(await screen.findByRole('link', { name: 'Reporte' }))
 
     expect(router.state.location.pathname).toBe('/inspecciones/7/reporte')
+  })
+})
+
+describe('ResultadosPage zone in the URL', () => {
+  const EN_PROA = unaFoto({ id: 24, estado: 'completada', seccion: SECCION_PROA })
+
+  function articulos() {
+    return screen.getAllByRole('article').map((a) => a.getAttribute('aria-label'))
+  }
+
+  it('opens filtered by the zone of the URL when it has analyzed photos', async () => {
+    renderizar([CORROIDA, EN_PROA], {}, `/inspecciones/7/resultados?zona=${SECCION_PROA.id}`)
+
+    expect(await screen.findByRole('article', { name: 'FWD-BTM · Foto #24' })).toBeInTheDocument()
+    expect(articulos()).toEqual(['FWD-BTM · Foto #24'])
+    expect(screen.getByLabelText('Zona')).toHaveValue(String(SECCION_PROA.id))
+  })
+
+  it('shows every zone when the zone of the URL has no analyzed photos', async () => {
+    const pendiente = unaFoto({ id: 24, estado: 'pendiente', seccion: SECCION_PROA })
+    renderizar([CORROIDA, pendiente], {}, `/inspecciones/7/resultados?zona=${SECCION_PROA.id}`)
+
+    expect(await screen.findByRole('article', { name: 'KEEL · Foto #21' })).toBeInTheDocument()
+    expect(articulos()).toEqual(['KEEL · Foto #21'])
+    expect(screen.getByLabelText('Zona')).toHaveValue('')
+  })
+
+  it('shows every zone when the zone of the URL is unknown', async () => {
+    renderizar([CORROIDA, EN_PROA], {}, '/vision/7/resultados?zona=99')
+
+    await screen.findByRole('article', { name: 'KEEL · Foto #21' })
+
+    expect(articulos()).toEqual(['KEEL · Foto #21', 'FWD-BTM · Foto #24'])
+    expect(screen.getByLabelText('Zona')).toHaveValue('')
+  })
+
+  it('keeps the chosen zone in the URL, replacing the entry, and drops it for every zone', async () => {
+    const { router } = renderizar([CORROIDA, EN_PROA], {}, '/vision/7/resultados?origen=casco')
+    await screen.findByRole('article', { name: 'KEEL · Foto #21' })
+
+    await userEvent.selectOptions(screen.getByLabelText('Zona'), String(SECCION_PROA.id))
+
+    expect(router.state.location.search).toBe(`?origen=casco&zona=${SECCION_PROA.id}`)
+    expect(router.state.historyAction).toBe('REPLACE')
+    expect(articulos()).toEqual(['FWD-BTM · Foto #24'])
+
+    await userEvent.selectOptions(screen.getByLabelText('Zona'), '')
+
+    expect(router.state.location.search).toBe('?origen=casco')
+    expect(articulos()).toEqual(['KEEL · Foto #21', 'FWD-BTM · Foto #24'])
   })
 })
 

@@ -10,6 +10,7 @@ import type { DetallePorInstancia } from '../inspecciones/domain/detecciones'
 import type { ModeloIA } from '../inspecciones/domain/modelo'
 import type { BorradorReporte, CambiosReporte } from '../inspecciones/domain/reporte'
 import type {
+  Deteccion,
   EventoInspeccion,
   FiltroInspecciones,
   Foto,
@@ -142,6 +143,20 @@ export function unaFoto(overrides: Partial<Foto> = {}): Foto {
   }
 }
 
+/** A confirmed critical corrosion finding (one instance). */
+export function unaDeteccion(overrides: Partial<Deteccion> = {}): Deteccion {
+  return {
+    clase: 'corrosion',
+    etiqueta: 'Corrosión',
+    tipo: 'anomalia',
+    severidad: 'critical',
+    cantidad: 1,
+    confianzaMaxima: 0.9,
+    descartada: false,
+    ...overrides,
+  }
+}
+
 export function unModelo(overrides: Partial<ModeloIA> = {}): ModeloIA {
   return {
     id: 'yolo-seg',
@@ -212,7 +227,7 @@ export function crearDependenciasFalsas() {
     },
     inspecciones: {
       buscar: vi.fn(async (_filtro: FiltroInspecciones, _cursor?: string) => unaPagina()),
-      obtener: vi.fn(async () => unDetalle()),
+      obtener: vi.fn(async (_id: number) => unDetalle()),
       crear: vi.fn(async () => unaInspeccion()),
       renombrar: vi.fn(async (_id: number, nombre: string) => unaInspeccion({ nombre })),
       eliminar: vi.fn(async () => {}),

@@ -8,12 +8,13 @@ import { Cargando, MensajeError, Vacio } from '../../shared/ui/Estados'
 import { Icon } from '../../shared/ui/Icon'
 import { Tarjeta } from '../../shared/ui/Tarjeta'
 import { mensajeDe } from '../../shared/ui/formato'
-import type { EventoInspeccion, Foto, SeccionCasco } from '../domain/inspeccion'
+import type { EventoInspeccion, Foto } from '../domain/inspeccion'
 import { modeloInicial } from '../domain/modelo'
 import { resumirProgreso } from '../domain/reglas'
 import { ColaFotos } from './ColaFotos'
 import { InsigniaPrivada } from './Insignias'
 import { MapaZonas } from './MapaZonas'
+import { useIdEnUrl } from './parametrosUrl'
 import { SelectorModelo } from './SelectorModelo'
 import { useInspeccionEnVivo, type DatosInspeccion } from './useInspeccionEnVivo'
 import { useModelos } from './useModelos'
@@ -47,7 +48,9 @@ function CargaPorZona({ datos, aplicar }: { datos: DatosInspeccion; aplicar: (ev
   const { inspecciones } = useDependencias()
   const { detalle, secciones } = datos
   const { subirFotos: puedeSubir, analizar: puedeAnalizar } = detalle.misPermisos
-  const [zona, setZona] = useState<SeccionCasco | null>(null)
+  // The active zone lives in `?zona=<seccionId>`; an id that is not a section of this vessel selects nothing.
+  const [zonaId, fijarZonaId] = useIdEnUrl('zona')
+  const zona = secciones.find((s) => s.id === zonaId) ?? null
   const [subiendo, setSubiendo] = useState(0)
   const [errores, setErrores] = useState<string[]>([])
   const [aviso, setAviso] = useState<string | null>(null)
@@ -174,7 +177,8 @@ function CargaPorZona({ datos, aplicar }: { datos: DatosInspeccion; aplicar: (ev
               secciones={secciones}
               seleccionadaId={zona?.id ?? null}
               fotosPorSeccion={fotosPorSeccion}
-              alSeleccionar={setZona}
+              // Zones are toggles: pressing the active one clears the selection.
+              alSeleccionar={(seccion) => fijarZonaId(seccion.id === zona?.id ? null : seccion.id)}
             />
           )}
         </Tarjeta>

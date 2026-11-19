@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
+import { unaDeteccion } from '../../test/dobles'
 import type { Foto } from './inspeccion'
-import { aplicarEvento, resumirProgreso, severidadMaxima } from './reglas'
+import { aplicarEvento, esHallazgo, masSevera, resumirProgreso, severidadMaxima } from './reglas'
 
 const seccion = { id: 1, codigo: 'KEEL', nombre: 'Quilla', descripcion: '', orden: 1 }
 
@@ -60,6 +61,31 @@ describe('severidadMaxima', () => {
   })
 })
 
+describe('masSevera', () => {
+  it('returns the more severe of two levels', () => {
+    expect(masSevera('medium', 'critical')).toBe('critical')
+    expect(masSevera('high', 'low')).toBe('high')
+  })
+
+  it('never lets a missing level win', () => {
+    expect(masSevera(null, 'low')).toBe('low')
+    expect(masSevera('low', null)).toBe('low')
+    expect(masSevera(null, null)).toBeNull()
+  })
+})
+
+describe('esHallazgo', () => {
+  it('counts a confirmed anomaly and an unknown class as findings', () => {
+    expect(esHallazgo(unaDeteccion())).toBe(true)
+    expect(esHallazgo(unaDeteccion({ tipo: null, severidad: null }))).toBe(true)
+  })
+
+  it('leaves out hull components and discarded anomalies', () => {
+    expect(esHallazgo(unaDeteccion({ tipo: 'componente', severidad: null }))).toBe(false)
+    expect(esHallazgo(unaDeteccion({ descartada: true }))).toBe(false)
+  })
+})
+
 describe('aplicarEvento', () => {
   it('appends a created photo', () => {
     const nueva = foto({ id: 2 })
@@ -81,7 +107,7 @@ describe('aplicarEvento', () => {
         fotoId: 1,
         estado: 'completada',
         severidad: 'critical',
-        detecciones: [{ clase: 'corrosion', etiqueta: 'Corrosión', tipo: 'anomalia', severidad: 'critical', cantidad: 2, confianzaMaxima: 0.92 }],
+        detecciones: [unaDeteccion({ cantidad: 2, confianzaMaxima: 0.92 })],
         tiempoInferenciaMs: 1200,
         imagenAnotada: 'http://api/media/a-anotada.jpg',
         errorDetalle: null,

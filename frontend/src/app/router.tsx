@@ -5,6 +5,7 @@ import { ListaBuquesPage } from '../buques/ui/ListaBuquesPage'
 import { NuevoBuquePage } from '../buques/ui/NuevoBuquePage'
 import { CargaPorZonaRuta } from '../inspecciones/ui/CargaPorZonaPage'
 import { BuquesConInspeccionesPage } from '../inspecciones/ui/BuquesConInspeccionesPage'
+import { CascoBuqueRuta } from '../inspecciones/ui/CascoBuquePage'
 import { ListaInspeccionesRuta } from '../inspecciones/ui/ListaInspeccionesPage'
 import { NuevaInspeccionPage } from '../inspecciones/ui/NuevaInspeccionPage'
 import { ReporteRuta } from '../inspecciones/ui/ReportePage'
@@ -30,6 +31,7 @@ export const rutas: RouteObject[] = [
             children: [
               { path: '/', element: <BuquesConInspeccionesPage /> },
               { path: '/inspecciones/buque/:id', element: <ListaInspeccionesRuta /> },
+              { path: '/inspecciones/buque/:id/casco', element: <CascoBuqueRuta /> },
               { path: '/vision', element: <NuevaInspeccionPage /> },
               { path: '/vision/:id', element: <CargaPorZonaRuta /> },
               { path: '/vision/:id/resultados', element: <ResultadosRuta /> },

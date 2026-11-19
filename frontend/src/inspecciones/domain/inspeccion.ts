@@ -25,6 +25,8 @@ export interface Deteccion {
   severidad: Severidad | null
   cantidad: number
   confianzaMaxima: number
+  /** The inspector dismissed this class as a false positive in the report (false when the server omits it). */
+  descartada: boolean
 }
 
 export interface Foto {
