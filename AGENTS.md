@@ -16,7 +16,7 @@ The product has three sections, each with its API and its screens:
 | Section | Purpose | Status |
 |---|---|---|
 | **Buques** | Vessel entity with a technical sheet and its own hull sections | API create / list / detail / partial update (`vision/views_buques.py`, no delete); screens `/buques`, `/buques/nuevo`, `/buques/:id`, `/buques/:id/editar` |
-| **Inspecciones** | History of the inspections already created | API search, detail, rename, delete, editable report + PDF; screens `/` (vessels with inspections), `/inspecciones/buque/:id` (that vessel's inspections, with filters), `/inspecciones/buque/:id/casco` (hull view of the vessel, coloured by inspection) and `/inspecciones/:id/resultados`, `/inspecciones/:id/reporte` (report editor) |
+| **Inspecciones** | History of the inspections already created | API search, detail, rename, delete, editable report + PDF; screens `/` (vessels with inspections), `/inspecciones/buque/:id` (that vessel's inspections, with filters, or its 3D hull with `?vista=3d`) and `/inspecciones/:id/resultados`, `/inspecciones/:id/reporte` (report editor) |
 | **Visión IA** | Create an inspection and analyze its photos; every analysis belongs to an inspection | API photos → Celery → SSE with model selection; screens `/vision`, `/vision/:id`, `/vision/:id/resultados` |
 
 All endpoints live under `/api/`. The `vision` module needs infrastructure beyond Django + Postgres: **RabbitMQ** (Celery broker) and **Redis** (SSE pub/sub + rate limiting).
