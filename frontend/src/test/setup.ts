@@ -22,3 +22,7 @@ Object.defineProperty(window, 'matchMedia', {
     dispatchEvent: () => false,
   }),
 })
+
+// jsdom has no object URLs; a readable fake (`blob:<file name>`) lets tests check image previews.
+URL.createObjectURL = (objeto: Blob | MediaSource) => `blob:${objeto instanceof File ? objeto.name : 'objeto'}`
+URL.revokeObjectURL = () => {}

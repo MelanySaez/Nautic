@@ -10,6 +10,7 @@ import { Cargando, MensajeError } from '../../shared/ui/Estados'
 import { Icon } from '../../shared/ui/Icon'
 import { mensajeDe } from '../../shared/ui/formato'
 import type { BuqueDetalle, CambiosBuque } from '../domain/buque'
+import { detalleDeError, SIN_CAMBIOS_IMAGEN, type EleccionImagen } from './eleccionImagen'
 import { CamposBuque } from './CamposBuque'
 import {
   CAMPOS_TECNICOS,
@@ -64,8 +65,8 @@ function Marco({ volverA, children }: { volverA: string; children: ReactNode }) 
 }
 
 /**
- * Only the fields whose input text changed: trimmed text, blank image and measures become
- * `null` (cleared), and a blank description is sent as an empty string.
+ * Only the fields whose input text changed: trimmed text, blank measures become `null`
+ * (cleared), and a blank description is sent as an empty string. The image goes apart.
  */
 function aCambios(iniciales: Valores, valores: Valores): CambiosBuque {
   const cambios: CambiosBuque = {}
@@ -74,7 +75,6 @@ function aCambios(iniciales: Valores, valores: Valores): CambiosBuque {
   if (cambio('tipo')) cambios.tipo = valores.tipo.trim()
   if (cambio('etapa')) cambios.etapa = valores.etapa.trim()
   if (cambio('descripcion')) cambios.descripcion = valores.descripcion.trim()
-  if (cambio('imagen')) cambios.imagen = valores.imagen.trim() || null
   for (const campo of CAMPOS_TECNICOS) {
     if (!cambio(campo.clave)) continue
     const texto = valores[campo.clave].trim()
@@ -93,6 +93,12 @@ function FormularioEdicion({ buque }: { buque: BuqueDetalle }) {
   const [errores, setErrores] = useState<Errores>({})
   const [errorEnvio, setErrorEnvio] = useState<string | null>(null)
   const [enviando, setEnviando] = useState(false)
+  const [imagen, setImagen] = useState<EleccionImagen>(SIN_CAMBIOS_IMAGEN)
+
+  function cambiarImagen(eleccion: EleccionImagen, error: string | null) {
+    setImagen(eleccion)
+    setErrores(({ imagen: _anterior, ...resto }) => (error ? { ...resto, imagen: error } : resto))
+  }
 
   function cambiar(clave: string, valor: string) {
     setValores((actual) => ({ ...actual, [clave]: valor }))
@@ -102,28 +108,45 @@ function FormularioEdicion({ buque }: { buque: BuqueDetalle }) {
   async function enviar(evento: FormEvent) {
     evento.preventDefault()
     const invalidos = validar(valores, { etapaRequerida: true })
+    // A rejected file stays rejected until another one is picked.
+    if (errores.imagen) invalidos.imagen = errores.imagen
     setErrores(invalidos)
     if (Object.keys(invalidos).length > 0) return
     const cambios = aCambios(iniciales, valores)
-    if (Object.keys(cambios).length === 0) {
+    const cambiaImagen = imagen.archivo !== null || imagen.quitar
+    if (Object.keys(cambios).length === 0 && !cambiaImagen) {
       navegar(rutaFicha)
       return
     }
     setErrorEnvio(null)
     setEnviando(true)
     try {
-      await buques.actualizar(buque.id, cambios)
-      navegar(rutaFicha)
+      if (Object.keys(cambios).length > 0) await buques.actualizar(buque.id, cambios)
     } catch (error) {
-      if (error instanceof ApiError && error.campos) {
-        const { delFormulario, sinCampo } = repartirErroresDelServidor(error.campos)
-        setErrores(delFormulario)
-        setErrorEnvio(sinCampo.length > 0 ? [error.message, ...sinCampo].join(' · ') : null)
-      } else {
-        setErrorEnvio(mensajeDe(error))
-      }
-      setEnviando(false)
+      mostrarError(error)
+      return
     }
+    try {
+      if (imagen.archivo) await buques.subirImagen(buque.id, imagen.archivo)
+      else if (imagen.quitar) await buques.quitarImagen(buque.id)
+    } catch (error) {
+      // The sheet is already saved: only the image is left to retry.
+      setErrores({ imagen: detalleDeError(error) })
+      setEnviando(false)
+      return
+    }
+    navegar(rutaFicha)
+  }
+
+  function mostrarError(error: unknown) {
+    if (error instanceof ApiError && error.campos) {
+      const { delFormulario, sinCampo } = repartirErroresDelServidor(error.campos)
+      setErrores(delFormulario)
+      setErrorEnvio(sinCampo.length > 0 ? [error.message, ...sinCampo].join(' · ') : null)
+    } else {
+      setErrorEnvio(mensajeDe(error))
+    }
+    setEnviando(false)
   }
 
   return (
@@ -139,7 +162,12 @@ function FormularioEdicion({ buque }: { buque: BuqueDetalle }) {
       </header>
 
       <form onSubmit={enviar} noValidate className="animar-entrada flex flex-col gap-6">
-        <CamposBuque valores={valores} errores={errores} alCambiar={cambiar} />
+        <CamposBuque
+          valores={valores}
+          errores={errores}
+          alCambiar={cambiar}
+          imagen={{ actual: buque.imagen, eleccion: imagen, alCambiar: cambiarImagen }}
+        />
 
         <p className="text-sm text-ink-muted">Las secciones del casco no se pueden editar.</p>
 

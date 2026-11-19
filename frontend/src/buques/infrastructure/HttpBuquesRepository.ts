@@ -63,4 +63,14 @@ export class HttpBuquesRepository implements BuquesRepository {
   async actualizar(id: number, cambios: CambiosBuque): Promise<BuqueDetalle> {
     return aBuqueDetalle(await this.api.patch<BuqueDetalleDto>(`/api/buques/${id}/`, aCambiosBuqueDto(cambios)))
   }
+
+  async subirImagen(id: number, archivo: File): Promise<BuqueDetalle> {
+    const cuerpo = new FormData()
+    cuerpo.append('imagen', archivo)
+    return aBuqueDetalle(await this.api.post<BuqueDetalleDto>(`/api/buques/${id}/imagen/`, cuerpo))
+  }
+
+  async quitarImagen(id: number): Promise<BuqueDetalle> {
+    return aBuqueDetalle(await this.api.request<BuqueDetalleDto>(`/api/buques/${id}/imagen/`, { method: 'DELETE' }))
+  }
 }

@@ -238,7 +238,7 @@ describe('HttpBuquesRepository', () => {
     it('omits undefined and blank optionals so the backend applies its defaults', async () => {
       fetchMock.mockResolvedValue(respuesta(201, detalleDto))
 
-      await repo.crear({ nombre: 'Lancha', tipo: 'Patrullera', etapa: '', descripcion: '', imagen: '', puntalM: undefined })
+      await repo.crear({ nombre: 'Lancha', tipo: 'Patrullera', etapa: '', descripcion: '', puntalM: undefined })
 
       expect(JSON.parse(String(llamada(0).init.body))).toEqual({ nombre: 'Lancha', tipo: 'Patrullera' })
     })
@@ -298,7 +298,7 @@ describe('HttpBuquesRepository', () => {
     it('patches only the given fields in snake_case, keeping nulls and blanks, and returns the sheet', async () => {
       fetchMock.mockResolvedValue(respuesta(200, detalleDto))
 
-      const actualizado = await repo.actualizar(1, { nombre: 'ARC Caribe', descripcion: '', puntalM: null, imagen: null })
+      const actualizado = await repo.actualizar(1, { nombre: 'ARC Caribe', descripcion: '', puntalM: null })
 
       const { url, init } = llamada(0)
       expect(url).toBe('http://api.test/api/buques/1/')
@@ -307,7 +307,6 @@ describe('HttpBuquesRepository', () => {
         nombre: 'ARC Caribe',
         descripcion: '',
         puntal_m: null,
-        imagen: null,
       })
       expect(actualizado.esloraTotalM).toBe(110.5)
     })
@@ -319,6 +318,33 @@ describe('HttpBuquesRepository', () => {
         status: 400,
         campos: { etapa: ['Requerido.'] },
       })
+    })
+  })
+
+  describe('imagen', () => {
+    it('uploads the image as a multipart file and returns the sheet', async () => {
+      fetchMock.mockResolvedValue(respuesta(200, detalleDto))
+      const archivo = new File(['png'], 'casco.png', { type: 'image/png' })
+
+      const actualizado = await repo.subirImagen(1, archivo)
+
+      const { url, init } = llamada(0)
+      expect(url).toBe('http://api.test/api/buques/1/imagen/')
+      expect(init.method).toBe('POST')
+      expect(init.body).toBeInstanceOf(FormData)
+      expect((init.body as FormData).get('imagen')).toBe(archivo)
+      expect(actualizado.id).toBe(detalleDto.id)
+    })
+
+    it('removes the image with a DELETE', async () => {
+      fetchMock.mockResolvedValue(respuesta(200, { ...detalleDto, imagen: null }))
+
+      const actualizado = await repo.quitarImagen(1)
+
+      const { url, init } = llamada(0)
+      expect(url).toBe('http://api.test/api/buques/1/imagen/')
+      expect(init.method).toBe('DELETE')
+      expect(actualizado.imagen).toBeNull()
     })
   })
 })

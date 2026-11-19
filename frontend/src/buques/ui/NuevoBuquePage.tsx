@@ -8,6 +8,7 @@ import { MensajeError } from '../../shared/ui/Estados'
 import { Icon } from '../../shared/ui/Icon'
 import { mensajeDe } from '../../shared/ui/formato'
 import type { NuevoBuque } from '../domain/buque'
+import { detalleDeError, SIN_CAMBIOS_IMAGEN, type EleccionImagen } from './eleccionImagen'
 import { CamposBuque } from './CamposBuque'
 import {
   aNuevasSecciones,
@@ -37,7 +38,6 @@ function aNuevoBuque(valores: Valores, modo: ModoSecciones, filas: FilaSeccion[]
   const datos: NuevoBuque = { nombre: valores.nombre.trim(), tipo: valores.tipo.trim() }
   if (valores.etapa.trim()) datos.etapa = valores.etapa.trim()
   if (valores.descripcion.trim()) datos.descripcion = valores.descripcion.trim()
-  if (valores.imagen.trim()) datos.imagen = valores.imagen.trim()
   for (const campo of CAMPOS_TECNICOS) {
     if (valores[campo.clave].trim()) datos[campo.clave] = Number(valores[campo.clave])
   }
@@ -56,6 +56,12 @@ export function NuevoBuquePage() {
   const [siguienteUid, setSiguienteUid] = useState(1)
   const [errorEnvio, setErrorEnvio] = useState<string | null>(null)
   const [enviando, setEnviando] = useState(false)
+  const [imagen, setImagen] = useState<EleccionImagen>(SIN_CAMBIOS_IMAGEN)
+
+  function cambiarImagen(eleccion: EleccionImagen, error: string | null) {
+    setImagen(eleccion)
+    setErrores(({ imagen: _anterior, ...resto }) => (error ? { ...resto, imagen: error } : resto))
+  }
 
   function cambiar(clave: string, valor: string) {
     setValores((actual) => ({ ...actual, [clave]: valor }))
@@ -101,13 +107,24 @@ export function NuevoBuquePage() {
   async function enviar(evento: FormEvent) {
     evento.preventDefault()
     const invalidos = { ...validar(valores), ...validarSecciones(modoSecciones, filas, REQUERIDO) }
+    // A rejected file stays rejected until another one is picked.
+    if (errores.imagen) invalidos.imagen = errores.imagen
     setErrores(invalidos)
     if (Object.keys(invalidos).length > 0) return
     setErrorEnvio(null)
     setEnviando(true)
     try {
       const creado = await buques.crear(aNuevoBuque(valores, modoSecciones, filas))
-      navegar(`/buques/${creado.id}`)
+      // The image needs the vessel id. If it fails the vessel already exists: the sheet says so.
+      let aviso: string | undefined
+      if (imagen.archivo) {
+        try {
+          await buques.subirImagen(creado.id, imagen.archivo)
+        } catch (error) {
+          aviso = `El buque se creó, pero la imagen no se pudo guardar: ${detalleDeError(error)} Puedes subirla desde «Editar buque».`
+        }
+      }
+      navegar(`/buques/${creado.id}`, aviso ? { state: { aviso } } : undefined)
     } catch (error) {
       if (error instanceof ApiError && error.campos) {
         const { delFormulario, sinCampo } = repartirErroresDelServidor(error.campos, {
@@ -137,6 +154,7 @@ export function NuevoBuquePage() {
           errores={errores}
           alCambiar={cambiar}
           ayudaEtapa="Si lo dejas vacío se registra como Activo."
+          imagen={{ actual: null, eleccion: imagen, alCambiar: cambiarImagen }}
         />
 
         <SeccionesCascoForm

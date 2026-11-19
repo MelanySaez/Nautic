@@ -19,7 +19,7 @@ Branch: `feat/imagen-buque` (from `main`; independent of the 3D branches). Runne
 
 ## Tasks
 - [x] T1 — S2, S3 backend: endpoint, storage helper, image validation shared with photos, `imagen` read-only and served as a URL, tests, docs. Route: inline.
-- [ ] T2 — S1, S4 frontend: repository `subirImagen`/`quitarImagen`, file picker with preview in `CamposBuque`, the create and edit flows, tests, docs. Route: inline.
+- [x] T2 — S1, S4 frontend: repository `subirImagen`/`quitarImagen`, file picker with preview in `CamposBuque`, the create and edit flows, tests, docs. Route: inline.
 
 Risk: item 2 (file upload and URL exposure) and item 3 (`imagen` stops being writable through JSON). Both get an independent verifier at the end.
 
@@ -30,3 +30,15 @@ Risk: item 2 (file upload and URL exposure) and item 3 (`imagen` stops being wri
   - Added `almacenamiento.guardar_imagen_buque` / `es_imagen_buque`, and the `api_buque_imagen` endpoint (POST/DELETE).
   - `imagen` is now read-only in JSON and served as a URL.
   - Evidence: RED first (12 failures, 1 error). Now `test_imagen_buque`, `test_buques_api` and every test that uploads files pass, and `manage.py check` is clean.
+- L3: T2 GREEN.
+  - **What changed:**
+    - `CampoImagen` (file picker plus preview) and `eleccionImagen.ts`.
+    - Repository `subirImagen`/`quitarImagen`.
+    - The create flow uploads after creating, with a sheet notice when the upload fails.
+    - The edit flow runs the PATCH, then the image operation, and shows image errors under the field.
+    - The sheet shows the image.
+    - Test setup fakes `URL.createObjectURL`.
+  - **Evidence:**
+    - RED first: 2 repository tests and 11 page tests failed.
+    - All 52 `buques` tests pass, plus the shared tests.
+    - tsc, lint and build are clean.

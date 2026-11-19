@@ -25,6 +25,67 @@ async function rellenarRequeridos() {
 }
 
 describe('NuevoBuquePage', () => {
+  it('opens the file explorer for the image and uploads it after creating the vessel', async () => {
+    const { dependencias } = crearDependenciasFalsas()
+    dependencias.buques.crear.mockResolvedValue(unDetalleBuque({ id: 9 }))
+    const { router } = renderizar(dependencias)
+    const archivo = new File(['png'], 'casco.png', { type: 'image/png' })
+    await rellenarRequeridos()
+
+    const selector = screen.getByLabelText('Imagen')
+    expect(selector).toHaveAttribute('type', 'file')
+    expect(selector).toHaveAttribute('accept', 'image/*')
+    await userEvent.upload(selector, archivo)
+    expect(screen.getByRole('img', { name: 'Vista previa de la imagen' })).toHaveAttribute('src', 'blob:casco.png')
+    await userEvent.click(screen.getByRole('button', { name: 'Crear buque' }))
+
+    expect(dependencias.buques.crear).toHaveBeenCalledWith({ nombre: 'ARC Caribe', tipo: 'Fragata' })
+    expect(dependencias.buques.subirImagen).toHaveBeenCalledWith(9, archivo)
+    expect(router.state.location.pathname).toBe('/buques/9')
+  })
+
+  it('does not upload anything without an image', async () => {
+    const { dependencias } = renderizar()
+    await rellenarRequeridos()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Crear buque' }))
+
+    expect(dependencias.buques.crear).toHaveBeenCalled()
+    expect(dependencias.buques.subirImagen).not.toHaveBeenCalled()
+  })
+
+  it('refuses a file that is not an image or is larger than 5 MB', async () => {
+    const { dependencias } = renderizar()
+    const selector = screen.getByLabelText('Imagen')
+
+    await userEvent.upload(selector, new File(['x'], 'notas.txt', { type: 'text/plain' }), { applyAccept: false })
+    expect(selector).toHaveAccessibleDescription('Selecciona un archivo de imagen.')
+
+    await userEvent.upload(selector, new File([new Uint8Array(5 * 1024 * 1024 + 1)], 'grande.png', { type: 'image/png' }))
+    expect(selector).toHaveAccessibleDescription('La imagen no puede superar 5 MB.')
+    expect(screen.queryByRole('img', { name: 'Vista previa de la imagen' })).not.toBeInTheDocument()
+
+    await rellenarRequeridos()
+    await userEvent.click(screen.getByRole('button', { name: 'Crear buque' }))
+    expect(dependencias.buques.crear).not.toHaveBeenCalled()
+  })
+
+  it('keeps the created vessel and says so on its sheet when the image upload fails', async () => {
+    const { dependencias } = crearDependenciasFalsas()
+    dependencias.buques.crear.mockResolvedValue(unDetalleBuque({ id: 9 }))
+    dependencias.buques.subirImagen.mockRejectedValue(new ApiError(400, 'Datos inválidos.', { imagen: ['Corrupta.'] }))
+    const { router } = renderizar(dependencias)
+    await rellenarRequeridos()
+    await userEvent.upload(screen.getByLabelText('Imagen'), new File(['png'], 'casco.png', { type: 'image/png' }))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Crear buque' }))
+
+    expect(router.state.location.pathname).toBe('/buques/9')
+    expect(router.state.location.state).toEqual({
+      aviso: 'El buque se creó, pero la imagen no se pudo guardar: Corrupta. Puedes subirla desde «Editar buque».',
+    })
+  })
+
   it('creates the vessel with trimmed values, only the filled fields, and opens its sheet', async () => {
     const { dependencias } = crearDependenciasFalsas()
     dependencias.buques.crear.mockResolvedValue(unDetalleBuque({ id: 9 }))

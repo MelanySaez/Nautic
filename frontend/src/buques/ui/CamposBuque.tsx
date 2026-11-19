@@ -2,6 +2,8 @@ import { Campo } from '../../shared/ui/Campo'
 import { CLASES_CONTROL } from '../../shared/ui/clasesControl'
 import { Tarjeta } from '../../shared/ui/Tarjeta'
 import { GRUPOS_TECNICOS } from '../domain/fichaTecnica'
+import { CampoImagen } from './CampoImagen'
+import type { EleccionImagen } from './eleccionImagen'
 import { GrupoNumerico } from './GrupoNumerico'
 import type { Errores, Valores } from './formularioBuque'
 
@@ -13,11 +15,18 @@ export function CamposBuque({
   errores,
   alCambiar,
   ayudaEtapa,
+  imagen,
 }: {
   valores: Valores
   errores: Errores
   alCambiar: (clave: string, valor: string) => void
   ayudaEtapa?: string
+  /** The image picker: the stored image URL and what the user chose (see `CampoImagen`). */
+  imagen: {
+    actual: string | null
+    eleccion: EleccionImagen
+    alCambiar: (eleccion: EleccionImagen, error: string | null) => void
+  }
 }) {
   return (
     <>
@@ -62,14 +71,7 @@ export function CamposBuque({
               className={`${CLASES_CONTROL} resize-y`}
             />
           </Campo>
-          <Campo etiqueta="Imagen" error={errores.imagen} ayuda="Nombre o ruta del archivo; todavía no se muestra.">
-            <input
-              value={valores.imagen}
-              onChange={(e) => alCambiar('imagen', e.target.value)}
-              maxLength={255}
-              className={CLASES_CONTROL}
-            />
-          </Campo>
+          <CampoImagen {...imagen} error={errores.imagen} />
         </div>
       </Tarjeta>
 
