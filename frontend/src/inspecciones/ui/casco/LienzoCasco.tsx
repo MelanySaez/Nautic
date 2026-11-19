@@ -73,6 +73,7 @@ interface PiezasEscena {
   inertes: BufferGeometry[]
 }
 
+/** A three.js geometry over the arrays of a generated mesh: they are shared, not copied. */
 function geometriaDe(malla: Malla): BufferGeometry {
   const geometria = new BufferGeometry()
   geometria.setAttribute('position', new BufferAttribute(malla.posiciones, 3))

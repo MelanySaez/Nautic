@@ -49,3 +49,11 @@ Branch: `feat/tipos-buque` (stacked on `feat/casco-3d-integrado`, which holds th
   - Removed: `buques/ui/tipo/` (the grid and thumbnails) and `geometriaThree.ts`, which moved back into `LienzoCasco`. The `LimiteDelLienzo` export is reverted.
   - The catalogue and the per-type archetypes stay for the inspections 3D view (S4).
   - Evidence: RED first (12 failing). Now 163 tests pass, lint is clean, and the build passes with no three.js in the entry chunk.
+- L7 (2026-11-18): the review of 96df3f7 was approved and acknowledged. The user said "adelante con esos retoques".
+  - `CamposBuque` matches the type once (`tipoActual`, `fueraDeCatalogo`).
+  - `geometriaDe` has its aliasing comment back.
+  - Each type's `id` now comes from its archetype.
+  - The test message names the mesh.
+  - The fallback-archetype test cleans up the first tree.
+  - New tests cover replacing a legacy type, and a stored type written differently showing as its catalogue entry. They passed from the start (coverage gaps).
+  - Evidence: 165 tests pass, lint is clean, and the build passes.

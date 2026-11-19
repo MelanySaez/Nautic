@@ -16,13 +16,16 @@ export interface TipoBuque {
   arquetipo: Arquetipo
 }
 
+/** The type's id is its archetype's, so the two never drift apart. */
+const tipo = (nombre: string, arquetipo: Arquetipo): TipoBuque => ({ id: arquetipo.id, nombre, arquetipo })
+
 export const TIPOS_BUQUE: readonly TipoBuque[] = [
-  { id: 'fragata', nombre: 'Fragata', arquetipo: FRAGATA },
-  { id: 'corbeta', nombre: 'Corbeta', arquetipo: CORBETA },
-  { id: 'patrullera', nombre: 'Patrullera', arquetipo: PATRULLERA },
-  { id: 'destructor', nombre: 'Destructor', arquetipo: DESTRUCTOR },
-  { id: 'buque-anfibio', nombre: 'Buque anfibio', arquetipo: BUQUE_ANFIBIO },
-  { id: 'buque-logistico', nombre: 'Buque logístico', arquetipo: BUQUE_LOGISTICO },
+  tipo('Fragata', FRAGATA),
+  tipo('Corbeta', CORBETA),
+  tipo('Patrullera', PATRULLERA),
+  tipo('Destructor', DESTRUCTOR),
+  tipo('Buque anfibio', BUQUE_ANFIBIO),
+  tipo('Buque logístico', BUQUE_LOGISTICO),
 ]
 
 /** Lower case, without accents or surrounding blanks: how stored types are compared. */

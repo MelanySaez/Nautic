@@ -18,7 +18,7 @@ describe('TIPOS_BUQUE', () => {
       'Buque logístico',
     ])
     expect(new Set(TIPOS_BUQUE.map((tipo) => tipo.id)).size).toBe(6)
-    expect(new Set(TIPOS_BUQUE.map((tipo) => tipo.arquetipo.id)).size).toBe(6)
+    for (const tipo of TIPOS_BUQUE) expect(tipo.id).toBe(tipo.arquetipo.id)
   })
 
   it.each(TIPOS_BUQUE.map((tipo) => [tipo.nombre, tipo] as const))('builds a valid hull for %s', (_, tipo) => {
@@ -28,8 +28,13 @@ describe('TIPOS_BUQUE', () => {
     const eps = 1e-4 * L
 
     expect(casco.zonas.map((zona) => zona.codigo)).toEqual([...CODIGOS_ZONA])
-    for (const malla of [...casco.zonas, ...casco.neutras, ...casco.decorativas]) {
-      expect(malla.posiciones.every(Number.isFinite), malla.toString()).toBe(true)
+    const mallas = [
+      ...casco.zonas.map((zona) => [zona.codigo, zona] as const),
+      ...casco.neutras.map((malla, i) => [`neutra ${i}`, malla] as const),
+      ...casco.decorativas.map((malla, i) => [`decorativa ${i}`, malla] as const),
+    ]
+    for (const [nombre, malla] of mallas) {
+      expect(malla.posiciones.every(Number.isFinite), nombre).toBe(true)
     }
     for (const zona of casco.zonas) {
       expect(zona.indices.length, zona.codigo).toBeGreaterThanOrEqual(3)

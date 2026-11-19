@@ -131,6 +131,32 @@ describe('EditarBuquePage', () => {
     expect(dependencias.buques.actualizar).toHaveBeenCalledWith(7, { puntalM: 81 })
   })
 
+  it('replaces a type from before the catalogue with the chosen one', async () => {
+    const dependencias = conBuque()
+    dependencias.buques.obtener.mockResolvedValue(unDetalleBuque({ ...BUQUE, tipo: 'Remolcador' }))
+    renderizar('/buques/7/editar', dependencias)
+    const tipo = await screen.findByLabelText('Tipo')
+
+    await userEvent.selectOptions(tipo, 'Patrullera')
+
+    expect(within(tipo).queryByRole('option', { name: /fuera del catálogo/ })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+    expect(dependencias.buques.actualizar).toHaveBeenCalledWith(7, { tipo: 'Patrullera' })
+  })
+
+  it('shows a stored type written differently as its catalogue entry, and leaves it alone', async () => {
+    const dependencias = conBuque()
+    dependencias.buques.obtener.mockResolvedValue(unDetalleBuque({ ...BUQUE, tipo: 'buque logistico' }))
+    renderizar('/buques/7/editar', dependencias)
+
+    const tipo = await screen.findByLabelText('Tipo')
+    expect(tipo).toHaveValue('Buque logístico')
+    expect(within(tipo).queryByRole('option', { name: /fuera del catálogo/ })).not.toBeInTheDocument()
+    await userEvent.type(screen.getByLabelText('Puntal (m)'), '1')
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+    expect(dependencias.buques.actualizar).toHaveBeenCalledWith(7, { puntalM: 81 })
+  })
+
   it('sends the name of the chosen type', async () => {
     const { dependencias } = renderizar()
 

@@ -1,4 +1,4 @@
-import { act, screen, waitFor, within } from '@testing-library/react'
+import { act, cleanup, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
@@ -336,6 +336,8 @@ describe('VistaCascoBuque canvas slot', () => {
     renderizar(dependencias)
     await waitFor(() => expect(propsDelLienzo().arquetipo).toBe(PATRULLERA))
 
+    // A fresh tree: the first one must not render into the spy any more.
+    cleanup()
     dependencias.buques.obtener.mockResolvedValue(
       unDetalleBuque({ id: 2, nombre: 'Viejo', tipo: 'Remolcador', secciones: SECCIONES }),
     )

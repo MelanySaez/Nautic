@@ -20,6 +20,10 @@ export function CamposBuque({
   alCambiar: (clave: string, valor: string) => void
   ayudaEtapa?: string
 }) {
+  // A stored type matches the catalogue ignoring case and accents; free text from before it does not.
+  const tipoActual = tipoBuqueDe(valores.tipo)
+  const fueraDeCatalogo = valores.tipo.trim() !== '' && tipoActual === null
+
   return (
     <>
       <Tarjeta titulo="Datos generales">
@@ -34,7 +38,7 @@ export function CamposBuque({
           </Campo>
           <Campo etiqueta="Tipo" error={errores.tipo}>
             <select
-              value={tipoBuqueDe(valores.tipo)?.nombre ?? valores.tipo}
+              value={tipoActual?.nombre ?? valores.tipo}
               onChange={(e) => alCambiar('tipo', e.target.value)}
               className={CLASES_CONTROL}
             >
@@ -42,7 +46,7 @@ export function CamposBuque({
                 Selecciona un tipo
               </option>
               {/* A type stored before the catalogue stays selectable until another one is chosen. */}
-              {valores.tipo.trim() !== '' && !tipoBuqueDe(valores.tipo) && (
+              {fueraDeCatalogo && (
                 <option value={valores.tipo}>{valores.tipo} (fuera del catálogo)</option>
               )}
               {TIPOS_BUQUE.map((tipo) => (
