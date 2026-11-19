@@ -2,10 +2,8 @@ import base64
 import hashlib
 import json
 import logging
-import os
 import time
 
-from PIL import Image
 from django.conf import settings
 from django.db import transaction
 from django.contrib.auth import get_user_model
@@ -21,6 +19,7 @@ from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExampl
 from drf_spectacular.types import OpenApiTypes
 
 from .almacenamiento import borrar_archivo, guardar_original, leer_archivo, url_archivo
+from .imagenes import validar_imagen
 from .busqueda import (
     BusquedaInvalida, LIMIT_MAXIMO, LIMIT_POR_DEFECTO, ValorInvalido,
     _parsear_entero_positivo, buscar_inspecciones,
@@ -44,39 +43,6 @@ from .taxonomia import color_clase, enriquecer_detecciones, info_clase, listar_t
 from .tasks import procesar_foto
 
 logger = logging.getLogger(__name__)
-
-# Extensiones y content-types de imagen aceptados
-_ALLOWED_IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.bmp', '.webp', '.tiff', '.tif'}
-_ALLOWED_IMAGE_CONTENT_TYPES = {
-    'image/jpeg', 'image/png', 'image/bmp', 'image/webp', 'image/tiff',
-}
-
-
-def _validar_imagen(archivo):
-    """
-    Valida que un archivo subido sea una imagen real.
-    Retorna (ok: bool, error_msg: str|None).
-    """
-    # 1. Verificar extensión
-    extension = os.path.splitext(archivo.name)[1].lower()
-    if extension not in _ALLOWED_IMAGE_EXTENSIONS:
-        return False, f'Extensión no permitida: {extension}. Aceptadas: {", ".join(sorted(_ALLOWED_IMAGE_EXTENSIONS))}'
-
-    # 2. Verificar content type del navegador
-    if archivo.content_type and archivo.content_type not in _ALLOWED_IMAGE_CONTENT_TYPES:
-        return False, f'Tipo de archivo no permitido: {archivo.content_type}'
-
-    # 3. Verificar que PIL pueda abrir la imagen (magic bytes)
-    try:
-        archivo.seek(0)
-        img = Image.open(archivo)
-        img.verify()  # Verifica integridad sin decodificar completamente
-        archivo.seek(0)  # Rebobinar para lectura posterior
-    except Exception:
-        return False, 'El archivo no es una imagen válida o está corrupto.'
-
-    return True, None
-
 
 @extend_schema(
     tags=["Visión Artificial"],
@@ -818,7 +784,7 @@ def api_vision_subir_foto(request, inspeccion_id):
     archivo = request.FILES['imagen']
 
     # Validar que sea imagen real antes de guardar
-    img_ok, img_error = _validar_imagen(archivo)
+    img_ok, img_error = validar_imagen(archivo)
     if not img_ok:
         return Response({'error': img_error}, status=400)
 

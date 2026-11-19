@@ -19,6 +19,26 @@ function renderizar(ruta: string, dependencias = crearDependenciasFalsas().depen
 }
 
 describe('BuqueDetallePage', () => {
+  it('shows the vessel image, or the ship icon without one', async () => {
+    const { dependencias } = crearDependenciasFalsas()
+    dependencias.buques.obtener.mockResolvedValue(
+      unDetalleBuque({ id: 7, nombre: 'ARC Caribe', imagen: '/media/buques/imagenes/caribe.png' }),
+    )
+    renderizar('/buques/7', dependencias)
+
+    expect(await screen.findByRole('img', { name: 'Imagen de ARC Caribe' })).toHaveAttribute(
+      'src',
+      '/media/buques/imagenes/caribe.png',
+    )
+  })
+
+  it('shows the notice passed by the page that sent here', async () => {
+    const { router } = renderizar('/buques')
+    await router.navigate('/buques/7', { state: { aviso: 'La imagen no se pudo guardar.' } })
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('La imagen no se pudo guardar.')
+  })
+
   it('renders the technical sheet by group, with units and a dash for unset values', async () => {
     const { dependencias } = crearDependenciasFalsas()
     dependencias.buques.obtener.mockResolvedValue(

@@ -6,7 +6,7 @@ export interface Buque {
   nombre: string
   tipo: string
   etapa: string
-  /** Plain name or path stored by the backend; there is no serving contract for it yet. */
+  /** URL of the uploaded image, or null. It only changes through `subirImagen` / `quitarImagen`. */
   imagen: string | null
   createdAt: string
   updatedAt: string
@@ -68,15 +68,15 @@ export interface NuevaSeccion {
  * or a non-empty list of custom sections in display order.
  */
 export type NuevoBuque = Pick<Buque, 'nombre' | 'tipo'> &
-  Partial<Omit<BuqueDetalle, 'id' | 'nombre' | 'tipo' | 'createdAt' | 'updatedAt' | 'secciones'>> & {
+  Partial<Omit<BuqueDetalle, 'id' | 'nombre' | 'tipo' | 'imagen' | 'createdAt' | 'updatedAt' | 'secciones'>> & {
     secciones?: 'estandar' | NuevaSeccion[]
   }
 
 /**
- * Partial update of the technical sheet: only the given fields change. `null` clears a measure
- * or the image. Hull sections cannot be edited.
+ * Partial update of the technical sheet: only the given fields change. `null` clears a measure.
+ * Hull sections cannot be edited, and the image has its own operations.
  */
-export type CambiosBuque = Partial<Omit<BuqueDetalle, 'id' | 'createdAt' | 'updatedAt' | 'secciones'>>
+export type CambiosBuque = Partial<Omit<BuqueDetalle, 'id' | 'imagen' | 'createdAt' | 'updatedAt' | 'secciones'>>
 
 export interface BuquesRepository {
   /** Returns the complete fleet in the order the API provides. */
@@ -86,4 +86,7 @@ export interface BuquesRepository {
   obtener(id: number): Promise<BuqueDetalle>
   crear(datos: NuevoBuque): Promise<BuqueDetalle>
   actualizar(id: number, cambios: CambiosBuque): Promise<BuqueDetalle>
+  /** Stores (or replaces) the vessel image; returns the sheet with its new URL. */
+  subirImagen(id: number, archivo: File): Promise<BuqueDetalle>
+  quitarImagen(id: number): Promise<BuqueDetalle>
 }

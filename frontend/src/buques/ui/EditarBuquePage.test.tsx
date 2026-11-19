@@ -12,7 +12,7 @@ const BUQUE = unDetalleBuque({
   tipo: 'Fragata',
   etapa: 'Activo',
   descripcion: 'Buque de prueba',
-  imagen: 'caribe.png',
+  imagen: '/media/buques/imagenes/caribe.png',
   esloraTotalM: 110.5,
   puntalM: 8,
 })
@@ -44,7 +44,10 @@ describe('EditarBuquePage', () => {
     expect(dependencias.buques.obtener).toHaveBeenCalledWith(7)
     expect(screen.getByLabelText('Tipo')).toHaveValue('Fragata')
     expect(screen.getByLabelText('Descripción')).toHaveValue('Buque de prueba')
-    expect(screen.getByLabelText('Imagen')).toHaveValue('caribe.png')
+    expect(screen.getByRole('img', { name: 'Vista previa de la imagen' })).toHaveAttribute(
+      'src',
+      '/media/buques/imagenes/caribe.png',
+    )
     expect(screen.getByLabelText('Eslora total (m)')).toHaveValue(110.5)
     expect(screen.getByLabelText('Manga moldeada (m)')).toHaveValue(null)
   })
@@ -58,13 +61,11 @@ describe('EditarBuquePage', () => {
     await userEvent.clear(screen.getByLabelText('Puntal (m)'))
     await userEvent.type(screen.getByLabelText('Manga moldeada (m)'), '14')
     await userEvent.clear(screen.getByLabelText('Descripción'))
-    await userEvent.clear(screen.getByLabelText('Imagen'))
     await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
 
     expect(dependencias.buques.actualizar).toHaveBeenCalledWith(7, {
       nombre: 'ARC Pacífico',
       descripcion: '',
-      imagen: null,
       puntalM: null,
       mangaMoldeadaM: 14,
     })
@@ -164,6 +165,53 @@ describe('EditarBuquePage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
 
     expect(dependencias.buques.actualizar).toHaveBeenCalledWith(7, { tipo: 'Patrullera' })
+  })
+
+  it('replaces the image with the chosen file when saving', async () => {
+    const { router, dependencias } = renderizar()
+    const archivo = new File(['png'], 'nueva.png', { type: 'image/png' })
+
+    await userEvent.upload(await screen.findByLabelText('Imagen'), archivo)
+    expect(screen.getByRole('img', { name: 'Vista previa de la imagen' })).toHaveAttribute('src', 'blob:nueva.png')
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+
+    expect(dependencias.buques.subirImagen).toHaveBeenCalledWith(7, archivo)
+    expect(dependencias.buques.actualizar).not.toHaveBeenCalled()
+    expect(router.state.location.pathname).toBe('/buques/7')
+  })
+
+  it('removes the current image when saving', async () => {
+    const { dependencias } = renderizar()
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Quitar imagen' }))
+    expect(screen.queryByRole('img', { name: 'Vista previa de la imagen' })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+
+    expect(dependencias.buques.quitarImagen).toHaveBeenCalledWith(7)
+    expect(dependencias.buques.subirImagen).not.toHaveBeenCalled()
+  })
+
+  it('shows a failed image upload under the field and stays on the form', async () => {
+    const dependencias = conBuque()
+    dependencias.buques.subirImagen.mockRejectedValue(
+      new ApiError(400, 'Datos inválidos.', { imagen: ['El archivo no es una imagen válida o está corrupto.'] }),
+    )
+    const { router } = renderizar('/buques/7/editar', dependencias)
+    const selector = await screen.findByLabelText('Imagen')
+
+    await userEvent.upload(selector, new File(['png'], 'rota.png', { type: 'image/png' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+
+    expect(await screen.findByText('El archivo no es una imagen válida o está corrupto.')).toBeInTheDocument()
+    expect(selector).toHaveAttribute('aria-invalid', 'true')
+    expect(router.state.location.pathname).toBe('/buques/7/editar')
+    expect(screen.getByRole('button', { name: 'Guardar cambios' })).toBeEnabled()
+
+    // The same file can be sent again once the problem is gone.
+    dependencias.buques.subirImagen.mockResolvedValue(unDetalleBuque({ id: 7 }))
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+    expect(dependencias.buques.subirImagen).toHaveBeenCalledTimes(2)
+    expect(router.state.location.pathname).toBe('/buques/7')
   })
 
   it('cancels back to the sheet', async () => {

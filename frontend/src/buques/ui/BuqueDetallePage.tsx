@@ -1,5 +1,5 @@
 import { useCallback, type ReactNode } from 'react'
-import { useParams } from 'react-router'
+import { useLocation, useParams } from 'react-router'
 import { EnlaceBoton } from '../../shared/ui/Boton'
 import { Enlace } from '../../shared/ui/Enlace'
 import { transicionNombreBuque } from '../../shared/ui/transiciones'
@@ -59,16 +59,26 @@ function Marco({ children }: { children: ReactNode }) {
 }
 
 function FichaTecnica({ buque }: { buque: BuqueDetalle }) {
+  // A notice from the page that sent here, e.g. an image the creation could not store.
+  const aviso = (useLocation().state as { aviso?: string } | null)?.aviso
   return (
     <div className="animar-entrada flex flex-col gap-6">
+      {aviso && <MensajeError mensaje={aviso} />}
       <header className="flex items-center gap-4">
         <Enlace to="/buques" aria-label="Volver a buques" className="rounded p-1 text-ink-muted hover:text-ink">
           <Icon name="back" className="size-6" />
         </Enlace>
-        {/* There is no image serving contract yet, so the picture is always a placeholder. */}
-        <div className="flex size-14 shrink-0 items-center justify-center rounded bg-surface-2 text-ink-dim">
-          <Icon name="ship" className="size-7" />
-        </div>
+        {buque.imagen ? (
+          <img
+            src={buque.imagen}
+            alt={`Imagen de ${buque.nombre}`}
+            className="size-14 shrink-0 rounded border border-line object-cover"
+          />
+        ) : (
+          <div className="flex size-14 shrink-0 items-center justify-center rounded bg-surface-2 text-ink-dim">
+            <Icon name="ship" className="size-7" />
+          </div>
+        )}
         <div className="min-w-0 flex-1">
           <p className="label-caps text-ink-dim">Ficha técnica · BUQ-{String(buque.id).padStart(4, '0')}</p>
           <h1 className="truncate text-2xl font-semibold tracking-tight md:text-3xl">
