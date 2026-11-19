@@ -32,3 +32,7 @@ Branch: `feat/casco-3d-integrado` (from `main`, merges `feat/casco-3d-05-lienzo`
   - a filter round-trip test was added.
 
   The retry and hidden-search tests failed before the fix (RED) and pass now.
+- L7 (2026-11-18): the reliability review of e851305 was approved and acknowledged, with advisories.
+  - **Fixed:** `R3-reactivation-drops-pages`. Reactivating the list used to re-request page 1 and drop the pages loaded with "Cargar más". The hook now keeps an answered search, and a dropped answer is asked for again.
+  - **New test:** a page opened in 3D, then switched to the list, runs the deferred filtered search.
+  - **Evidence:** RED first (the round-trip test failed). After the fix, 42 tests pass, and lint and build pass.

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useDependencias } from '../../app/useDependencias'
 import { ApiError, type ErroresDeCampo } from '../../shared/http/apiClient'
 import { mensajeDe } from '../../shared/ui/formato'
@@ -23,7 +23,8 @@ type Registro = EstadoBusqueda & { clave: string }
  * Runs the server-side search for `filtro` and accumulates pages. Any change of filter (or a retry)
  * starts again from the first page, and responses that belong to a previous search are discarded.
  * The filter is compared by content, so callers may pass a new object on every render.
- * While `activa` is false nothing is requested (e.g. a list that is not on screen).
+ * While `activa` is false nothing is requested (e.g. a list that is not on screen); turning it back
+ * on keeps an answered search, with every page loaded so far, instead of asking again.
  */
 export function useBusquedaInspecciones(filtro: FiltroInspecciones, { activa = true }: { activa?: boolean } = {}) {
   const { inspecciones } = useDependencias()
@@ -32,14 +33,22 @@ export function useBusquedaInspecciones(filtro: FiltroInspecciones, { activa = t
   const consulta = JSON.stringify(filtro)
   const clave = `${intento}:${consulta}`
 
+  // The search already answered (or still in flight) for `clave`.
+  const pedida = useRef<string | null>(null)
+
   useEffect(() => {
-    if (!activa) return
+    if (!activa || pedida.current === clave) return
+    pedida.current = clave
     let vigente = true
+    let respondida = false
+    const responder = (nuevo: Registro) => {
+      respondida = true
+      if (vigente) setRegistro(nuevo)
+    }
     inspecciones.buscar(JSON.parse(consulta) as FiltroInspecciones).then(
-      (pagina) => vigente && setRegistro({ clave, tipo: 'listo', ...pagina, cargandoMas: false, errorMas: null }),
+      (pagina) => responder({ clave, tipo: 'listo', ...pagina, cargandoMas: false, errorMas: null }),
       (error: unknown) =>
-        vigente &&
-        setRegistro({
+        responder({
           clave,
           tipo: 'error',
           mensaje: mensajeDe(error),
@@ -48,6 +57,8 @@ export function useBusquedaInspecciones(filtro: FiltroInspecciones, { activa = t
     )
     return () => {
       vigente = false
+      // A dropped answer must be asked for again next time.
+      if (!respondida) pedida.current = null
     }
   }, [inspecciones, activa, consulta, clave])
 

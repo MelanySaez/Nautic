@@ -337,6 +337,40 @@ describe('ListaInspeccionesPage list / 3D switch', () => {
     expect(dependencias.inspecciones.buscar).not.toHaveBeenCalledWith(expect.objectContaining({ severidadMin: 'high' }))
   })
 
+  it('keeps the pages loaded with "Cargar más" through a round trip to 3D', async () => {
+    const dependencias = conBuque()
+    dependencias.inspecciones.buscar.mockImplementation(async (_filtro, cursor) =>
+      cursor
+        ? unaPagina([unaInspeccion({ id: 2, nombre: 'Segunda' })])
+        : unaPagina([unaInspeccion({ id: 1, nombre: 'Primera' })], { siguiente: 'c1', hayMas: true }),
+    )
+    renderizar(dependencias)
+    await userEvent.click(await screen.findByRole('button', { name: 'Cargar más' }))
+    expect(await screen.findByText('Segunda')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Vista 3D' }))
+    await screen.findByRole('group', { name: 'Zonas del casco' })
+    await userEvent.click(screen.getByRole('button', { name: 'Lista' }))
+
+    expect(await screen.findByText('Primera')).toBeInTheDocument()
+    expect(screen.getByText('Segunda')).toBeInTheDocument()
+    expect(dependencias.inspecciones.buscar).toHaveBeenCalledTimes(3) // list, next page, 3D
+  })
+
+  it('runs the filtered search when a page opened in 3D switches to the list', async () => {
+    const dependencias = conBuque()
+    dependencias.inspecciones.buscar.mockImplementation(async (filtro) =>
+      unaPagina(filtro.severidadMin ? [unaInspeccion({ id: 4, nombre: 'Grave' })] : []),
+    )
+    renderizar(dependencias, `${RUTA}?vista=3d&severidad_min=high`)
+    await screen.findByRole('group', { name: 'Zonas del casco' })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Lista' }))
+
+    expect(await screen.findByText('Grave')).toBeInTheDocument()
+    expect(dependencias.inspecciones.buscar).toHaveBeenCalledWith({ buqueId: 1, severidadMin: 'high' })
+  })
+
   it('retries loading the vessel from the 3D view', async () => {
     const dependencias = conBuque()
     dependencias.buques.obtener.mockRejectedValueOnce(new Error('Sin conexión'))
