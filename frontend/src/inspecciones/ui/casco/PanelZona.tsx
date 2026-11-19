@@ -25,7 +25,7 @@ export function PanelZona({
       {zona ? (
         <ZonaElegida zona={zona} buqueId={buqueId} alVerInspecciones={alVerInspecciones} />
       ) : (
-        <p className="text-sm text-ink-muted">Selecciona una zona del casco o de la lista.</p>
+        <p className="text-sm text-ink-muted">Pasa el cursor por el casco para ver cada sección y haz clic para elegirla.</p>
       )}
     </section>
   )

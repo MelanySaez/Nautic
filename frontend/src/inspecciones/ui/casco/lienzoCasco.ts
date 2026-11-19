@@ -18,6 +18,8 @@ export interface PropsLienzoCasco {
   estados: ReadonlyMap<CodigoZona, EstadoZona>
   /** Photos of each placed zone in the selected inspection, in any state (0 included). */
   fotosPorZona: ReadonlyMap<CodigoZona, number>
+  /** Section name of each placed zone, shown next to the pointer while hovering it. */
+  nombresZona: ReadonlyMap<CodigoZona, string>
   /** True while the selected inspection loads: the states are not final yet. */
   cargando: boolean
   /** The selected zone, when the selected section is placed on the hull. */

@@ -43,6 +43,10 @@ function unasProps(cambios: Partial<PropsLienzoCasco> = {}): PropsLienzoCasco {
       ['KEEL', 3],
       ['MID-BTM', 0],
     ]),
+    nombresZona: new Map<CodigoZona, string>([
+      ['KEEL', 'Quilla'],
+      ['MID-BTM', 'Fondo - Centro'],
+    ]),
     cargando: false,
     seleccionada: 'MID-BTM',
     onSeleccionar: vi.fn(),

@@ -6,12 +6,22 @@
  */
 import { Edges, Html, OrbitControls } from '@react-three/drei'
 import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
-import { useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type Ref } from 'react'
+import {
+  useEffect,
+  useImperativeHandle,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent as EventoPunteroReact,
+  type Ref,
+} from 'react'
 import { BufferAttribute, BufferGeometry, Color, DoubleSide, type MeshStandardMaterial, type Vector3 } from 'three'
 import { generarCasco, type CascoGenerado } from '../../../buques/domain/casco/geometria'
 import type { Malla, Vec3 } from '../../../buques/domain/casco/malla'
 import type { CodigoZona } from '../../../buques/domain/casco/zonas'
 import { mezclarColores, useColoresTema, variableDeZona } from './coloresZona'
+import { PRESENTACION_ESTADO_ZONA } from './estadosZona'
 import type { PropsLienzoCasco } from './lienzoCasco'
 import {
   ASPECTO_POR_DEFECTO,
@@ -301,7 +311,8 @@ function Camara({ ref, caja, reducido }: { ref: Ref<MandoCamara>; caja: CascoGen
 
 /**
  * The hull in 3D, one clickable mesh per placed zone, coloured by its state. Hover highlights a
- * zone, a click (not a drag) picks it, a click on anything else clears the selection. The canvas is
+ * zone and labels it next to the pointer (section name and state), a click (not a drag) picks it,
+ * a click on anything else clears the selection. The canvas is
  * decorative for assistive technology: the zone list of the page is the accessible path.
  */
 export default function LienzoCasco({
@@ -310,6 +321,7 @@ export default function LienzoCasco({
   arquetipo,
   estados,
   fotosPorZona,
+  nombresZona,
   cargando,
   seleccionada,
   onSeleccionar,
@@ -322,6 +334,16 @@ export default function LienzoCasco({
 
   const [encima, setEncima] = useState<CodigoZona | null>(null)
   const [flotacion, setFlotacion] = useState(false)
+  // The hover label follows the pointer through its style, so moving it never re-renders the scene.
+  const etiqueta = useRef<HTMLDivElement>(null)
+  // Last pointer position, so a label that appears starts where the pointer already is.
+  const puntero = useRef('0px 0px')
+  const seguirPuntero = (evento: EventoPunteroReact<HTMLDivElement>) => {
+    const caja = evento.currentTarget.getBoundingClientRect()
+    puntero.current = `${evento.clientX - caja.left}px ${evento.clientY - caja.top}px`
+    etiqueta.current?.style.setProperty('translate', puntero.current)
+  }
+  const estadoEncima = encima ? estados.get(encima) : undefined
   const mando = useRef<MandoCamara>(null)
   // The canvas camera starts where the fly-in begins: the silhouette's side view, framed for the
   // 16:9 slot (or directly at 3/4 when nothing may move). Kept stable so R3F never resets it.
@@ -376,6 +398,7 @@ export default function LienzoCasco({
         aria-label={`Modelo 3D del casco de ${nombreBuque}`}
         className="absolute inset-0"
         style={{ cursor: encima ? 'pointer' : 'grab' }}
+        onPointerMove={seguirPuntero}
       >
         <Canvas
           aria-hidden="true"
@@ -454,6 +477,24 @@ export default function LienzoCasco({
           <Camara ref={mando} caja={casco.caja} reducido={reducido} />
         </Canvas>
       </div>
+
+      {encima && (
+        // The outer box sits on the pointer; the inner one floats up and to the right of it.
+        <div
+          ref={etiqueta}
+          aria-hidden="true"
+          style={{ translate: puntero.current }}
+          className="pointer-events-none absolute top-0 left-0 z-20 select-none"
+        >
+          <div className="-mt-3 ml-4 -translate-y-full rounded border border-line bg-surface/95 px-2.5 py-1.5 shadow-md">
+            <p className="font-mono text-[10px] tracking-wider text-ink-dim uppercase">{encima}</p>
+            <p className="text-sm font-semibold whitespace-nowrap text-ink">{nombresZona.get(encima) ?? encima}</p>
+            {estadoEncima && !cargando && (
+              <p className="text-xs text-ink-muted">{PRESENTACION_ESTADO_ZONA[estadoEncima].texto}</p>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="pointer-events-none absolute inset-x-2 bottom-2 flex flex-wrap items-end justify-between gap-2">
         <div role="group" aria-label="Vista de la cámara" className="pointer-events-auto flex flex-wrap gap-1">

@@ -5,7 +5,6 @@ import { dimensionesCasco } from '../../buques/domain/casco/dimensiones'
 import { CODIGOS_ZONA, ubicarSecciones, type CodigoZona } from '../../buques/domain/casco/zonas'
 import type { EstadoRecurso } from '../../shared/hooks/useRecurso'
 import { Cargando, MensajeError } from '../../shared/ui/Estados'
-import { Tarjeta } from '../../shared/ui/Tarjeta'
 import type { Foto, Inspeccion, InspeccionDetalle, SeccionCasco } from '../domain/inspeccion'
 import { resumirZonas, type EstadoZona } from '../domain/resumenZonas'
 import { EscenaCasco } from './casco/EscenaCasco'
@@ -107,11 +106,13 @@ function VistaCasco({
   const lienzo = useMemo(() => {
     const estados = new Map<CodigoZona, EstadoZona>()
     const fotosPorZona = new Map<CodigoZona, number>()
-    for (const [codigo, { resumen }] of enCasco) {
+    const nombresZona = new Map<CodigoZona, string>()
+    for (const [codigo, { seccion, resumen }] of enCasco) {
       estados.set(codigo, resumen.estado)
       fotosPorZona.set(codigo, resumen.fotos)
+      nombresZona.set(codigo, seccion.nombre)
     }
-    return { estados, fotosPorZona }
+    return { estados, fotosPorZona, nombresZona }
   }, [enCasco])
 
   const ubicadas = [...enCasco.values()]
@@ -126,6 +127,7 @@ function VistaCasco({
     arquetipo: BUQUE_DE_GUERRA,
     estados: lienzo.estados,
     fotosPorZona: lienzo.fotosPorZona,
+    nombresZona: lienzo.nombresZona,
     cargando: detalle?.tipo === 'cargando',
     seleccionada: codigoSeleccionado,
     onSeleccionar: (codigo) => {
@@ -148,36 +150,37 @@ function VistaCasco({
         )}
       </p>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
-        <div className="flex min-w-0 flex-col gap-6">
-          <Tarjeta titulo="Casco">
-            <div className="flex flex-col gap-4">
-              {/* No padding: the 3D canvas fills the frame; the silhouette pads itself. */}
-              <div className="flex aspect-video items-center justify-center overflow-hidden rounded border border-line bg-surface-2">
-                <EscenaCasco {...propsLienzo} />
-              </div>
-              <LeyendaZonas />
-            </div>
-          </Tarjeta>
-          {listo && <PanelZona zona={seleccionada} buqueId={buque.id} alVerInspecciones={alVerInspecciones} />}
+      {/* The hull is the page: full width, with the selected zone and its actions under it. */}
+      <div className="flex flex-col gap-3">
+        <div className="relative flex aspect-video max-h-[72vh] w-full items-center justify-center overflow-hidden rounded-lg border border-line bg-surface-2">
+          <EscenaCasco {...propsLienzo} />
         </div>
+        <LeyendaZonas />
+      </div>
 
-        <Tarjeta
-          titulo="Secciones del casco"
-          accion={<span className="label-caps text-accent-ink">{buque.secciones.length} secciones</span>}
+      {detalle?.tipo === 'cargando' && <Cargando texto="Cargando inspección…" />}
+      {detalle?.tipo === 'error' && <MensajeError mensaje={detalle.mensaje} alReintentar={reintentarDetalle} />}
+      {listo && <PanelZona zona={seleccionada} buqueId={buque.id} alVerInspecciones={alVerInspecciones} />}
+
+      {/* Keyboard and screen reader path to every section, folded so the hull stays the focus. */}
+      {listo && (
+        <details
+          aria-label={`Lista de secciones (${buque.secciones.length})`}
+          className="rounded-lg border border-line bg-surface"
         >
-          {detalle?.tipo === 'cargando' && <Cargando texto="Cargando inspección…" />}
-          {detalle?.tipo === 'error' && <MensajeError mensaje={detalle.mensaje} alReintentar={reintentarDetalle} />}
-          {listo && (
+          <summary className="label-caps cursor-pointer px-4 py-3 text-ink-muted hover:text-ink">
+            Lista de secciones ({buque.secciones.length})
+          </summary>
+          <div className="border-t border-line p-4">
             <ListaZonasCasco
               ubicadas={ubicadas}
               sinUbicar={sinUbicar}
               seleccionadaId={seleccionada?.seccion.id ?? null}
               alSeleccionar={alternar}
             />
-          )}
-        </Tarjeta>
-      </div>
+          </div>
+        </details>
+      )}
     </div>
   )
 }

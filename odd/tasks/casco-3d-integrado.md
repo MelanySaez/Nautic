@@ -36,3 +36,8 @@ Branch: `feat/casco-3d-integrado` (from `main`, merges `feat/casco-3d-05-lienzo`
   - **Fixed:** `R3-reactivation-drops-pages`. Reactivating the list used to re-request page 1 and drop the pages loaded with "Cargar más". The hook now keeps an answered search, and a dropped answer is asked for again.
   - **New test:** a page opened in 3D, then switched to the list, runs the deferred filtered search.
   - **Evidence:** RED first (the round-trip test failed). After the fix, 42 tests pass, and lint and build pass.
+- L8 (2026-11-18): "la intencion de la vista es que el barco sea el elemento principal y central de la misma, no necesito que aparezca un largo listado de secciones a su derecha como es el estado actual de la pestaña, seria preferible que tenga un hover sobre la seccion para que de una guia de su nombre por ejemplo"
+  - Done: the hull is full width and the side list card is gone.
+  - Hovering a zone shows a label with its code, name and state.
+  - The section list is kept only as a folded `<details>` under the hull, as the keyboard and screen-reader path.
+  - Evidence: RED first (12 failing against the previous code). After the change, 92 tests pass, and lint and build pass. The hover label itself needs WebGL, so it is checked by hand.

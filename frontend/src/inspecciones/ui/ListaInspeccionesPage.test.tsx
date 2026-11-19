@@ -305,7 +305,7 @@ describe('ListaInspeccionesPage list / 3D switch', () => {
     await userEvent.click(vista3d)
 
     expect(router.state.location.search).toBe('?vista=3d')
-    expect(await screen.findByRole('group', { name: 'Zonas del casco' })).toBeInTheDocument()
+    expect(await screen.findByRole('group', { name: /^Lista de secciones/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Vista 3D' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.queryByLabelText('Buscar por nombre')).not.toBeInTheDocument()
 
@@ -313,7 +313,7 @@ describe('ListaInspeccionesPage list / 3D switch', () => {
 
     expect(router.state.location.search).toBe('')
     expect(await screen.findByLabelText('Buscar por nombre')).toBeInTheDocument()
-    expect(screen.queryByRole('group', { name: 'Zonas del casco' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: /^Lista de secciones/ })).not.toBeInTheDocument()
   })
 
   it('keeps the list filters through a round trip to 3D', async () => {
@@ -332,7 +332,7 @@ describe('ListaInspeccionesPage list / 3D switch', () => {
     const dependencias = conBuque()
     renderizar(dependencias, `${RUTA}?vista=3d&severidad_min=high`)
 
-    expect(await screen.findByRole('group', { name: 'Zonas del casco' })).toBeInTheDocument()
+    expect(await screen.findByRole('group', { name: /^Lista de secciones/ })).toBeInTheDocument()
     expect(dependencias.inspecciones.buscar).toHaveBeenCalledWith({ buqueId: 1 })
     expect(dependencias.inspecciones.buscar).not.toHaveBeenCalledWith(expect.objectContaining({ severidadMin: 'high' }))
   })
@@ -349,7 +349,7 @@ describe('ListaInspeccionesPage list / 3D switch', () => {
     expect(await screen.findByText('Segunda')).toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: 'Vista 3D' }))
-    await screen.findByRole('group', { name: 'Zonas del casco' })
+    await screen.findByRole('group', { name: /^Lista de secciones/ })
     await userEvent.click(screen.getByRole('button', { name: 'Lista' }))
 
     expect(await screen.findByText('Primera')).toBeInTheDocument()
@@ -363,7 +363,7 @@ describe('ListaInspeccionesPage list / 3D switch', () => {
       unaPagina(filtro.severidadMin ? [unaInspeccion({ id: 4, nombre: 'Grave' })] : []),
     )
     renderizar(dependencias, `${RUTA}?vista=3d&severidad_min=high`)
-    await screen.findByRole('group', { name: 'Zonas del casco' })
+    await screen.findByRole('group', { name: /^Lista de secciones/ })
 
     await userEvent.click(screen.getByRole('button', { name: 'Lista' }))
 
@@ -378,7 +378,7 @@ describe('ListaInspeccionesPage list / 3D switch', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: /Reintentar/ }))
 
-    expect(await screen.findByRole('group', { name: 'Zonas del casco' })).toBeInTheDocument()
+    expect(await screen.findByRole('group', { name: /^Lista de secciones/ })).toBeInTheDocument()
     expect(dependencias.buques.obtener).toHaveBeenCalledTimes(2)
   })
 
