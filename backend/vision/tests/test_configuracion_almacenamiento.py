@@ -60,6 +60,7 @@ class ConfigurarStoragesTests(SimpleTestCase):
                     'default_acl': None,
                     'file_overwrite': False,
                     'signature_version': 's3v4',
+                    'object_parameters': {'CacheControl': 'private, max-age=600, immutable'},
                 },
             },
         )
@@ -101,7 +102,7 @@ class ConfigurarStoragesTests(SimpleTestCase):
         self.assertEqual(
             set(opciones),
             {'bucket_name', 'querystring_auth', 'querystring_expire', 'default_acl',
-             'file_overwrite', 'signature_version'},
+             'file_overwrite', 'signature_version', 'object_parameters'},
         )
         self.assertEqual(opciones['querystring_expire'], 900)
 

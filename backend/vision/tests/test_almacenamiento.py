@@ -141,6 +141,133 @@ class UrlArchivoTests(AlmacenamientoBase):
         request.build_absolute_uri.assert_not_called()
 
 
+@override_settings(CACHES={
+    'default': {'BACKEND': 'django.core.cache.backends.locmem.LocMemCache'},
+    'compartida': {'BACKEND': 'django.core.cache.backends.locmem.LocMemCache'},
+})
+class UrlFirmadaTests(AlmacenamientoBase):
+    """A signed URL is reused while it has at least half its lifetime left, so browsers can cache the photo."""
+
+    def setUp(self):
+        super().setUp()
+        from django.core.cache import caches
+
+        caches['compartida'].clear()
+        self._parchear('vision.almacenamiento._cache_en_pausa_hasta', new=0.0)
+        self.firmas = iter(range(1, 100))
+        self.firmar = self._parchear_storage(
+            'url', side_effect=lambda clave: f'https://bucket.example/{clave}?sig={next(self.firmas)}'
+        )
+
+    def _parchear_storage(self, atributo, **kwargs):
+        patcher = mock.patch.object(default_storage.__class__, atributo, create=True, **kwargs)
+        mocked = patcher.start()
+        self.addCleanup(patcher.stop)
+        return mocked
+
+    def _como_s3(self, expiracion=900):
+        self._parchear_storage('querystring_auth', new=True)
+        self._parchear_storage('querystring_expire', new=expiracion)
+
+    def test_s3_reutiliza_la_url_firmada_de_la_misma_clave(self):
+        self._como_s3()
+
+        primera = almacenamiento.url_archivo('inspecciones/a.jpg', mock.Mock())
+        segunda = almacenamiento.url_archivo('inspecciones/a.jpg')
+
+        self.assertEqual(primera, 'https://bucket.example/inspecciones/a.jpg?sig=1')
+        self.assertEqual(segunda, primera)
+        self.assertEqual(self.firmar.call_count, 1)
+
+    def test_s3_claves_distintas_tienen_urls_distintas(self):
+        self._como_s3()
+
+        self.assertNotEqual(almacenamiento.url_archivo('a.jpg'), almacenamiento.url_archivo('b.jpg'))
+
+    def test_s3_guarda_la_url_la_mitad_de_su_vigencia(self):
+        self._como_s3(expiracion=600)
+        with mock.patch('vision.almacenamiento.caches', {'compartida': mock.Mock()}) as caches:
+            cache = caches['compartida']
+            cache.get.return_value = None
+            url = almacenamiento.url_archivo('a.jpg')
+
+        self.assertEqual(cache.set.call_args.args[1:], (url, 300))
+
+    def test_s3_sin_cache_disponible_firma_igual_y_la_pausa_sin_esperar_a_redis(self):
+        self._como_s3()
+        with mock.patch('vision.almacenamiento.caches', {'compartida': mock.Mock()}) as caches, \
+                self.assertLogs('vision.almacenamiento', 'WARNING'):
+            cache = caches['compartida']
+            cache.get.side_effect = ConnectionError('redis caído')
+            primera = almacenamiento.url_archivo('a.jpg')
+            segunda = almacenamiento.url_archivo('b.jpg')
+
+        self.assertEqual(primera, 'https://bucket.example/a.jpg?sig=1')
+        self.assertEqual(segunda, 'https://bucket.example/b.jpg?sig=2')
+        self.assertEqual(cache.get.call_count, 1)
+        cache.set.assert_not_called()
+
+    def test_s3_tras_la_pausa_vuelve_a_usar_la_cache(self):
+        self._como_s3()
+        with mock.patch('vision.almacenamiento.caches', {'compartida': mock.Mock()}) as caches, \
+                mock.patch('vision.almacenamiento.time.monotonic', return_value=100.0) as reloj, \
+                self.assertLogs('vision.almacenamiento', 'WARNING'):
+            cache = caches['compartida']
+            cache.get.side_effect = [ConnectionError('redis caído'), None]
+            almacenamiento.url_archivo('a.jpg')
+            reloj.return_value = 100.0 + almacenamiento.PAUSA_CACHE_SEGUNDOS + 1
+            almacenamiento.url_archivo('a.jpg')
+
+        self.assertEqual(cache.get.call_count, 2)
+        cache.set.assert_called_once()
+
+    def test_s3_si_falla_guardar_devuelve_la_firma_y_pausa_la_cache(self):
+        self._como_s3()
+        with mock.patch('vision.almacenamiento.caches', {'compartida': mock.Mock()}) as caches, \
+                self.assertLogs('vision.almacenamiento', 'WARNING'):
+            cache = caches['compartida']
+            cache.get.return_value = None
+            cache.set.side_effect = ConnectionError('redis caído')
+            primera = almacenamiento.url_archivo('a.jpg')
+            almacenamiento.url_archivo('b.jpg')
+
+        self.assertEqual(primera, 'https://bucket.example/a.jpg?sig=1')
+        self.assertEqual((cache.get.call_count, cache.set.call_count), (1, 1))
+
+    def test_s3_cambiar_la_configuracion_de_firma_no_reutiliza_la_url(self):
+        self._como_s3()
+        nuevos = {
+            'custom_domain': 'cdn.nuevo', 'region_name': 'eu-west-1', 'signature_version': 's3',
+            'addressing_style': 'path', 'endpoint_url': 'https://otro.endpoint', 'location': 'prod',
+            'access_key': 'AKIA-ROTADA', 'querystring_expire': 1800,
+        }
+        for atributo, valor in nuevos.items():
+            with self.subTest(atributo=atributo):
+                vieja = almacenamiento.url_archivo('a.jpg')
+                # On the instance: the in-memory test storage sets its own ``location`` there.
+                patcher = mock.patch.object(default_storage._wrapped, atributo, valor, create=True)
+                patcher.start()
+                self.addCleanup(patcher.stop)
+
+                self.assertNotEqual(almacenamiento.url_archivo('a.jpg'), vieja)
+
+    def test_s3_otro_bucket_no_reutiliza_la_url(self):
+        self._como_s3()
+        self._parchear_storage('bucket_name', new='fotos-viejo')
+        vieja = almacenamiento.url_archivo('a.jpg')
+        self._parchear_storage('bucket_name', new='fotos-nuevo')
+
+        self.assertNotEqual(almacenamiento.url_archivo('a.jpg'), vieja)
+
+    def test_storage_local_no_usa_la_cache(self):
+        with mock.patch('vision.almacenamiento.caches', {'compartida': mock.Mock()}) as caches:
+            cache = caches['compartida']
+            almacenamiento.url_archivo('a.jpg')
+
+        cache.get.assert_not_called()
+        cache.set.assert_not_called()
+
+
 class TareaStorageTests(AlmacenamientoBase):
     def _procesar(self, foto):
         resultado = {'detections': [{'class_name': 'corrosion', 'confidence': 0.9}], 'inference_time_ms': 1.0}

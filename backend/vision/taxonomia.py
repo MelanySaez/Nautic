@@ -59,6 +59,13 @@ def enriquecer_detecciones(detecciones: Optional[List[Dict[str, Any]]]):
     return [{**d, **info_clase(d.get("class_name", ""))} for d in detecciones]
 
 
+def version_taxonomia() -> str:
+    """Version of the installed taxonomy; it changes whenever labels, types or colors do."""
+    from core_engine.vision.domain import TAXONOMY_VERSION
+
+    return str(TAXONOMY_VERSION)
+
+
 def listar_taxonomia() -> Dict[str, Any]:
     """Every class of the library, in id order, plus the taxonomy version."""
     from core_engine.vision.domain import CLASSES, TAXONOMY_VERSION
