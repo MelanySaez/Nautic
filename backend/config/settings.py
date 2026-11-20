@@ -135,6 +135,9 @@ CSRF_TRUSTED_ORIGINS = [
 # Cookies (Lax)
 
 SESSION_COOKIE_SAMESITE = "Lax"
+# Sessions end after one hour without requests: every request renews the deadline.
+SESSION_COOKIE_AGE = 60 * 60
+SESSION_SAVE_EVERY_REQUEST = True
 CSRF_COOKIE_SAMESITE = "Lax"
 # En dev (HTTP):
 SESSION_COOKIE_SECURE = False

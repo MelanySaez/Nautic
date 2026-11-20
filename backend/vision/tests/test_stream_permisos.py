@@ -1,9 +1,12 @@
 """Streaming authorization uses current inspection and membership state."""
 import json
+from datetime import timedelta
 from unittest import mock
 
 from django.contrib.auth import get_user_model
+from django.contrib.sessions.models import Session
 from django.test import TestCase, override_settings
+from django.utils import timezone
 
 from vision.models import Buque, InspeccionCasco, InspeccionMiembro
 
@@ -89,6 +92,22 @@ class StreamPermisosTests(TestCase):
         InspeccionCasco.objects.filter(pk=self.insp.pk).update(privada=True)
         self.assertIsNone(next(self.stream, None))
         self.pubsub.close.assert_called_once_with()
+
+    def test_sesion_vencida_o_cerrada_cierra_antes_del_evento(self):
+        for cambio in ('vencer', 'cerrar'):
+            with self.subTest(cambio=cambio):
+                self.pubsub.reset_mock()
+                self._abrir()
+                self._handshake()
+                sesiones = Session.objects.filter(session_key=self.client.session.session_key)
+                if cambio == 'vencer':
+                    sesiones.update(expire_date=timezone.now() - timedelta(seconds=1))
+                else:
+                    sesiones.delete()
+                self.pubsub.get_message.return_value = self._mensaje()
+                self.assertIsNone(next(self.stream, None))
+                self.pubsub.close.assert_called_once_with()
+                self.client.force_login(self.lector)
 
     def test_cuenta_desactivada_cierra_antes_del_evento(self):
         self._abrir()
