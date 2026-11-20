@@ -10,7 +10,7 @@ El proyecto se organiza en tres secciones y avanza **backend primero**: cada sec
 
 | Sección | Qué es | Backend | Frontend |
 |---|---|---|---|
-| **Buques** | Entidad buque con ficha técnica (dimensiones, autonomía, capacidades…) | Alta (con sus secciones del casco: las 20 estándar o una lista propia), listado y ficha | Listado, alta (con secciones estándar o propias) y ficha técnica |
+| **Buques** | Entidad buque con ficha técnica (dimensiones, autonomía, capacidades…) | Alta (con sus secciones del casco: las 23 estándar o una lista propia), listado y ficha | Listado, alta (con secciones estándar o propias) y ficha técnica |
 | **Inspecciones** | Historial de las inspecciones ya creadas | Alta, listado con búsqueda y paginación, detalle, renombrado y borrado | Historial con filtros (buque, fechas, severidad, nombre) y «Cargar más», resultados y renombrado |
 | **Visión IA** | Alta de la inspección y análisis de sus fotos; todo análisis pertenece a una inspección | Fotos → cola Celery → inferencia → resultados en vivo (SSE) | Alta de la inspección, carga de fotos por sección, elección del modelo y resultados en vivo |
 

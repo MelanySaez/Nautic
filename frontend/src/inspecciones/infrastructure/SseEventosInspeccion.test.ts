@@ -69,7 +69,10 @@ describe('SseEventosInspeccion', () => {
         inspeccion_id: 7,
         estado: 'completada',
         severidad: 'high',
-        detecciones: [{ class_name: 'corrosion', count: 1, max_confidence: 0.81, etiqueta: 'Corrosión', tipo: 'anomalia', severidad: 'critical' }],
+        detecciones: [
+          { class_name: 'corrosion', count: 1, max_confidence: 0.81, descartada: true, etiqueta: 'Corrosión', tipo: 'anomalia', severidad: 'critical' },
+          { class_name: 'ship_hull', count: 1, max_confidence: 0.9, etiqueta: 'Casco del buque', tipo: 'componente', severidad: null },
+        ],
         tiempo_inferencia_ms: 950,
         modelo: 'yolo-seg',
         modelo_version: '1.2.0',
@@ -87,7 +90,16 @@ describe('SseEventosInspeccion', () => {
           fotoId: 11,
           estado: 'completada',
           severidad: 'high',
-          detecciones: [{ clase: 'corrosion', etiqueta: 'Corrosión', tipo: 'anomalia', severidad: 'critical', cantidad: 1, confianzaMaxima: 0.81 }],
+          detecciones: [
+            {
+              clase: 'corrosion', etiqueta: 'Corrosión', tipo: 'anomalia', severidad: 'critical', cantidad: 1, confianzaMaxima: 0.81,
+              descartada: true,
+            },
+            {
+              clase: 'ship_hull', etiqueta: 'Casco del buque', tipo: 'componente', severidad: null, cantidad: 1, confianzaMaxima: 0.9,
+              descartada: false,
+            },
+          ],
           tiempoInferenciaMs: 950,
           modelo: 'yolo-seg',
           modeloVersion: '1.2.0',

@@ -25,6 +25,8 @@ export interface Deteccion {
   severidad: Severidad | null
   cantidad: number
   confianzaMaxima: number
+  /** The inspector dismissed this class as a false positive in the report (false when the server omits it). */
+  descartada: boolean
 }
 
 export interface Foto {
@@ -110,6 +112,8 @@ export interface FiltroInspecciones {
   severidadMin?: Severidad
   /** Text contained in the inspection name (the backend requires 2-100 characters). */
   q?: string
+  /** Keeps inspections with at least one photo in this hull section (`SeccionCasco.id`). */
+  seccionId?: number
 }
 
 /** One page of a search; `siguiente` is the opaque cursor to request the next one. */

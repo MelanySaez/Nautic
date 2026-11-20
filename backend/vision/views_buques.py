@@ -242,7 +242,7 @@ def _validar_secciones_buque(data):
         'de la ficha técnica es opcional. Los campos numéricos no admiten valores '
         'negativos. Los campos desconocidos se rechazan.\n\n'
         '`secciones` define las zonas del casco del buque: `"estandar"` (por defecto si se omite) '
-        'crea las 20 secciones estándar; una lista de `{nombre, codigo?, descripcion?}` crea '
+        'crea las 23 secciones estándar; una lista de `{nombre, codigo?, descripcion?}` crea '
         'exactamente esas, en ese orden (`codigo` se genera, p. ej. `SEC-01`, si se omite).'
     ),
     request={

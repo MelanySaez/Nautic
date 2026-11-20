@@ -64,7 +64,7 @@ export interface NuevaSeccion {
 
 /**
  * Creation input: only `nombre` and `tipo` are required; omitted fields take the backend default.
- * `secciones` is `'estandar'` (the 20 standard sections, also the backend default when omitted)
+ * `secciones` is `'estandar'` (the 23 standard sections, also the backend default when omitted)
  * or a non-empty list of custom sections in display order.
  */
 export type NuevoBuque = Pick<Buque, 'nombre' | 'tipo'> &

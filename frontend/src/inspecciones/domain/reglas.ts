@@ -27,19 +27,25 @@ export function resumirProgreso(fotos: Foto[]): ResumenProgreso {
 
 const RANGO_SEVERIDAD: Record<Severidad, number> = { low: 1, medium: 2, high: 3, critical: 4 }
 
+/** The more severe of two levels; a missing level (null) never wins. */
+export function masSevera(a: Severidad | null, b: Severidad | null): Severidad | null {
+  if (!a) return b
+  if (!b) return a
+  return RANGO_SEVERIDAD[b] > RANGO_SEVERIDAD[a] ? b : a
+}
+
 export function severidadMaxima(fotos: Foto[]): Severidad | null {
-  let maxima: Severidad | null = null
-  for (const { severidad } of fotos) {
-    if (severidad && (maxima === null || RANGO_SEVERIDAD[severidad] > RANGO_SEVERIDAD[maxima])) {
-      maxima = severidad
-    }
-  }
-  return maxima
+  return fotos.reduce<Severidad | null>((maxima, { severidad }) => masSevera(maxima, severidad), null)
 }
 
 /** A component is a hull part, not a defect; an unknown class counts as an anomaly so it is never hidden. */
 export function esAnomalia(deteccion: Deteccion): boolean {
   return deteccion.tipo !== 'componente'
+}
+
+/** A finding, as the PDF report counts it: an anomaly the inspector did not discard. */
+export function esHallazgo(deteccion: Deteccion): boolean {
+  return esAnomalia(deteccion) && !deteccion.descartada
 }
 
 export function tieneAnomalias(foto: Foto): boolean {

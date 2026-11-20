@@ -340,18 +340,21 @@ class DeteccionFoto(models.Model):
 
 def resumen_detecciones(foto):
     """
-    The photo's detections in the API shape ``[{class_name, count, max_confidence}]``.
+    The photo's detections in the API shape
+    ``[{class_name, count, max_confidence, descartada}]``.
 
-    ``None`` while the photo has never been analyzed, ``[]`` when it was analyzed
-    and nothing was found (also while it is re-queued: ``detecciones_archivo`` marks
-    a past analysis). Uses prefetched rows when present.
+    ``descartada`` is true when the inspector dismissed the class as a false positive
+    in the report. ``None`` while the photo has never been analyzed, ``[]`` when it was
+    analyzed and nothing was found (also while it is re-queued: ``detecciones_archivo``
+    marks a past analysis). Uses prefetched rows when present.
     """
     filas = list(foto.detecciones.all())
     analizada = foto.estado == FotoInspeccion.Estado.COMPLETADA or bool(foto.detecciones_archivo)
     if not filas and not analizada:
         return None
     return [
-        {'class_name': f.clase, 'count': f.cantidad, 'max_confidence': f.confianza_max}
+        {'class_name': f.clase, 'count': f.cantidad, 'max_confidence': f.confianza_max,
+         'descartada': f.descartada}
         for f in filas
     ]
 

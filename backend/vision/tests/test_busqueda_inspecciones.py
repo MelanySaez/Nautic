@@ -111,6 +111,27 @@ class FiltrosTests(BusquedaBase):
 
         self.assertEqual(self._ids(desde='2026-01-10', hasta='2026-01-10'), [a.id])
 
+    def test_seccion_deja_las_inspecciones_con_fotos_en_esa_seccion(self):
+        fondo = SeccionCasco.objects.create(buque=self.caribe, codigo='FWD-BTM', nombre='Fondo')
+        quilla = SeccionCasco.objects.create(buque=self.caribe, codigo='KEEL', nombre='Quilla')
+        con_fondo = _crear(self.caribe, fecha=datetime(2026, 1, 1, 10))
+        con_ambas = _crear(self.caribe, fecha=datetime(2026, 2, 1, 10))
+        solo_quilla = _crear(self.caribe, fecha=datetime(2026, 3, 1, 10))
+        _crear(self.caribe)  # sin fotos
+        for insp, seccion in ((con_fondo, fondo), (con_ambas, fondo), (con_ambas, fondo),
+                              (con_ambas, quilla), (solo_quilla, quilla)):
+            FotoInspeccion.objects.create(inspeccion=insp, seccion=seccion, imagen_original='media/x.jpg')
+
+        # Una inspeccion con varias fotos en la seccion aparece una sola vez.
+        self.assertEqual(self._ids(seccion=fondo.id), [con_ambas.id, con_fondo.id])
+        self.assertEqual(self._ids(seccion=quilla.id, buque=self.caribe.id), [solo_quilla.id, con_ambas.id])
+
+    def test_seccion_invalida_es_400(self):
+        res = self._get(seccion='abc')
+
+        self.assertEqual(res.status_code, 400)
+        self.assertIn('seccion', res.json()['campos'])
+
     def test_severidad_min(self):
         _crear(self.caribe)  # sin severidad
         _crear(self.caribe, severidad=1)
@@ -364,7 +385,7 @@ class DescribirFiltrosTests(TestCase):
     def test_forma_de_cada_filtro(self):
         por_nombre = {f['nombre']: f for f in describir_filtros()['filtros']}
 
-        self.assertEqual(set(por_nombre), {'buque', 'desde', 'hasta', 'severidad_min', 'q'})
+        self.assertEqual(set(por_nombre), {'buque', 'desde', 'hasta', 'severidad_min', 'q', 'seccion'})
         for filtro in por_nombre.values():
             self.assertEqual(
                 set(filtro), {'nombre', 'tipo', 'descripcion', 'valores', 'formato', 'alias'},

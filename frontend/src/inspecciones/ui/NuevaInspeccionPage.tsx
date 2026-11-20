@@ -1,4 +1,5 @@
 import { useCallback, useState, type FormEvent } from 'react'
+import { useSearchParams } from 'react-router'
 import { useNavegar } from '../../shared/hooks/useNavegar'
 import { Enlace } from '../../shared/ui/Enlace'
 import { useDependencias } from '../../app/useDependencias'
@@ -12,6 +13,7 @@ import { Tarjeta } from '../../shared/ui/Tarjeta'
 import { mensajeDe } from '../../shared/ui/formato'
 import { ApiError } from '../../shared/http/apiClient'
 import { EquipoInicial, type ErroresFila, type FilaInvitado } from './EquipoInicial'
+import { idDeParametro } from './parametrosUrl'
 
 const CLAVE_MIEMBRO = /^miembros\.(\d+)\.(email|rol|permisos)$/
 
@@ -39,8 +41,15 @@ export function NuevaInspeccionPage() {
   const navegar = useNavegar()
   const cargarBuques = useCallback(() => buques.listar(), [buques])
   const { estado: flota } = useRecurso(cargarBuques)
+  // Deep links (e.g. from the 3D hull view) may name the vessel and the zone to start with.
+  const [parametros] = useSearchParams()
+  const buqueUrl = idDeParametro(parametros, 'buque')
+  const zonaUrl = idDeParametro(parametros, 'zona')
 
-  const [buqueId, setBuqueId] = useState('')
+  // Until the user picks one, the vessel of the URL is preselected if it is in the fleet.
+  const [eleccionBuque, setEleccionBuque] = useState<string | null>(null)
+  const buqueUrlEnFlota = flota.tipo === 'listo' && flota.datos.some((b) => b.id === buqueUrl)
+  const buqueId = eleccionBuque ?? (buqueUrlEnFlota ? String(buqueUrl) : '')
   const [nombre, setNombre] = useState('')
   const [tomadoPor, setTomadoPor] = useState('')
   const [descripcion, setDescripcion] = useState('')
@@ -77,7 +86,7 @@ export function NuevaInspeccionPage() {
         ...(enviadas.length ? { miembros: enviadas.map((f) => ({ email: f.email.trim(), rol: f.rol })) } : {}),
         ...(privada ? { privada: true } : {}),
       })
-      navegar(`/vision/${creada.id}`)
+      navegar(zonaUrl === null ? `/vision/${creada.id}` : `/vision/${creada.id}?zona=${zonaUrl}`)
     } catch (error) {
       if (error instanceof ApiError && error.campos) {
         const { porFila, otros } = erroresPorFila(error.campos, enviadas.map((f) => f.uid))
@@ -111,7 +120,7 @@ export function NuevaInspeccionPage() {
               <select
                 value={buqueId}
                 onChange={(e) => {
-                  setBuqueId(e.target.value)
+                  setEleccionBuque(e.target.value)
                   setErrorBuque(null)
                 }}
                 disabled={flota.tipo !== 'listo'}
