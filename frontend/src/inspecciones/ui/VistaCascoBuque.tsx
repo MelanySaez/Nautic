@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
 import type { BuqueDetalle } from '../../buques/domain/buque'
-import { BUQUE_DE_GUERRA } from '../../buques/domain/casco/arquetipo'
 import { dimensionesCasco } from '../../buques/domain/casco/dimensiones'
 import { CODIGOS_ZONA, ubicarSecciones, type CodigoZona } from '../../buques/domain/casco/zonas'
+import { arquetipoDeBuque } from '../../buques/domain/tiposBuque'
 import type { EstadoRecurso } from '../../shared/hooks/useRecurso'
 import { Cargando, MensajeError } from '../../shared/ui/Estados'
 import type { Foto, Inspeccion, InspeccionDetalle, SeccionCasco } from '../domain/inspeccion'
@@ -102,7 +102,9 @@ function VistaCasco({
 }) {
   const fotos = detalle?.tipo === 'listo' ? detalle.datos.fotos : SIN_FOTOS
   const { enCasco, sinUbicar } = useMemo(() => zonasDelBuque(buque.secciones, fotos), [buque.secciones, fotos])
-  const dimensiones = useMemo(() => dimensionesCasco(buque, BUQUE_DE_GUERRA), [buque])
+  // The vessel's type shapes the hull; free text from before the catalogue gets the generic warship.
+  const arquetipo = arquetipoDeBuque(buque.tipo)
+  const dimensiones = useMemo(() => dimensionesCasco(buque, arquetipo), [buque, arquetipo])
   const lienzo = useMemo(() => {
     const estados = new Map<CodigoZona, EstadoZona>()
     const fotosPorZona = new Map<CodigoZona, number>()
@@ -124,7 +126,7 @@ function VistaCasco({
   const propsLienzo: PropsLienzoCasco = {
     nombreBuque: buque.nombre,
     dimensiones,
-    arquetipo: BUQUE_DE_GUERRA,
+    arquetipo,
     estados: lienzo.estados,
     fotosPorZona: lienzo.fotosPorZona,
     nombresZona: lienzo.nombresZona,

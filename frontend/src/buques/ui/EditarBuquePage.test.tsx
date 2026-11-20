@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { ApiError } from '../../shared/http/apiClient'
@@ -81,15 +81,14 @@ describe('EditarBuquePage', () => {
     expect(router.state.location.pathname).toBe('/buques/7')
   })
 
-  it('requires name, type and stage before calling the port', async () => {
+  it('requires name and stage before calling the port', async () => {
     const { dependencias } = renderizar()
 
     await userEvent.clear(await screen.findByLabelText('Nombre'))
-    await userEvent.clear(screen.getByLabelText('Tipo'))
     await userEvent.clear(screen.getByLabelText('Etapa'))
     await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
 
-    expect(screen.getAllByText('Este campo es requerido.')).toHaveLength(3)
+    expect(screen.getAllByText('Este campo es requerido.')).toHaveLength(2)
     expect(dependencias.buques.actualizar).not.toHaveBeenCalled()
   })
 
@@ -113,10 +112,59 @@ describe('EditarBuquePage', () => {
     dependencias.buques.actualizar.mockReturnValue(new Promise<BuqueDetalle>(() => {}))
     renderizar('/buques/7/editar', dependencias)
 
-    await userEvent.type(await screen.findByLabelText('Tipo'), ' ligera')
+    await userEvent.selectOptions(await screen.findByLabelText('Tipo'), 'Corbeta')
     await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
 
     expect(screen.getByRole('button', { name: 'Guardando…' })).toBeDisabled()
+  })
+
+  it('keeps a type from before the catalogue until another one is chosen', async () => {
+    const dependencias = conBuque()
+    dependencias.buques.obtener.mockResolvedValue(unDetalleBuque({ ...BUQUE, tipo: 'Remolcador' }))
+    renderizar('/buques/7/editar', dependencias)
+
+    const tipo = await screen.findByLabelText('Tipo')
+    expect(tipo).toHaveValue('Remolcador')
+    expect(within(tipo).getByRole('option', { selected: true })).toHaveTextContent('Remolcador (fuera del catálogo)')
+    await userEvent.type(screen.getByLabelText('Puntal (m)'), '1')
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+
+    expect(dependencias.buques.actualizar).toHaveBeenCalledWith(7, { puntalM: 81 })
+  })
+
+  it('replaces a type from before the catalogue with the chosen one', async () => {
+    const dependencias = conBuque()
+    dependencias.buques.obtener.mockResolvedValue(unDetalleBuque({ ...BUQUE, tipo: 'Remolcador' }))
+    renderizar('/buques/7/editar', dependencias)
+    const tipo = await screen.findByLabelText('Tipo')
+
+    await userEvent.selectOptions(tipo, 'Patrullera')
+
+    expect(within(tipo).queryByRole('option', { name: /fuera del catálogo/ })).not.toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+    expect(dependencias.buques.actualizar).toHaveBeenCalledWith(7, { tipo: 'Patrullera' })
+  })
+
+  it('shows a stored type written differently as its catalogue entry, and leaves it alone', async () => {
+    const dependencias = conBuque()
+    dependencias.buques.obtener.mockResolvedValue(unDetalleBuque({ ...BUQUE, tipo: 'buque logistico' }))
+    renderizar('/buques/7/editar', dependencias)
+
+    const tipo = await screen.findByLabelText('Tipo')
+    expect(tipo).toHaveValue('Buque logístico')
+    expect(within(tipo).queryByRole('option', { name: /fuera del catálogo/ })).not.toBeInTheDocument()
+    await userEvent.type(screen.getByLabelText('Puntal (m)'), '1')
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+    expect(dependencias.buques.actualizar).toHaveBeenCalledWith(7, { puntalM: 81 })
+  })
+
+  it('sends the name of the chosen type', async () => {
+    const { dependencias } = renderizar()
+
+    await userEvent.selectOptions(await screen.findByLabelText('Tipo'), 'Patrullera')
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+
+    expect(dependencias.buques.actualizar).toHaveBeenCalledWith(7, { tipo: 'Patrullera' })
   })
 
   it('replaces the image with the chosen file when saving', async () => {

@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { ApiError } from '../../shared/http/apiClient'
@@ -21,10 +21,37 @@ function renderizar(dependencias = crearDependenciasFalsas().dependencias) {
 
 async function rellenarRequeridos() {
   await userEvent.type(screen.getByLabelText('Nombre'), '  ARC Caribe ')
-  await userEvent.type(screen.getByLabelText('Tipo'), 'Fragata')
+  await userEvent.selectOptions(screen.getByLabelText('Tipo'), 'Fragata')
 }
 
 describe('NuevoBuquePage', () => {
+  it('offers the vessel types as a list to choose from, with none chosen yet', () => {
+    renderizar()
+
+    const tipo = screen.getByRole('combobox', { name: 'Tipo' })
+    expect(within(tipo).getAllByRole('option').map((opcion) => opcion.textContent)).toEqual([
+      'Selecciona un tipo',
+      'Fragata',
+      'Corbeta',
+      'Patrullera',
+      'Destructor',
+      'Buque anfibio',
+      'Buque logístico',
+    ])
+    expect(tipo).toHaveValue('')
+    expect(document.querySelector('canvas, svg[aria-label^="Silueta"]')).toBeNull()
+  })
+
+  it('requires choosing a type before calling the port', async () => {
+    const { dependencias } = renderizar()
+    await userEvent.type(screen.getByLabelText('Nombre'), 'ARC Caribe')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Crear buque' }))
+
+    expect(screen.getByLabelText('Tipo')).toHaveAccessibleDescription('Este campo es requerido.')
+    expect(dependencias.buques.crear).not.toHaveBeenCalled()
+  })
+
   it('opens the file explorer for the image and uploads it after creating the vessel', async () => {
     const { dependencias } = crearDependenciasFalsas()
     dependencias.buques.crear.mockResolvedValue(unDetalleBuque({ id: 9 }))

@@ -5,6 +5,7 @@ import { GRUPOS_TECNICOS } from '../domain/fichaTecnica'
 import { CampoImagen } from './CampoImagen'
 import type { EleccionImagen } from './eleccionImagen'
 import { GrupoNumerico } from './GrupoNumerico'
+import { TIPOS_BUQUE, tipoBuqueDe } from '../domain/tiposBuque'
 import type { Errores, Valores } from './formularioBuque'
 
 const ETAPAS_SUGERIDAS = ['Activo', 'En construcción']
@@ -28,6 +29,10 @@ export function CamposBuque({
     alCambiar: (eleccion: EleccionImagen, error: string | null) => void
   }
 }) {
+  // A stored type matches the catalogue ignoring case and accents; free text from before it does not.
+  const tipoActual = tipoBuqueDe(valores.tipo)
+  const fueraDeCatalogo = valores.tipo.trim() !== '' && tipoActual === null
+
   return (
     <>
       <Tarjeta titulo="Datos generales">
@@ -41,13 +46,24 @@ export function CamposBuque({
             />
           </Campo>
           <Campo etiqueta="Tipo" error={errores.tipo}>
-            <input
-              value={valores.tipo}
+            <select
+              value={tipoActual?.nombre ?? valores.tipo}
               onChange={(e) => alCambiar('tipo', e.target.value)}
-              maxLength={255}
-              placeholder="Fragata, patrullera…"
               className={CLASES_CONTROL}
-            />
+            >
+              <option value="" disabled>
+                Selecciona un tipo
+              </option>
+              {/* A type stored before the catalogue stays selectable until another one is chosen. */}
+              {fueraDeCatalogo && (
+                <option value={valores.tipo}>{valores.tipo} (fuera del catálogo)</option>
+              )}
+              {TIPOS_BUQUE.map((tipo) => (
+                <option key={tipo.id} value={tipo.nombre}>
+                  {tipo.nombre}
+                </option>
+              ))}
+            </select>
           </Campo>
           <Campo etiqueta="Etapa" error={errores.etapa} ayuda={ayudaEtapa}>
             <input

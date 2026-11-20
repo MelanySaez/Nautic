@@ -73,6 +73,7 @@ interface PiezasEscena {
   inertes: BufferGeometry[]
 }
 
+/** A three.js geometry over the arrays of a generated mesh: they are shared, not copied. */
 function geometriaDe(malla: Malla): BufferGeometry {
   const geometria = new BufferGeometry()
   geometria.setAttribute('position', new BufferAttribute(malla.posiciones, 3))
@@ -481,9 +482,12 @@ export default function LienzoCasco({
       {encima && (
         // The outer box sits on the pointer; the inner one floats up and to the right of it.
         <div
-          ref={etiqueta}
+          ref={(nodo) => {
+            etiqueta.current = nodo
+            // Starts where the pointer already is; later moves update it through `seguirPuntero`.
+            nodo?.style.setProperty('translate', puntero.current)
+          }}
           aria-hidden="true"
-          style={{ translate: puntero.current }}
           className="pointer-events-none absolute top-0 left-0 z-20 select-none"
         >
           <div className="-mt-3 ml-4 -translate-y-full rounded border border-line bg-surface/95 px-2.5 py-1.5 shadow-md">
