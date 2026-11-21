@@ -1,8 +1,12 @@
 """User accounts and session login (cookie + CSRF)."""
+from datetime import timedelta
+from unittest import mock
+
 from django.contrib.auth import get_user_model
 from django.contrib import admin
 from django.core.cache import cache
 from django.test import RequestFactory, TestCase, override_settings
+from django.utils import timezone
 from rest_framework.test import APIClient
 
 Usuario = get_user_model()
@@ -165,6 +169,24 @@ class SesionTests(TestCase):
 
         self.assertEqual(respuesta.status_code, 204)
         self.assertEqual(self.cliente.get(URL_YO).status_code, 401)
+
+    def test_la_sesion_vence_tras_una_hora_sin_actividad(self):
+        inicio = timezone.now()
+
+        def en(minutos):
+            return mock.patch('django.utils.timezone.now', return_value=inicio + timedelta(minutes=minutos))
+
+        with en(0):
+            self._login()
+        with en(59):
+            respuesta = self.cliente.get(URL_YO)
+            self.assertEqual(respuesta.status_code, 200)
+            # Every request renews the cookie for another hour.
+            self.assertEqual(respuesta.cookies['sessionid']['max-age'], 3600)
+        with en(118):
+            self.assertEqual(self.cliente.get(URL_YO).status_code, 200)
+        with en(118 + 61):
+            self.assertEqual(self.cliente.get(URL_YO).status_code, 401)
 
 
 class RegistroTests(TestCase):

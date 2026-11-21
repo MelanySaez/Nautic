@@ -1,9 +1,12 @@
 """Streaming authorization uses current inspection and membership state."""
 import json
+from datetime import timedelta
 from unittest import mock
 
-from django.contrib.auth import get_user_model
+from django.contrib.auth import SESSION_KEY, get_user_model
+from django.contrib.sessions.models import Session
 from django.test import TestCase, override_settings
+from django.utils import timezone
 
 from vision.models import Buque, InspeccionCasco, InspeccionMiembro
 
@@ -87,6 +90,45 @@ class StreamPermisosTests(TestCase):
     def test_privacidad_cambiada_antes_del_handshake_cierra_sin_datos(self):
         self._abrir()
         InspeccionCasco.objects.filter(pk=self.insp.pk).update(privada=True)
+        self.assertIsNone(next(self.stream, None))
+        self.pubsub.close.assert_called_once_with()
+
+    def test_sesion_vencida_o_cerrada_cierra_antes_del_evento(self):
+        for cambio in ('vencer', 'cerrar'):
+            with self.subTest(cambio=cambio):
+                self.pubsub.reset_mock()
+                self._abrir()
+                self._handshake()
+                sesiones = Session.objects.filter(session_key=self.client.session.session_key)
+                if cambio == 'vencer':
+                    sesiones.update(expire_date=timezone.now() - timedelta(seconds=1))
+                else:
+                    sesiones.delete()
+                self.pubsub.get_message.return_value = self._mensaje()
+                self.assertIsNone(next(self.stream, None))
+                self.pubsub.close.assert_called_once_with()
+                self.client.force_login(self.lector)
+
+    def test_sesion_vencida_durante_la_espera_cierra_sin_keepalive(self):
+        self._abrir()
+        self._handshake()
+        clave = self.client.session.session_key
+
+        def vencer(timeout):
+            Session.objects.filter(session_key=clave).update(expire_date=timezone.now() - timedelta(seconds=1))
+            return None
+
+        self.pubsub.get_message.side_effect = vencer
+        self.assertIsNone(next(self.stream, None))
+        self.pubsub.close.assert_called_once_with()
+
+    def test_sesion_de_otro_usuario_cierra_antes_del_evento(self):
+        self._abrir()
+        self._handshake()
+        sesion = self.client.session
+        sesion[SESSION_KEY] = str(self.lider.pk)
+        sesion.save()
+        self.pubsub.get_message.return_value = self._mensaje()
         self.assertIsNone(next(self.stream, None))
         self.pubsub.close.assert_called_once_with()
 

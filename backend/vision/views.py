@@ -6,7 +6,7 @@ import time
 
 from django.conf import settings
 from django.db import transaction
-from django.contrib.auth import get_user_model
+from django.contrib.auth import SESSION_KEY, get_user_model
 from django.http import Http404, HttpResponse, HttpResponseNotModified, JsonResponse, StreamingHttpResponse
 from django.utils.http import parse_etags
 from django.shortcuts import get_object_or_404
@@ -1045,7 +1045,14 @@ def api_vision_inspeccion_stream(request, inspeccion_id):
 
     keepalive_seconds = getattr(settings, 'SSE_KEEPALIVE_SECONDS', 15)
 
+    clave_sesion = request.session.session_key
+    pk_sesion = str(request.user.pk)
+
     def sigue_autorizado():
+        # Re-read the session from its store: an expired or closed session ends the stream,
+        # since the open stream itself does not renew it.
+        if request.session.__class__(clave_sesion).get(SESSION_KEY) != pk_sesion:
+            return False
         # Re-read account and visibility; never reuse an inspection's membership cache.
         usuario = get_user_model().objects.filter(pk=request.user.pk, is_active=True).first()
         return usuario is not None and visibles_para(
