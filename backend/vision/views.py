@@ -571,7 +571,7 @@ def api_vision_taxonomia(request):
                 'miembros': {
                     'type': 'array',
                     'description': (
-                        'Equipo invitado al crear (opcional): `{email, rol, permisos?}` con las mismas reglas '
+                        'Equipo invitado al crear (opcional): `{email | usuario_id, rol, permisos?}` con las mismas reglas '
                         'que `POST .../miembros/`. Si algún invitado es inválido no se crea nada y los errores '
                         'llegan en `campos` como `miembros.<i>.email` / `miembros.<i>.rol` / `miembros.<i>.permisos`.'
                     ),
