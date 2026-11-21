@@ -2,7 +2,7 @@ import { Enlace } from '../../shared/ui/Enlace'
 import { Icon } from '../../shared/ui/Icon'
 import { formatearFecha } from '../../shared/ui/formato'
 import type { Inspeccion } from '../domain/inspeccion'
-import { InsigniaPrivada, InsigniaSeveridad } from './Insignias'
+import { InsigniaPrivada, InsigniaRelacion, InsigniaSeveridad } from './Insignias'
 
 export function TarjetaInspeccion({
   inspeccion,
@@ -18,7 +18,7 @@ export function TarjetaInspeccion({
   eliminando: boolean
   alEliminar: () => void
 }) {
-  const { id, nombre, severidadMax, descripcion, tomadoPor, fechaCreacion, totalFotos, privada } = inspeccion
+  const { id, nombre, severidadMax, descripcion, tomadoPor, fechaCreacion, totalFotos, privada, miRelacion } = inspeccion
 
   return (
     <article
@@ -38,6 +38,7 @@ export function TarjetaInspeccion({
           </h3>
           <p className="label-caps flex items-center gap-2 text-ink-dim">
             INS-{String(id).padStart(4, '0')}
+            {miRelacion && <InsigniaRelacion relacion={miRelacion} />}
             {privada && <InsigniaPrivada />}
           </p>
         </div>

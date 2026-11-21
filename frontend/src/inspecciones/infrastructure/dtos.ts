@@ -69,6 +69,7 @@ export interface InspeccionDto {
   total_fotos: number
   lider?: UsuarioRefDto | null
   privada?: boolean
+  mi_relacion?: 'lider' | 'invitado' | null
 }
 
 export interface UsuarioRefDto {
@@ -185,6 +186,7 @@ export function aInspeccion(dto: InspeccionDto): Inspeccion {
     totalFotos: dto.total_fotos,
     lider: dto.lider ? { id: dto.lider.id, nombre: dto.lider.nombre } : null,
     privada: dto.privada ?? false,
+    miRelacion: dto.mi_relacion ?? null,
   }
 }
 

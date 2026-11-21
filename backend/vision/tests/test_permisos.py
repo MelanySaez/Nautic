@@ -340,6 +340,40 @@ class BuquesConInspeccionesTests(BasePermisos):
 
 
 
+class RelacionConLaInspeccionTests(BasePermisos):
+    """`mi_relacion` on each inspection and the `relacion` search filter, for the signed-in user."""
+
+    def setUp(self):
+        super().setUp()
+        self.propia = self._crear_como(self.colaborador, nombre='Propia')   # led by the colaborador
+        self.ajena = self._crear_como(self.extrano, nombre='Ajena')         # public, unrelated
+
+    def _buscar(self, usuario, **params):
+        res = self._como(usuario).get('/api/vision/inspecciones/', params)
+        self.assertEqual(res.status_code, 200, res.content)
+        return {r['nombre']: r['mi_relacion'] for r in res.json()['resultados']}
+
+    def test_cada_inspeccion_dice_si_la_lidero_o_me_invitaron(self):
+        self.assertEqual(self._buscar(self.colaborador), {'Propia': 'lider', 'Dique': 'invitado', 'Ajena': None})
+
+    def test_filtra_las_que_lidero_o_en_las_que_me_invitaron(self):
+        self.assertEqual(self._buscar(self.colaborador, relacion='lider'), {'Propia': 'lider'})
+        self.assertEqual(self._buscar(self.colaborador, relacion='invitado'), {'Dique': 'invitado'})
+        self.assertEqual(self._buscar(self.extrano, relacion='invitado'), {})
+
+    def test_relacion_invalida(self):
+        res = self._como(self.colaborador).get('/api/vision/inspecciones/', {'relacion': 'jefe'})
+
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(list(res.json()['campos']), ['relacion'])
+
+    def test_el_detalle_tambien_dice_la_relacion(self):
+        res = self._como(self.revisor).get(self._url())
+
+        self.assertEqual(res.json()['mi_relacion'], 'invitado')
+        self.assertEqual(self._como(self.lider).get(self._url()).json()['mi_relacion'], 'lider')
+
+
 class CrearConEquipoTests(BasePermisos):
     def _crear(self, miembros, usuario=None):
         return self._como(usuario or self.extrano).post(

@@ -6,6 +6,7 @@ import time
 
 from django.conf import settings
 from django.db import transaction
+from django.db.models import Exists, OuterRef
 from django.contrib.auth import SESSION_KEY, get_user_model
 from django.http import Http404, HttpResponse, HttpResponseNotModified, JsonResponse, StreamingHttpResponse
 from django.utils.http import parse_etags
@@ -245,6 +246,17 @@ def _foto_to_dict(f, request=None):
     }
 
 
+def _relacion_con(usuario, insp):
+    """'lider' when ``usuario`` leads ``insp``, 'invitado' when it is a member, else None."""
+    if insp.lider_id is not None and insp.lider_id == usuario.pk:
+        return 'lider'
+    # The search annotates `es_miembro` to avoid one query per row.
+    es_miembro = getattr(insp, 'es_miembro', None)
+    if es_miembro is None:
+        es_miembro = insp.miembros.filter(usuario_id=usuario.pk).exists()
+    return 'invitado' if es_miembro else None
+
+
 def _inspeccion_to_dict(insp, include_fotos=False, request=None, con_permisos=False):
     d = {
         'id': insp.id,
@@ -261,6 +273,8 @@ def _inspeccion_to_dict(insp, include_fotos=False, request=None, con_permisos=Fa
         'lider': _usuario_ref(insp.lider),
         'privada': insp.privada,
     }
+    if request is not None:
+        d['mi_relacion'] = _relacion_con(request.user, insp)
     if con_permisos and request is not None:
         # What the current user may do, so the UI can hide or disable actions.
         d['mis_permisos'] = permisos_de(request.user, insp)
@@ -590,8 +604,10 @@ def api_vision_inspecciones(request):
     """
     if request.method == 'GET':
         try:
-            base = visibles_para(request.user, InspeccionCasco.objects.select_related('buque', 'lider'))
-            pagina, siguiente, hay_mas = buscar_inspecciones(request.query_params, base=base)
+            base = visibles_para(request.user, InspeccionCasco.objects.select_related('buque', 'lider')).annotate(
+                es_miembro=Exists(InspeccionMiembro.objects.filter(inspeccion=OuterRef('pk'), usuario=request.user)),
+            )
+            pagina, siguiente, hay_mas = buscar_inspecciones(request.query_params, base=base, usuario=request.user)
         except BusquedaInvalida as exc:
             return Response({'error': 'Datos inválidos.', 'campos': exc.errores}, status=400)
         return Response({

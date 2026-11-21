@@ -3,12 +3,13 @@ import { Campo } from '../../shared/ui/Campo'
 import { CLASES_CONTROL } from '../../shared/ui/clasesControl'
 import { MIN_CARACTERES_BUSQUEDA } from './filtroUrl'
 
-export type CampoFiltro = 'desde' | 'hasta' | 'severidad_min'
+export type CampoFiltro = 'desde' | 'hasta' | 'severidad_min' | 'relacion'
 
 export interface ValoresFiltros {
   desde: string
   hasta: string
   severidadMin: string
+  relacion: string
   texto: string
 }
 
@@ -17,6 +18,11 @@ const NIVELES = [
   { valor: 'medium', texto: 'Media' },
   { valor: 'high', texto: 'Alta' },
   { valor: 'critical', texto: 'Crítica' },
+]
+
+const RELACIONES = [
+  { valor: 'lider', texto: 'Soy propietario' },
+  { valor: 'invitado', texto: 'Me invitaron' },
 ]
 
 export function FiltrosInspecciones({
@@ -75,6 +81,20 @@ export function FiltrosInspecciones({
           {NIVELES.map((n) => (
             <option key={n.valor} value={n.valor}>
               {n.texto}
+            </option>
+          ))}
+        </select>
+      </Campo>
+      <Campo etiqueta="Participación" error={errores.relacion}>
+        <select
+          value={valores.relacion}
+          onChange={(e) => alCambiar('relacion', e.target.value)}
+          className={CLASES_CONTROL}
+        >
+          <option value="">Todas</option>
+          {RELACIONES.map((r) => (
+            <option key={r.valor} value={r.valor}>
+              {r.texto}
             </option>
           ))}
         </select>

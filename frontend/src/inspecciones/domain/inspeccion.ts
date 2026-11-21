@@ -82,6 +82,8 @@ export interface Inspeccion {
   lider: UsuarioRef | null
   /** Private inspections are visible only to their leader and members. */
   privada: boolean
+  /** How the current user relates to it: its leader, invited, or neither (null). */
+  miRelacion: RelacionInspeccion | null
 }
 
 export interface InspeccionDetalle extends Inspeccion {
@@ -101,6 +103,9 @@ export interface NuevaInspeccion {
 }
 
 /** Server-side search criteria; every field is optional and they combine with AND. */
+/** The current user's place in an inspection: its owner (leader) or an invited member. */
+export type RelacionInspeccion = 'lider' | 'invitado'
+
 export interface FiltroInspecciones {
   buqueId?: number
   /** First day to include, `YYYY-MM-DD`. */
@@ -113,6 +118,8 @@ export interface FiltroInspecciones {
   q?: string
   /** Keeps inspections with at least one photo in this hull section (`SeccionCasco.id`). */
   seccionId?: number
+  /** Keeps the inspections the current user leads (`lider`) or was invited to (`invitado`). */
+  relacion?: RelacionInspeccion
 }
 
 /** One page of a search; `siguiente` is the opaque cursor to request the next one. */

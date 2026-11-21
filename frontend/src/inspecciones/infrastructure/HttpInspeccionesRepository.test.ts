@@ -18,6 +18,7 @@ const inspeccionDto = {
   total_fotos: 1,
   lider: { id: 3, nombre: 'Juan Gómez' },
   privada: true,
+  mi_relacion: 'invitado',
 }
 const misPermisosDto = {
   ver: true,
@@ -72,10 +73,11 @@ describe('HttpInspeccionesRepository', () => {
       hasta: '2026-10-31',
       severidadMin: 'high',
       q: 'casco',
+      relacion: 'invitado',
     })
 
     expect(ultimaLlamada().url).toBe(
-      'http://api.test/api/vision/inspecciones/?buque=2&desde=2026-10-01&hasta=2026-10-31&severidad_min=high&q=casco&limit=24',
+      'http://api.test/api/vision/inspecciones/?buque=2&desde=2026-10-01&hasta=2026-10-31&severidad_min=high&q=casco&relacion=invitado&limit=24',
     )
     expect(pagina.siguiente).toBe('abc')
     expect(pagina.hayMas).toBe(true)
@@ -93,6 +95,7 @@ describe('HttpInspeccionesRepository', () => {
         totalFotos: 1,
         lider: { id: 3, nombre: 'Juan Gómez' },
         privada: true,
+        miRelacion: 'invitado',
       },
     ])
   })

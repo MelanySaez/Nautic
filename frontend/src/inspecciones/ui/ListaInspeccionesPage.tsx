@@ -18,7 +18,7 @@ import { conParametro, idDeParametro } from './parametrosUrl'
 import { VistaCascoBuque } from './VistaCascoBuque'
 
 const RETARDO_TEXTO_MS = 300
-const CAMPOS_CON_CONTROL = ['q', 'desde', 'hasta', 'severidad_min']
+const CAMPOS_CON_CONTROL = ['q', 'desde', 'hasta', 'severidad_min', 'relacion']
 const VISTA_3D = '3d'
 
 /** Route entry: keys the page by vessel so switching vessels starts from a clean state. */
@@ -117,6 +117,7 @@ export function ListaInspeccionesPage({ buqueId }: { buqueId: number }) {
     desde: campos?.desde?.[0],
     hasta: campos?.hasta?.[0],
     severidad_min: campos?.severidad_min?.[0],
+    relacion: campos?.relacion?.[0],
   }
   // Errors on a field with no control (cursor, limit) would otherwise vanish.
   const errorSinControl =
@@ -214,6 +215,7 @@ export function ListaInspeccionesPage({ buqueId }: { buqueId: number }) {
             desde: parametros.get('desde') ?? '',
             hasta: parametros.get('hasta') ?? '',
             severidadMin: parametros.get('severidad_min') ?? '',
+            relacion: parametros.get('relacion') ?? '',
             texto,
           }}
           errores={errores}

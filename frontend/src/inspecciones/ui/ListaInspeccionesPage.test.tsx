@@ -489,6 +489,37 @@ describe('ListaInspeccionesPage permissions', () => {
     expect(within(tarjeta).getByRole('button', { name: 'Eliminar inspección' })).toBeInTheDocument()
   })
 
+  it('labels the inspections I own and the ones I was invited to', async () => {
+    const { dependencias } = crearDependenciasFalsas()
+    dependencias.inspecciones.buscar.mockResolvedValue(unaPagina([
+      unaInspeccion({ id: 1, nombre: 'Mía', miRelacion: 'lider' }),
+      unaInspeccion({ id: 2, nombre: 'De otro equipo', miRelacion: 'invitado' }),
+      unaInspeccion({ id: 3, nombre: 'Pública', miRelacion: null }),
+    ]))
+    renderizar(dependencias)
+
+    const [mia, invitada, publica] = await screen.findAllByRole('article')
+    expect(within(mia).getByText('Propietario')).toBeInTheDocument()
+    expect(within(invitada).getByText('Invitado')).toBeInTheDocument()
+    expect(within(publica).queryByText(/^(Propietario|Invitado)$/)).not.toBeInTheDocument()
+  })
+
+  it('filters by owned or invited inspections and keeps it in the URL', async () => {
+    const { dependencias } = crearDependenciasFalsas()
+    dependencias.inspecciones.buscar.mockResolvedValue(unaPagina([]))
+    const { router } = renderizar(dependencias)
+    await screen.findByLabelText('Participación')
+
+    await userEvent.selectOptions(screen.getByLabelText('Participación'), 'invitado')
+    expect(router.state.location.search).toBe('?relacion=invitado')
+    await waitFor(() => expect(dependencias.inspecciones.buscar).toHaveBeenLastCalledWith({ buqueId: 1, relacion: 'invitado' }))
+
+    await userEvent.selectOptions(screen.getByLabelText('Participación'), 'lider')
+    await waitFor(() => expect(dependencias.inspecciones.buscar).toHaveBeenLastCalledWith({ buqueId: 1, relacion: 'lider' }))
+    expect(screen.getByRole('option', { name: 'Soy propietario' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'Me invitaron' })).toBeInTheDocument()
+  })
+
   it('marks private inspections on their card', async () => {
     const { dependencias } = crearDependenciasFalsas()
     dependencias.inspecciones.buscar.mockResolvedValue(unaPagina([unaInspeccion({ privada: true })]))

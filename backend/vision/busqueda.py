@@ -29,7 +29,7 @@ from django.db.models import CharField, Count, Exists, Lookup, OuterRef, Q, Subq
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 
-from .models import FotoInspeccion, InspeccionCasco, NivelSeveridad
+from .models import FotoInspeccion, InspeccionCasco, InspeccionMiembro, NivelSeveridad
 
 
 
@@ -86,6 +86,8 @@ class Filtro:
     valores: Optional[tuple] = None              # valores permitidos (enum)
     formato: Optional[str] = None                # p. ej. 'YYYY-MM-DD'
     alias: tuple = ()                            # nombres alternativos del parámetro
+    # When True, ``aplicar`` also receives the user searching: (queryset, valor, usuario).
+    por_usuario: bool = False
 
     def describir(self):
         return {
@@ -162,6 +164,22 @@ def _aplicar_hasta(qs, dia):
     return qs.filter(fecha_creacion__lt=_inicio_del_dia(siguiente))
 
 
+RELACIONES = ('lider', 'invitado')
+
+
+def _parsear_relacion(raw):
+    valor = raw.strip().lower()
+    if valor not in RELACIONES:
+        raise ValorInvalido(f"Debe ser uno de: {', '.join(RELACIONES)}.")
+    return valor
+
+
+def _aplicar_relacion(qs, relacion, usuario):
+    if relacion == 'lider':
+        return qs.filter(lider=usuario)
+    return qs.filter(Exists(InspeccionMiembro.objects.filter(inspeccion=OuterRef('pk'), usuario=usuario)))
+
+
 def _aplicar_seccion(qs, seccion_id):
     # Exists keeps one row per inspection however many photos it has in the section.
     fotos = FotoInspeccion.objects.filter(inspeccion=OuterRef('pk'), seccion_id=seccion_id)
@@ -219,6 +237,15 @@ FILTROS = {
             descripcion='ID de una sección del casco: inspecciones con al menos una foto en ella.',
             parsear=_parsear_entero_positivo,
             aplicar=_aplicar_seccion,
+        ),
+        Filtro(
+            nombre='relacion',
+            tipo='enum',
+            descripcion='Inspecciones que lidera quien busca (`lider`) o en las que lo invitaron (`invitado`).',
+            parsear=_parsear_relacion,
+            aplicar=_aplicar_relacion,
+            valores=RELACIONES,
+            por_usuario=True,
         ),
     )
 }
@@ -306,11 +333,12 @@ def _con_total_fotos(qs):
     return qs.annotate(n_fotos=Coalesce(Subquery(fotos), 0))
 
 
-def buscar_inspecciones(params, base=None):
+def buscar_inspecciones(params, base=None, usuario=None):
     """
     Busca inspecciones según ``params`` (un QueryDict o dict de strings).
 
-    ``base`` (optional queryset) restricts what can be found.
+    ``base`` (optional queryset) restricts what can be found; ``usuario`` is who searches
+    (needed by the filters relative to them, such as ``relacion``).
     Devuelve ``(pagina, siguiente_cursor, hay_mas)``. Lanza ``BusquedaInvalida``
     con los errores de todos los campos inválidos.
     """
@@ -349,7 +377,8 @@ def buscar_inspecciones(params, base=None):
         raise BusquedaInvalida(errores)
 
     for nombre, valor in valores.items():
-        qs = FILTROS[nombre].aplicar(qs, valor)
+        filtro = FILTROS[nombre]
+        qs = filtro.aplicar(qs, valor, usuario) if filtro.por_usuario else filtro.aplicar(qs, valor)
 
     if ancla:
         fecha, pk = ancla

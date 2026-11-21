@@ -1,4 +1,4 @@
-import type { EstadoFoto, Severidad } from '../domain/inspeccion'
+import type { EstadoFoto, RelacionInspeccion, Severidad } from '../domain/inspeccion'
 
 // Status badges are "stamps": rectangular, 2px radius, tinted background with dark text.
 const BASE = 'inline-flex items-center rounded-sm px-2 py-0.5 font-mono text-[11px] font-medium tracking-wider uppercase'
@@ -30,4 +30,13 @@ export function InsigniaEstado({ estado }: { estado: EstadoFoto }) {
 /** Marks an inspection only its leader and members can see. */
 export function InsigniaPrivada() {
   return <span className={`${BASE} bg-info-bg text-info`}>Privada</span>
+}
+
+/** The current user's place in the inspection: its owner or an invited member. */
+export function InsigniaRelacion({ relacion }: { relacion: RelacionInspeccion }) {
+  return relacion === 'lider' ? (
+    <span className={`${BASE} bg-accent/15 text-accent-ink`}>Propietario</span>
+  ) : (
+    <span className={`${BASE} border border-line bg-surface-2 text-ink-muted`}>Invitado</span>
+  )
 }

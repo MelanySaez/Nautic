@@ -115,6 +115,7 @@ export function unaInspeccion(overrides: Partial<Inspeccion> = {}): Inspeccion {
     totalFotos: 0,
     lider: { id: 1, nombre: 'María Pérez' },
     privada: false,
+    miRelacion: null,
     ...overrides,
   }
 }

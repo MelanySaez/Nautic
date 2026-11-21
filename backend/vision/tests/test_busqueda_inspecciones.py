@@ -385,7 +385,8 @@ class DescribirFiltrosTests(TestCase):
     def test_forma_de_cada_filtro(self):
         por_nombre = {f['nombre']: f for f in describir_filtros()['filtros']}
 
-        self.assertEqual(set(por_nombre), {'buque', 'desde', 'hasta', 'severidad_min', 'q', 'seccion'})
+        self.assertEqual(set(por_nombre), {'buque', 'desde', 'hasta', 'severidad_min', 'q', 'seccion', 'relacion'})
+        self.assertEqual(por_nombre['relacion']['valores'], ['lider', 'invitado'])
         for filtro in por_nombre.values():
             self.assertEqual(
                 set(filtro), {'nombre', 'tipo', 'descripcion', 'valores', 'formato', 'alias'},

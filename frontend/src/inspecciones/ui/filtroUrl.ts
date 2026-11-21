@@ -1,7 +1,9 @@
-import type { FiltroInspecciones, Severidad } from '../domain/inspeccion'
+import type { FiltroInspecciones, RelacionInspeccion, Severidad } from '../domain/inspeccion'
 import { idDeParametro } from './parametrosUrl'
 
 export const NIVELES_SEVERIDAD: Severidad[] = ['low', 'medium', 'high', 'critical']
+
+export const RELACIONES: RelacionInspeccion[] = ['lider', 'invitado']
 
 /** Longest and shortest `q` the backend accepts is 2-100; below 2 the text is not sent. */
 export const MIN_CARACTERES_BUSQUEDA = 2
@@ -23,5 +25,7 @@ export function filtroDesdeParametros(parametros: URLSearchParams): FiltroInspec
   if (q && q.length >= MIN_CARACTERES_BUSQUEDA) filtro.q = q
   const seccionId = idDeParametro(parametros, 'seccion')
   if (seccionId !== null) filtro.seccionId = seccionId
+  const relacion = parametros.get('relacion')
+  if (RELACIONES.some((r) => r === relacion)) filtro.relacion = relacion as RelacionInspeccion
   return filtro
 }
