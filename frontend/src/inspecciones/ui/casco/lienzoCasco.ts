@@ -14,13 +14,15 @@ export interface PropsLienzoCasco {
   /** Hull measurements, with the archetype fallbacks already applied (`dimensionesCasco`). */
   dimensiones: DimensionesCasco
   arquetipo: Arquetipo
-  /** State of each placed zone in the selected inspection (every zone `sin-fotos` without one). */
+  /** State of each placed zone in its latest inspection with photos of it (`sin-fotos` without one). */
   estados: ReadonlyMap<CodigoZona, EstadoZona>
-  /** Photos of each placed zone in the selected inspection, in any state (0 included). */
+  /** Photos of each placed zone in its latest inspection, in any state (0 included). */
   fotosPorZona: ReadonlyMap<CodigoZona, number>
   /** Section name of each placed zone, shown next to the pointer while hovering it. */
   nombresZona: ReadonlyMap<CodigoZona, string>
-  /** True while the selected inspection loads: the states are not final yet. */
+  /** Name of the inspection each photographed zone takes its state from, shown while hovering it. */
+  inspeccionesZona: ReadonlyMap<CodigoZona, string>
+  /** True while the zones load: the states are not final yet. */
   cargando: boolean
   /** The selected zone, when the selected section is placed on the hull. */
   seleccionada: CodigoZona | null

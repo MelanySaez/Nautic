@@ -378,6 +378,31 @@ describe('HttpInspeccionesRepository', () => {
     expect(ultimaLlamada().url).toBe('http://api.test/api/vision/secciones/?buque=2')
   })
 
+  it('loads the latest photographed inspection of every zone of a vessel', async () => {
+    fetchMock.mockResolvedValue(
+      respuesta(200, {
+        zonas: [
+          {
+            seccion_id: 3,
+            inspeccion: { id: 7, nombre: 'Control 2026', fecha_creacion: '2026-10-01T10:00:00Z' },
+            fotos: [fotoDto],
+          },
+        ],
+      }),
+    )
+
+    const zonas = await repo.zonasRecientes(2)
+
+    expect(ultimaLlamada().url).toBe('http://api.test/api/buques/2/zonas/')
+    expect(zonas).toEqual([
+      {
+        seccionId: 3,
+        inspeccion: { id: 7, nombre: 'Control 2026', fechaCreacion: '2026-10-01T10:00:00Z' },
+        fotos: [expect.objectContaining({ id: 11, seccion: seccionDto, estado: 'pendiente', detecciones: [] })],
+      },
+    ])
+  })
+
   it('uploads a photo as multipart form data', async () => {
     fetchMock.mockResolvedValue(respuesta(202, fotoDto))
     const imagen = new File(['bytes'], 'keel.jpg', { type: 'image/jpeg' })

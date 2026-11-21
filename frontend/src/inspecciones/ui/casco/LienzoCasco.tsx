@@ -312,7 +312,7 @@ function Camara({ ref, caja, reducido }: { ref: Ref<MandoCamara>; caja: CascoGen
 
 /**
  * The hull in 3D, one clickable mesh per placed zone, coloured by its state. Hover highlights a
- * zone and labels it next to the pointer (section name and state), a click (not a drag) picks it,
+ * zone and labels it next to the pointer (section name, state and source inspection), a click (not a drag) picks it,
  * a click on anything else clears the selection. The canvas is
  * decorative for assistive technology: the zone list of the page is the accessible path.
  */
@@ -323,6 +323,7 @@ export default function LienzoCasco({
   estados,
   fotosPorZona,
   nombresZona,
+  inspeccionesZona,
   cargando,
   seleccionada,
   onSeleccionar,
@@ -495,6 +496,9 @@ export default function LienzoCasco({
             <p className="text-sm font-semibold whitespace-nowrap text-ink">{nombresZona.get(encima) ?? encima}</p>
             {estadoEncima && !cargando && (
               <p className="text-xs text-ink-muted">{PRESENTACION_ESTADO_ZONA[estadoEncima].texto}</p>
+            )}
+            {!cargando && inspeccionesZona.has(encima) && (
+              <p className="text-xs whitespace-nowrap text-ink-dim">{inspeccionesZona.get(encima)}</p>
             )}
           </div>
         </div>

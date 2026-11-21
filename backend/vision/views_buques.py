@@ -2,6 +2,7 @@ import math
 
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
+from django.db.models import OuterRef, Subquery
 from django.shortcuts import get_object_or_404
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema
@@ -11,13 +12,14 @@ from rest_framework.response import Response
 
 from .almacenamiento import borrar_archivo, es_imagen_buque, guardar_imagen_buque, url_archivo
 from .imagenes import validar_imagen
-from .models import Buque
+from .models import Buque, FotoInspeccion, InspeccionCasco
 from cuentas.models import referencia_publica
 
-from .permisos import condicion_visible
+from .permisos import condicion_visible, visibles_para
 from .secciones import (
     crear_secciones_estandar, crear_secciones_personalizadas, seccion_to_dict, validar_secciones,
 )
+from .views import _foto_to_dict
 
 # Pagination bounds for the list endpoint.
 _LIMIT_POR_DEFECTO = 50
@@ -462,3 +464,46 @@ def api_buque_imagen(request, buque_id):
     if es_imagen_buque(anterior) and anterior != buque.imagen:
         borrar_archivo(anterior)
     return Response(_buque_to_dict(buque))
+
+
+@extend_schema(
+    methods=['GET'],
+    tags=['Buques'],
+    summary='Estado reciente de cada zona del casco',
+    description=(
+        'Para cada sección del buque, la inspección más reciente (por `fecha_creacion` y luego `id`) '
+        'que el usuario puede ver y que tiene al menos una foto de esa sección, con esas fotos. '
+        'Las secciones que ninguna inspección visible fotografió no aparecen.'
+    ),
+    responses={200: OpenApiTypes.OBJECT, 404: OpenApiTypes.OBJECT},
+)
+@api_view(['GET'])
+def api_buque_zonas(request, buque_id):
+    """
+    GET /api/buques/<id>/zonas/  → {zonas: [{seccion_id, inspeccion: {id, nombre, fecha_creacion}, fotos}]}
+    """
+    buque = get_object_or_404(Buque, pk=buque_id)
+    # Latest readable inspection of the vessel with a photo of the outer photo's section.
+    visibles = visibles_para(request.user, InspeccionCasco.objects.filter(buque=buque)).values('id')
+    ultima = (FotoInspeccion.objects
+              .filter(seccion_id=OuterRef('seccion_id'), inspeccion_id__in=visibles)
+              .order_by('-inspeccion__fecha_creacion', '-inspeccion_id')
+              .values('inspeccion_id')[:1])
+    fotos = (FotoInspeccion.objects
+             .filter(seccion__buque=buque, inspeccion__buque=buque, inspeccion_id=Subquery(ultima))
+             .select_related('seccion', 'subida_por', 'inspeccion')
+             .prefetch_related('detecciones')
+             .order_by('seccion__orden', 'seccion__codigo', 'seccion_id', 'fecha_creacion', 'id'))
+
+    zonas = {}
+    for foto in fotos:
+        zona = zonas.get(foto.seccion_id)
+        if zona is None:
+            insp = foto.inspeccion
+            zona = zonas[foto.seccion_id] = {
+                'seccion_id': foto.seccion_id,
+                'inspeccion': {'id': insp.id, 'nombre': insp.nombre, 'fecha_creacion': insp.fecha_creacion.isoformat()},
+                'fotos': [],
+            }
+        zona['fotos'].append(_foto_to_dict(foto, request))
+    return Response({'zonas': list(zonas.values())})

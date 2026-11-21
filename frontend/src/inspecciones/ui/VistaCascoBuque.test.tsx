@@ -8,10 +8,9 @@ import {
   unaFoto,
   unaInspeccion,
   unaPagina,
-  unDetalle,
   unDetalleBuque,
 } from '../../test/dobles'
-import type { InspeccionDetalle, SeccionCasco } from '../domain/inspeccion'
+import type { SeccionCasco, ZonaReciente } from '../domain/inspeccion'
 import { BUQUE_DE_GUERRA, PATRULLERA } from '../../buques/domain/casco/arquetipo'
 import { EscenaCasco } from './casco/EscenaCasco'
 import type { PropsLienzoCasco } from './casco/lienzoCasco'
@@ -27,24 +26,33 @@ const RUTA = '/inspecciones/buque/1?vista=3d'
 
 const FONDO_PROA: SeccionCasco = { id: 11, codigo: 'FWD-BTM', nombre: 'Fondo - Proa', descripcion: 'Fondo plano de proa', orden: 1 }
 const FONDO_CENTRO: SeccionCasco = { id: 12, codigo: 'MID-BTM', nombre: 'Fondo - Centro', descripcion: 'Fondo plano central', orden: 2 }
+const FONDO_POPA: SeccionCasco = { id: 14, codigo: 'AFT-BTM', nombre: 'Fondo - Popa', descripcion: '', orden: 3 }
 const QUILLA: SeccionCasco = { id: 13, codigo: 'KEEL', nombre: 'Quilla', descripcion: '', orden: 19 }
 // Not in the standard order on purpose: the hull list follows the standard codes.
 // Only standard zone codes: a single custom section turns the 3D view off (`admiteVista3d`).
-const SECCIONES = [QUILLA, FONDO_CENTRO, FONDO_PROA]
+const SECCIONES = [QUILLA, FONDO_CENTRO, FONDO_POPA, FONDO_PROA]
 
 const RECIENTE = unaInspeccion({ id: 7, nombre: 'Control 2026', fechaCreacion: '2026-11-01T10:00:00Z' })
 const ANTERIOR = unaInspeccion({ id: 5, nombre: 'Control 2025', fechaCreacion: '2025-11-01T10:00:00Z' })
 
-const DETALLES: Record<number, InspeccionDetalle> = {
-  7: unDetalle({
-    ...RECIENTE,
-    fotos: [
-      unaFoto({ id: 1, seccion: FONDO_CENTRO, estado: 'completada', detecciones: [unaDeteccion({ cantidad: 2 })] }),
-      unaFoto({ id: 2, seccion: FONDO_PROA, estado: 'pendiente' }),
-    ],
-  }),
-  5: unDetalle({
-    ...ANTERIOR,
+const ref = ({ id, nombre, fechaCreacion }: typeof RECIENTE) => ({ id, nombre, fechaCreacion })
+
+// Each zone comes from its own latest inspection: the keel was last photographed in 2025, and
+// nobody ever photographed the aft bottom.
+const ZONAS: ZonaReciente[] = [
+  {
+    seccionId: FONDO_PROA.id,
+    inspeccion: ref(RECIENTE),
+    fotos: [unaFoto({ id: 2, seccion: FONDO_PROA, estado: 'pendiente' })],
+  },
+  {
+    seccionId: FONDO_CENTRO.id,
+    inspeccion: ref(RECIENTE),
+    fotos: [unaFoto({ id: 1, seccion: FONDO_CENTRO, estado: 'completada', detecciones: [unaDeteccion({ cantidad: 2 })] })],
+  },
+  {
+    seccionId: QUILLA.id,
+    inspeccion: ref(ANTERIOR),
     fotos: [
       unaFoto({
         id: 3,
@@ -53,8 +61,8 @@ const DETALLES: Record<number, InspeccionDetalle> = {
         detecciones: [unaDeteccion({ clase: 'paint_peel', etiqueta: 'Descascaramiento', severidad: 'low' })],
       }),
     ],
-  }),
-}
+  },
+]
 
 function preparar() {
   const falsas = crearDependenciasFalsas()
@@ -63,7 +71,7 @@ function preparar() {
     unDetalleBuque({ id: 1, nombre: 'ARA Libertad', esloraTotalM: 110, secciones: SECCIONES }),
   )
   inspecciones.buscar.mockResolvedValue(unaPagina([RECIENTE, ANTERIOR]))
-  inspecciones.obtener.mockImplementation(async (id: number) => DETALLES[id])
+  inspecciones.zonasRecientes.mockResolvedValue(ZONAS)
   return falsas
 }
 
@@ -136,7 +144,7 @@ describe('VistaCascoBuque layout', () => {
   it('puts the hull first, with the section list folded under it and no side list', async () => {
     renderizar()
 
-    const plegable = await screen.findByRole('group', { name: 'Lista de secciones (3)' })
+    const plegable = await screen.findByRole('group', { name: 'Lista de secciones (4)' })
     expect(plegable).not.toHaveAttribute('open')
     expect(screen.queryByRole('heading', { name: 'Secciones del casco' })).not.toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Zona seleccionada' })).toHaveTextContent(
@@ -146,34 +154,61 @@ describe('VistaCascoBuque layout', () => {
 
   it('hands the section name of every placed zone to the scene, for the hover label', async () => {
     renderizar()
-    await waitFor(() => expect(propsDelLienzo().nombresZona.size).toBe(3))
+    await waitFor(() => expect(propsDelLienzo().nombresZona.size).toBe(4))
 
     expect(propsDelLienzo().nombresZona).toEqual(
       new Map([
         ['FWD-BTM', 'Fondo - Proa'],
         ['MID-BTM', 'Fondo - Centro'],
+        ['AFT-BTM', 'Fondo - Popa'],
         ['KEEL', 'Quilla'],
+      ]),
+    )
+  })
+
+  it('hands the scene the inspection each photographed zone takes its colour from', async () => {
+    renderizar()
+    await waitFor(() => expect(propsDelLienzo().inspeccionesZona.size).toBe(3))
+
+    expect(propsDelLienzo().inspeccionesZona).toEqual(
+      new Map([
+        ['FWD-BTM', 'Control 2026'],
+        ['MID-BTM', 'Control 2026'],
+        ['KEEL', 'Control 2025'],
       ]),
     )
   })
 })
 
 describe('VistaCascoBuque colours', () => {
-  it('colours the zones with the most recent inspection and names it', async () => {
+  it('colours every zone with its own most recent inspection and explains it', async () => {
     const { dependencias } = renderizar()
 
     expect(await zona('MID-BTM')).toHaveTextContent('Crítica')
-    expect(screen.getByText(/Colores según la última inspección:/)).toHaveTextContent('Control 2026')
-    expect(dependencias.inspecciones.buscar).toHaveBeenCalledWith({ buqueId: 1 })
-    expect(dependencias.inspecciones.obtener).toHaveBeenCalledWith(7)
-    expect(dependencias.inspecciones.obtener).not.toHaveBeenCalledWith(5)
+    // The 2026 inspection did not photograph the keel: the 2025 one still colours it.
+    expect(await zona('KEEL')).toHaveTextContent('Baja')
+    expect(await zona('AFT-BTM')).toHaveTextContent('Sin fotos')
+    expect(screen.getByText('Cada zona muestra su inspección más reciente con fotos de esa sección.')).toBeInTheDocument()
+    expect(screen.queryByText(/Colores según la última inspección/)).not.toBeInTheDocument()
+    expect(dependencias.inspecciones.zonasRecientes).toHaveBeenCalledWith(1)
+    expect(dependencias.inspecciones.obtener).not.toHaveBeenCalled()
   })
 
-  it('updates the zone states live while photos are analyzed', async () => {
+  it('reloads the zones when a photo of the latest inspection changes', async () => {
     const falsas = preparar()
+    const { zonasRecientes } = falsas.dependencias.inspecciones
     renderizar(falsas.dependencias)
     expect(await zona('FWD-BTM')).toHaveTextContent('Sin analizar')
+    expect(falsas.dependencias.eventos.suscribir).toHaveBeenCalledWith(7, expect.any(Function))
+    expect(zonasRecientes).toHaveBeenCalledTimes(1)
 
+    const analizada = unaFoto({
+      id: 2,
+      seccion: FONDO_PROA,
+      estado: 'completada',
+      detecciones: [unaDeteccion({ clase: 'pitting', etiqueta: 'Picaduras', severidad: 'high' })],
+    })
+    zonasRecientes.mockResolvedValue([{ ...ZONAS[0], fotos: [analizada] }, ...ZONAS.slice(1)])
     act(() =>
       falsas.emitirEvento({
         tipo: 'foto-actualizada',
@@ -193,17 +228,20 @@ describe('VistaCascoBuque colours', () => {
       }),
     )
 
-    expect(await zona('FWD-BTM')).toHaveTextContent('Alta')
+    await waitFor(async () => expect(await zona('FWD-BTM')).toHaveTextContent('Alta'))
+    expect(zonasRecientes).toHaveBeenCalledTimes(2)
+    expect(zonasRecientes).toHaveBeenLastCalledWith(1)
   })
 
   it('shows every zone without photos when the vessel has no inspections', async () => {
     const { dependencias } = preparar()
     dependencias.inspecciones.buscar.mockResolvedValue(unaPagina())
+    dependencias.inspecciones.zonasRecientes.mockResolvedValue([])
     renderizar(dependencias)
 
     expect(await screen.findByText('Este buque aún no tiene inspecciones.')).toBeInTheDocument()
     for (const boton of within(await zonasDelCasco()).getAllByRole('button')) expect(boton).toHaveTextContent('Sin fotos')
-    expect(dependencias.inspecciones.obtener).not.toHaveBeenCalled()
+    expect(dependencias.eventos.suscribir).not.toHaveBeenCalled()
   })
 })
 
@@ -216,15 +254,18 @@ describe('VistaCascoBuque zones', () => {
     expect(within(grupo).getAllByRole('button').map((b) => b.textContent?.split(' · ')[0])).toEqual([
       'FWD-BTM',
       'MID-BTM',
+      'AFT-BTM',
       'KEEL',
     ])
     expect(await zona('MID-BTM')).toHaveTextContent('Fondo - Centro')
     expect(await zona('MID-BTM')).toHaveTextContent('1 foto')
     expect(await zona('FWD-BTM')).toHaveTextContent('Sin analizar')
-    expect(await zona('KEEL')).toHaveTextContent('Sin fotos')
+    expect(await zona('KEEL')).toHaveTextContent('Baja')
+    expect(await zona('AFT-BTM')).toHaveTextContent('Sin fotos')
+    expect(await zona('AFT-BTM')).toHaveTextContent('0 fotos')
   })
 
-  it('opens the two-option menu of the selected zone; selecting it again closes it', async () => {
+  it('opens the menu of the selected zone; selecting it again closes it', async () => {
     const { router } = renderizar()
     await zonasDelCasco()
     expect(panel()).toHaveTextContent('Pasa el cursor por el casco y haz clic en una sección, o elígela en la «Lista de secciones».')
@@ -239,6 +280,7 @@ describe('VistaCascoBuque zones', () => {
     expect(conteos(panel())).toEqual({ Fotos: '1', Analizadas: '1', Hallazgos: '2' })
     const acciones = within(panel()).getByRole('group', { name: 'Acciones de la zona' })
     expect(within(acciones).getAllByRole('link').concat(within(acciones).getAllByRole('button')).map((e) => e.textContent)).toEqual([
+      'Abrir inspección',
       'Nueva inspección en esta sección',
       'Ver inspecciones de esta sección',
     ])
@@ -251,6 +293,25 @@ describe('VistaCascoBuque zones', () => {
 
     expect(router.state.location.search).toBe('?vista=3d')
     expect(panel()).toHaveTextContent('Pasa el cursor por el casco y haz clic en una sección, o elígela en la «Lista de secciones».')
+  })
+
+  it("names the inspection the selected zone's colour comes from and opens that one", async () => {
+    const { router } = renderizar(preparar().dependencias, `${RUTA}&zona=13`)
+    await zonasDelCasco()
+
+    expect(panel()).toHaveTextContent('Según la inspección Control 2025')
+    expect(panel()).toHaveTextContent('Baja')
+    await userEvent.click(within(panel()).getByRole('link', { name: 'Abrir inspección' }))
+
+    expect(router.state.location.pathname).toBe('/inspecciones/5/resultados')
+  })
+
+  it('offers no inspection to open for a zone nobody photographed', async () => {
+    renderizar(preparar().dependencias, `${RUTA}&zona=14`)
+    await zonasDelCasco()
+
+    expect(panel()).toHaveTextContent('Ninguna inspección tiene fotos de esta sección.')
+    expect(within(panel()).queryByRole('link', { name: 'Abrir inspección' })).not.toBeInTheDocument()
   })
 
   it('goes to the new inspection form with the vessel and the zone preselected', async () => {
@@ -296,14 +357,16 @@ describe('VistaCascoBuque canvas slot', () => {
       new Map([
         ['FWD-BTM', 'sin-analizar'],
         ['MID-BTM', 'critical'],
-        ['KEEL', 'sin-fotos'],
+        ['AFT-BTM', 'sin-fotos'],
+        ['KEEL', 'low'],
       ]),
     )
     expect(props.fotosPorZona).toEqual(
       new Map([
         ['FWD-BTM', 1],
         ['MID-BTM', 1],
-        ['KEEL', 0],
+        ['AFT-BTM', 0],
+        ['KEEL', 1],
       ]),
     )
     expect(props.seleccionada).toBeNull()

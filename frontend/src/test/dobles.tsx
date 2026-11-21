@@ -19,6 +19,7 @@ import type {
   PaginaInspecciones,
   PermisosInspeccion,
   SeccionCasco,
+  ZonaReciente,
 } from '../inspecciones/domain/inspeccion'
 import type { CambiosMiembro, Miembro, NuevoMiembro, PersonaSugerida } from '../inspecciones/domain/miembros'
 
@@ -233,6 +234,7 @@ export function crearDependenciasFalsas() {
       renombrar: vi.fn(async (_id: number, nombre: string) => unaInspeccion({ nombre })),
       eliminar: vi.fn(async () => {}),
       cambiarPrivacidad: vi.fn(async (_id: number, privada: boolean) => unDetalle({ privada })),
+      zonasRecientes: vi.fn(async (_buqueId: number): Promise<ZonaReciente[]> => []),
       listarSecciones: vi.fn(async (_buqueId: number) => [SECCION_QUILLA]),
       subirFoto: vi.fn(async () => unaFoto()),
       analizar: vi.fn(async (_inspeccionId: number, _modeloId?: string) => ({ iniciadas: 0, omitidasPorLimite: 0 })),

@@ -8,6 +8,7 @@ import type {
   NuevaInspeccion,
   PaginaInspecciones,
   SeccionCasco,
+  ZonaReciente,
 } from '../domain/inspeccion'
 import type { DetallePorInstancia } from '../domain/detecciones'
 import type { CambiosMiembro, Miembro, NuevoMiembro, PersonaSugerida } from '../domain/miembros'
@@ -28,6 +29,11 @@ export interface InspeccionesRepository {
   eliminar(id: number): Promise<void>
   /** Leader only: makes the inspection private (only leader and members see it) or public again. */
   cambiarPrivacidad(id: number, privada: boolean): Promise<InspeccionDetalle>
+  /**
+   * Per hull section of the vessel, the latest readable inspection with photos of it and those
+   * photos. Sections no readable inspection photographed are absent.
+   */
+  zonasRecientes(buqueId: number): Promise<ZonaReciente[]>
   /** Hull sections declared by one vessel, in display order. */
   listarSecciones(buqueId: number): Promise<SeccionCasco[]>
   subirFoto(inspeccionId: number, seccionId: number, imagen: File): Promise<Foto>

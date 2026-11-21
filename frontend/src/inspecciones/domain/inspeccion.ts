@@ -86,6 +86,16 @@ export interface Inspeccion {
   miRelacion: RelacionInspeccion | null
 }
 
+/**
+ * The most recent inspection the user may read that photographed one hull section, with its
+ * photos of that section: what colours the zone on the vessel's 3D hull.
+ */
+export interface ZonaReciente {
+  seccionId: number
+  inspeccion: Pick<Inspeccion, 'id' | 'nombre' | 'fechaCreacion'>
+  fotos: Foto[]
+}
+
 export interface InspeccionDetalle extends Inspeccion {
   fotos: Foto[]
   misPermisos: PermisosInspeccion

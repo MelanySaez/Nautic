@@ -10,6 +10,7 @@ import type {
   SeccionCasco,
   Severidad,
   TipoClase,
+  ZonaReciente,
 } from '../domain/inspeccion'
 import type { BorradorReporte, CambiosReporte, TextosReporte } from '../domain/reporte'
 import type { DetallePorInstancia } from '../domain/detecciones'
@@ -91,6 +92,15 @@ export interface ListaInspeccionesDto {
   resultados: InspeccionDto[]
   siguiente: string | null
   hay_mas: boolean
+}
+
+/** Body of `GET /api/buques/<id>/zonas/`. */
+export interface ZonasRecientesDto {
+  zonas: Array<{
+    seccion_id: number
+    inspeccion: { id: number; nombre: string; fecha_creacion: string }
+    fotos: FotoDto[]
+  }>
 }
 
 export interface InspeccionDetalleDto extends InspeccionDto {
@@ -203,6 +213,14 @@ function aPermisosInspeccion(dto: PermisosInspeccionDto | undefined): PermisosIn
 
 export function aPagina(dto: ListaInspeccionesDto): PaginaInspecciones {
   return { resultados: dto.resultados.map(aInspeccion), siguiente: dto.siguiente, hayMas: dto.hay_mas }
+}
+
+export function aZonasRecientes(dto: ZonasRecientesDto): ZonaReciente[] {
+  return dto.zonas.map((zona) => ({
+    seccionId: zona.seccion_id,
+    inspeccion: { id: zona.inspeccion.id, nombre: zona.inspeccion.nombre, fechaCreacion: zona.inspeccion.fecha_creacion },
+    fotos: zona.fotos.map(aFoto),
+  }))
 }
 
 export function aInspeccionDetalle(dto: InspeccionDetalleDto): InspeccionDetalle {

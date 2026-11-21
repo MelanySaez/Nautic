@@ -8,6 +8,7 @@ import type {
   NuevaInspeccion,
   PaginaInspecciones,
   SeccionCasco,
+  ZonaReciente,
 } from '../domain/inspeccion'
 import type { DetallePorInstancia } from '../domain/detecciones'
 import type { BorradorReporte, CambiosReporte } from '../domain/reporte'
@@ -21,12 +22,14 @@ import {
   aNuevoMiembroDto,
   aPagina,
   aSeccion,
+  aZonasRecientes,
   type DetallePorInstanciaDto,
   type FotoDto,
   type InspeccionDetalleDto,
   type InspeccionDto,
   type ListaInspeccionesDto,
   type SeccionDto,
+  type ZonasRecientesDto,
   type BorradorReporteDto,
 } from './dtos'
 
@@ -101,6 +104,10 @@ export class HttpInspeccionesRepository implements InspeccionesRepository {
 
   eliminar(id: number): Promise<void> {
     return this.api.delete(`/api/vision/inspecciones/${id}/`)
+  }
+
+  async zonasRecientes(buqueId: number): Promise<ZonaReciente[]> {
+    return aZonasRecientes(await this.api.get<ZonasRecientesDto>(`/api/buques/${buqueId}/zonas/`))
   }
 
   async listarSecciones(buqueId: number): Promise<SeccionCasco[]> {

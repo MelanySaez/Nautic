@@ -1,12 +1,14 @@
 import { useId } from 'react'
-import type { SeccionCasco } from '../../domain/inspeccion'
+import type { SeccionCasco, ZonaReciente } from '../../domain/inspeccion'
 import type { ResumenZona } from '../../domain/resumenZonas'
 import { PRESENTACION_ESTADO_ZONA } from './estadosZona'
 
-/** A section of the vessel with what the selected inspection says about it. */
+/** A section of the vessel with what its latest inspection with photos of it says about it. */
 export interface ZonaListada {
   seccion: SeccionCasco
   resumen: ResumenZona
+  /** The inspection the summary comes from; null when no readable inspection photographed it. */
+  inspeccion: ZonaReciente['inspeccion'] | null
 }
 
 /**
