@@ -28,9 +28,9 @@ const RUTA = '/inspecciones/buque/1?vista=3d'
 const FONDO_PROA: SeccionCasco = { id: 11, codigo: 'FWD-BTM', nombre: 'Fondo - Proa', descripcion: 'Fondo plano de proa', orden: 1 }
 const FONDO_CENTRO: SeccionCasco = { id: 12, codigo: 'MID-BTM', nombre: 'Fondo - Centro', descripcion: 'Fondo plano central', orden: 2 }
 const QUILLA: SeccionCasco = { id: 13, codigo: 'KEEL', nombre: 'Quilla', descripcion: '', orden: 19 }
-const LASTRE: SeccionCasco = { id: 14, codigo: 'SEC-01', nombre: 'Tanque de lastre', descripcion: '', orden: 24 }
 // Not in the standard order on purpose: the hull list follows the standard codes.
-const SECCIONES = [QUILLA, LASTRE, FONDO_CENTRO, FONDO_PROA]
+// Only standard zone codes: a single custom section turns the 3D view off (`admiteVista3d`).
+const SECCIONES = [QUILLA, FONDO_CENTRO, FONDO_PROA]
 
 const RECIENTE = unaInspeccion({ id: 7, nombre: 'Control 2026', fechaCreacion: '2026-11-01T10:00:00Z' })
 const ANTERIOR = unaInspeccion({ id: 5, nombre: 'Control 2025', fechaCreacion: '2025-11-01T10:00:00Z' })
@@ -136,7 +136,7 @@ describe('VistaCascoBuque layout', () => {
   it('puts the hull first, with the section list folded under it and no side list', async () => {
     renderizar()
 
-    const plegable = await screen.findByRole('group', { name: 'Lista de secciones (4)' })
+    const plegable = await screen.findByRole('group', { name: 'Lista de secciones (3)' })
     expect(plegable).not.toHaveAttribute('open')
     expect(screen.queryByRole('heading', { name: 'Secciones del casco' })).not.toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Zona seleccionada' })).toHaveTextContent(
@@ -224,15 +224,6 @@ describe('VistaCascoBuque zones', () => {
     expect(await zona('KEEL')).toHaveTextContent('Sin fotos')
   })
 
-  it('lists a custom section apart, as not placed on the hull', async () => {
-    renderizar()
-    await zonasDelCasco()
-
-    const aparte = screen.getByRole('group', { name: 'Secciones sin ubicación en el casco' })
-    expect(within(aparte).getAllByRole('button')).toHaveLength(1)
-    expect(within(aparte).getByRole('button', { name: /^SEC-01 · Tanque de lastre/ })).toHaveTextContent('Sin fotos')
-  })
-
   it('opens the two-option menu of the selected zone; selecting it again closes it', async () => {
     const { router } = renderizar()
     await zonasDelCasco()
@@ -290,16 +281,6 @@ describe('VistaCascoBuque zones', () => {
     expect(screen.queryByText(/^Sección:/)).not.toBeInTheDocument()
   })
 
-  it('selects a section that is not placed on the hull the same way', async () => {
-    const { router } = renderizar()
-    await zonasDelCasco()
-
-    await userEvent.click(screen.getByRole('button', { name: /^SEC-01 · / }))
-
-    expect(router.state.location.search).toBe('?vista=3d&zona=14')
-    expect(within(panel()).getByRole('heading', { name: 'Tanque de lastre' })).toBeInTheDocument()
-    expect(conteos(panel())).toEqual({ Fotos: '0', Analizadas: '0', Hallazgos: '0' })
-  })
 })
 
 describe('VistaCascoBuque canvas slot', () => {
