@@ -136,6 +136,20 @@ describe('NuevoBuquePage', () => {
     expect(router.state.location.pathname).toBe('/buques/9')
   })
 
+  it('says the 3D hull uses the standard sections and is not available with custom ones', async () => {
+    renderizar()
+    await rellenarRequeridos()
+
+    expect(screen.getByText(/La vista 3D del casco se genera con estas secciones\./)).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('radio', { name: 'Declarar secciones propias' }))
+
+    expect(screen.getByRole('note')).toHaveTextContent(
+      'Con secciones propias, la vista 3D del casco no estará disponible para este buque.',
+    )
+    expect(screen.queryByText(/La vista 3D del casco se genera/)).not.toBeInTheDocument()
+  })
+
   it('sends the custom sections in the order shown, after reordering and removing rows', async () => {
     const { dependencias } = crearDependenciasFalsas()
     renderizar(dependencias)

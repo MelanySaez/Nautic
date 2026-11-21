@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { admiteVista3d } from '../../buques/domain/casco/zonas'
 import { useLocation, useParams, useSearchParams } from 'react-router'
 import { Enlace } from '../../shared/ui/Enlace'
 import { useDependencias } from '../../app/useDependencias'
@@ -36,15 +37,19 @@ export function ListaInspeccionesPage({ buqueId }: { buqueId: number }) {
   const usuario = useUsuarioActual()
   const [parametros, setParametros] = useSearchParams()
   const filtroUrl = useMemo(() => filtroDesdeParametros(parametros), [parametros])
-  const en3d = parametros.get('vista') === VISTA_3D
+  const pide3d = parametros.get('vista') === VISTA_3D
   const zonaId = idDeParametro(parametros, 'zona')
+  const cargarBuque = useCallback(() => buques.obtener(buqueId), [buques, buqueId])
+  const { estado: buque, reintentar: reintentarBuque } = useRecurso(cargarBuque)
+  // Vessels declared with their own sections have no 3D hull; until the vessel loads, assume it has.
+  const disponible3d = buque.tipo !== 'listo' || admiteVista3d(buque.datos.secciones)
+  const en3d = pide3d && disponible3d
+  const idNo3d = useId()
   // The list is not on screen in 3D: its (filtered) search waits until it is shown again.
   const { estado, cargarMas, quitar, reintentar } = useBusquedaInspecciones(
     { ...filtroUrl, buqueId },
     { activa: !en3d },
   )
-  const cargarBuque = useCallback(() => buques.obtener(buqueId), [buques, buqueId])
-  const { estado: buque, reintentar: reintentarBuque } = useRecurso(cargarBuque)
   // The vessel list passes the name along so the title is there from the first frame of the transition.
   const ubicacion = useLocation()
   const desdeLista = ubicacion.state as { buqueNombre?: string; volverA?: string } | null
@@ -177,10 +182,12 @@ export function ListaInspeccionesPage({ buqueId }: { buqueId: number }) {
                   key={etiqueta}
                   type="button"
                   aria-pressed={activa}
+                  disabled={vista3d && !disponible3d}
+                  aria-describedby={vista3d && !disponible3d ? idNo3d : undefined}
                   onClick={() => !activa && mostrar3d(vista3d)}
                   className={`label-caps flex items-center gap-2 rounded-sm px-3 py-2 ${
                     activa ? 'bg-surface-2 text-ink' : 'text-ink-muted hover:text-ink'
-                  }`}
+                  } disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:text-ink-muted`}
                 >
                   <Icon name={icono} className="size-4" />
                   {etiqueta}
@@ -188,6 +195,11 @@ export function ListaInspeccionesPage({ buqueId }: { buqueId: number }) {
               )
             })}
           </div>
+          {!disponible3d && (
+            <p id={idNo3d} className="self-center text-sm text-ink-dim">
+              Este buque usa secciones propias: la vista 3D no está disponible.
+            </p>
+          )}
           <EnlaceBoton to={`/vision?buque=${buqueId}`}>
             <Icon name="plus" className="size-4" />
             Nueva inspección

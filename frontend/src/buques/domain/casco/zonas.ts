@@ -36,6 +36,14 @@ export function esCodigoZona(codigo: string): codigo is CodigoZona {
   return CODIGOS.has(codigo)
 }
 
+/**
+ * Whether the vessel's sections fit the generated 3D hull: at least one, and every code a standard
+ * zone. A vessel declared with its own sections (custom codes such as `SEC-01`) has no 3D view.
+ */
+export function admiteVista3d(secciones: readonly { codigo: string }[]): boolean {
+  return secciones.length > 0 && secciones.every((s) => esCodigoZona(s.codigo))
+}
+
 /** Lengthwise third: aft, middle or forward. */
 export type Tercio = 'AFT' | 'MID' | 'FWD'
 /** Side: port (babor, `P`, z < 0) or starboard (estribor, `S`, z > 0). */

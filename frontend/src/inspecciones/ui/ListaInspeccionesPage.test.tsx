@@ -296,6 +296,22 @@ describe('ListaInspeccionesPage list / 3D switch', () => {
     return falsas.dependencias
   }
 
+  it('disables the 3D hull for a vessel with its own sections, even from a 3D link', async () => {
+    const falsas = crearDependenciasFalsas()
+    falsas.dependencias.buques.obtener.mockResolvedValue(
+      unDetalleBuque({ id: 1, nombre: 'ARA Libertad', secciones: [FONDO, { ...FONDO, id: 13, codigo: 'SEC-01', nombre: 'Popa' }] }),
+    )
+    const { router } = renderizar(falsas.dependencias, `${RUTA}?vista=3d`)
+
+    const vista3d = await screen.findByRole('button', { name: 'Vista 3D' })
+    await waitFor(() => expect(vista3d).toBeDisabled())
+    expect(vista3d).toHaveAccessibleDescription('Este buque usa secciones propias: la vista 3D no está disponible.')
+    expect(screen.getByRole('button', { name: 'Lista' })).toHaveAttribute('aria-pressed', 'true')
+    expect(await screen.findByLabelText('Buscar por nombre')).toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: /^Lista de secciones/ })).not.toBeInTheDocument()
+    expect(router.state.location.search).toBe('?vista=3d')
+  })
+
   it('switches to the 3D hull and back to the list, keeping the choice in the URL', async () => {
     const { router } = renderizar(conBuque())
     const vista3d = await screen.findByRole('button', { name: 'Vista 3D' })

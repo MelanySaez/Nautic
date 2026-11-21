@@ -53,9 +53,14 @@ export function SeccionesCascoForm({
       </div>
 
       {modo === 'estandar' ? (
-        <p className="text-sm text-ink-dim">Se crean las 23 zonas estándar del casco.</p>
+        <p className="text-sm text-ink-dim">
+          Se crean las 23 zonas estándar del casco. La vista 3D del casco se genera con estas secciones.
+        </p>
       ) : (
         <div className="flex flex-col gap-4">
+          <p role="note" className="rounded border border-high/30 bg-high-bg px-3 py-2 text-sm text-high">
+            Con secciones propias, la vista 3D del casco no estará disponible para este buque.
+          </p>
           <ol className="flex flex-col gap-4">
             {filas.map((fila, indice) => {
               const numero = indice + 1
