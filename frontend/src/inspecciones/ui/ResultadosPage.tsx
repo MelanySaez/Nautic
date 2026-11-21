@@ -58,6 +58,8 @@ function Resultados({
   // `?zona=<seccionId>` filters only while that zone is one of the options; otherwise every zone shows.
   const zonaId = zonasConResultados.some((s) => s.id === zonaUrl) ? zonaUrl : null
   const visibles = zonaId === null ? analizadas : analizadas.filter((f) => f.seccion.id === zonaId)
+  // Folded by default so the team section stays close; a zone in the URL means "show me these photos".
+  const [fotosAbiertas, setFotosAbiertas] = useState(zonaId !== null)
   const progreso = resumirProgreso(detalle.fotos)
   const sinAnalizar = progreso.pendientes + progreso.enProceso
   const maxima = severidadMaxima(analizadas)
@@ -149,33 +151,42 @@ function Resultados({
           <p>Todavía no hay fotos analizadas.</p>
         </Vacio>
       ) : (
-        <>
-          <label className="flex items-center gap-3 self-start">
-            <span className="label-caps text-ink-muted">Zona</span>
-            <select
-              value={zonaId ?? ''}
-              onChange={(e) => fijarZonaUrl(e.target.value ? Number(e.target.value) : null)}
-              className={clasesControlCompacto}
-            >
-              <option value="">Todas las zonas</option>
-              {zonasConResultados.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.codigo} · {s.nombre}
-                </option>
+        <details
+          open={fotosAbiertas}
+          onToggle={(e) => setFotosAbiertas(e.currentTarget.open)}
+          className="rounded-lg border border-line bg-surface"
+        >
+          <summary className="label-caps cursor-pointer px-4 py-3 text-ink-muted hover:text-ink">
+            Resultados por foto ({analizadas.length})
+          </summary>
+          <div className="flex flex-col gap-4 border-t border-line p-4">
+            <label className="flex items-center gap-3 self-start">
+              <span className="label-caps text-ink-muted">Zona</span>
+              <select
+                value={zonaId ?? ''}
+                onChange={(e) => fijarZonaUrl(e.target.value ? Number(e.target.value) : null)}
+                className={clasesControlCompacto}
+              >
+                <option value="">Todas las zonas</option>
+                {zonasConResultados.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.codigo} · {s.nombre}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="grid gap-6 lg:grid-cols-2">
+              {visibles.map((foto) => (
+                <TarjetaResultado
+                  key={foto.id}
+                  foto={foto}
+                  modelos={modelos}
+                  alCargarDetecciones={(id) => inspecciones.obtenerDetecciones(id)}
+                />
               ))}
-            </select>
-          </label>
-          <div className="grid gap-6 lg:grid-cols-2">
-            {visibles.map((foto) => (
-              <TarjetaResultado
-                key={foto.id}
-                foto={foto}
-                modelos={modelos}
-                alCargarDetecciones={(id) => inspecciones.obtenerDetecciones(id)}
-              />
-            ))}
+            </div>
           </div>
-        </>
+        </details>
       )}
 
       <EquipoInspeccion detalle={detalle} alCambiarDetalle={alActualizarDetalle} />

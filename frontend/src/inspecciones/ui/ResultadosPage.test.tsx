@@ -75,6 +75,24 @@ function renderizar(fotos: Foto[], extra: Partial<InspeccionDetalle> = {}, ruta 
 }
 
 describe('ResultadosPage', () => {
+  it('folds the photo results by default so the team section is close, and unfolds them on demand', async () => {
+    renderizar([CORROIDA, SOLO_CASCO])
+
+    const resumen = await screen.findByText('Resultados por foto (2)')
+    const plegable = resumen.closest('details')!
+    expect(plegable).not.toHaveAttribute('open')
+
+    await userEvent.click(resumen)
+    expect(plegable).toHaveAttribute('open')
+  })
+
+  it('unfolds the photo results when a zone comes in the URL', async () => {
+    const enProa = unaFoto({ id: 24, estado: 'completada', seccion: SECCION_PROA })
+    renderizar([CORROIDA, enProa], {}, `/inspecciones/7/resultados?zona=${SECCION_PROA.id}`)
+
+    expect((await screen.findByText(/^Resultados por foto/)).closest('details')).toHaveAttribute('open')
+  })
+
   it('renames the inspection and shows the new name as the title', async () => {
     const { dependencias } = renderizar([CORROIDA])
     dependencias.inspecciones.renombrar.mockResolvedValue(unaInspeccion({ id: 7, nombre: 'Casco proa' }))
