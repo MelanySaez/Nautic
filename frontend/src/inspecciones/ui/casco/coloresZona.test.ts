@@ -24,7 +24,7 @@ afterEach(() => {
 
 describe('variableDeZona', () => {
   it('colours a zone with the token of its state', () => {
-    expect(variableDeZona('KEEL', ESTADOS, false)).toBe('--c-critical')
+    expect(variableDeZona('KEEL', ESTADOS, false)).toBe('--c-critical-fill')
     expect(variableDeZona('MID-BTM', ESTADOS, false)).toBe('--c-zona-sin-hallazgos')
   })
 
@@ -111,14 +111,14 @@ describe('observarTema', () => {
 describe('useColoresTema', () => {
   it('re-reads the tokens when the theme changes', async () => {
     vi.spyOn(window, 'getComputedStyle').mockImplementation(() =>
-      estilo({ '--c-critical': html.classList.contains('dark') ? '#ff2a51' : '#93000a' }) as CSSStyleDeclaration,
+      estilo({ '--c-critical-fill': html.classList.contains('dark') ? '#ff2a51' : '#e11d48' }) as CSSStyleDeclaration,
     )
     const { result } = renderHook(() => useColoresTema())
-    expect(result.current.get('--c-critical')).toBe('#93000a')
+    expect(result.current.get('--c-critical-fill')).toBe('#e11d48')
 
     await act(async () => html.classList.add('dark'))
 
-    await vi.waitFor(() => expect(result.current.get('--c-critical')).toBe('#ff2a51'))
+    await vi.waitFor(() => expect(result.current.get('--c-critical-fill')).toBe('#ff2a51'))
   })
 
   it('keeps the same colours object while nothing changes', async () => {

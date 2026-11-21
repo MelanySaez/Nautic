@@ -21,14 +21,22 @@
   --c-accent-ink: #00687a;
   --c-on-accent: #0f172a;
 
-  --c-critical: #93000a;
-  --c-critical-bg: #ffdad6;
+  /*
+   * Severity: `--c-<nivel>` is text (badges, errors) on `--c-<nivel>-bg`, at least 4.5:1;
+   * `--c-<nivel>-fill` paints swatches and the 3D hull, vivid so the four levels stay apart.
+   */
+  --c-critical: #9f1239;
+  --c-critical-bg: #fecdd3;
+  --c-critical-fill: #e11d48;
   --c-high: #9a3412;
-  --c-high-bg: #ffedd5;
+  --c-high-bg: #fed7aa;
+  --c-high-fill: #f97316;
   --c-medium: #854d0e;
-  --c-medium-bg: #fef9c3;
+  --c-medium-bg: #fef08a;
+  --c-medium-fill: #eab308;
   --c-low: #166534;
-  --c-low-bg: #dcfce7;
+  --c-low-bg: #bbf7d0;
+  --c-low-fill: #16a34a;
   --c-info: #00687a;
   --c-info-bg: #cff4fc;
 
@@ -58,12 +66,16 @@
 
   --c-critical: #ff2a51;
   --c-critical-bg: #2a0812;
+  --c-critical-fill: #ff2a51;
   --c-high: #fb923c;
   --c-high-bg: #2a1305;
+  --c-high-fill: #fb923c;
   --c-medium: #f59e0b;
   --c-medium-bg: #261704;
+  --c-medium-fill: #f59e0b;
   --c-low: #10b981;
   --c-low-bg: #042217;
+  --c-low-fill: #10b981;
   --c-info: #00d2ff;
   --c-info-bg: #042433;
 
@@ -91,12 +103,16 @@
   --color-on-accent: var(--c-on-accent);
   --color-critical: var(--c-critical);
   --color-critical-bg: var(--c-critical-bg);
+  --color-critical-fill: var(--c-critical-fill);
   --color-high: var(--c-high);
   --color-high-bg: var(--c-high-bg);
+  --color-high-fill: var(--c-high-fill);
   --color-medium: var(--c-medium);
   --color-medium-bg: var(--c-medium-bg);
+  --color-medium-fill: var(--c-medium-fill);
   --color-low: var(--c-low);
   --color-low-bg: var(--c-low-bg);
+  --color-low-fill: var(--c-low-fill);
   --color-info: var(--c-info);
   --color-info-bg: var(--c-info-bg);
   --color-zona-sin-clasificar: var(--c-zona-sin-clasificar);

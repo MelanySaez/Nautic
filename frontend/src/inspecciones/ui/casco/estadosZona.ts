@@ -29,10 +29,10 @@ export const ESTADOS_ZONA: readonly EstadoZona[] = [
 
 // The four severity labels and badge colours are the ones of `InsigniaSeveridad`.
 export const PRESENTACION_ESTADO_ZONA: Record<EstadoZona, PresentacionEstadoZona> = {
-  critical: { texto: 'Crítica', insignia: 'bg-critical-bg text-critical', muestra: 'bg-critical', variableColor: '--c-critical' },
-  high: { texto: 'Alta', insignia: 'bg-high-bg text-high', muestra: 'bg-high', variableColor: '--c-high' },
-  medium: { texto: 'Media', insignia: 'bg-medium-bg text-medium', muestra: 'bg-medium', variableColor: '--c-medium' },
-  low: { texto: 'Baja', insignia: 'bg-low-bg text-low', muestra: 'bg-low', variableColor: '--c-low' },
+  critical: { texto: 'Crítica', insignia: 'bg-critical-bg text-critical', muestra: 'bg-critical-fill', variableColor: '--c-critical-fill' },
+  high: { texto: 'Alta', insignia: 'bg-high-bg text-high', muestra: 'bg-high-fill', variableColor: '--c-high-fill' },
+  medium: { texto: 'Media', insignia: 'bg-medium-bg text-medium', muestra: 'bg-medium-fill', variableColor: '--c-medium-fill' },
+  low: { texto: 'Baja', insignia: 'bg-low-bg text-low', muestra: 'bg-low-fill', variableColor: '--c-low-fill' },
   'sin-clasificar': {
     texto: 'Hallazgo sin clasificar',
     insignia: 'bg-surface-2 text-zona-sin-clasificar',
