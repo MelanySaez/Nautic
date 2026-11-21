@@ -3,16 +3,20 @@ import { Campo } from '../../shared/ui/Campo'
 import { CLASES_CONTROL } from '../../shared/ui/clasesControl'
 import { Icon } from '../../shared/ui/Icon'
 import { Tarjeta } from '../../shared/ui/Tarjeta'
-import { ROLES_PLANTILLA, type RolPlantilla } from '../domain/miembros'
+import { ROLES_PLANTILLA, type PersonaSugerida, type RolPlantilla } from '../domain/miembros'
+import { SelectorPersona } from './SelectorPersona'
 
 export interface FilaInvitado {
   uid: number
-  email: string
+  /** What was typed: a name to search or an email. */
+  texto: string
+  /** The user picked from the suggestions; null while the row holds typed text. */
+  persona: PersonaSugerida | null
   rol: RolPlantilla
 }
 
-/** Error messages of one row, by field (`email`, `rol`, `permisos`). */
-export type ErroresFila = Partial<Record<'email' | 'rol' | 'permisos', string>>
+/** Error messages of one row, by field (`email`, `usuario_id`, `rol`, `permisos`). */
+export type ErroresFila = Partial<Record<'email' | 'usuario_id' | 'rol' | 'permisos', string>>
 
 /** People invited while creating an inspection, each with a role template. */
 export function EquipoInicial({
@@ -23,6 +27,7 @@ export function EquipoInicial({
   alAgregar,
   alCambiar,
   alQuitar,
+  buscarPersonas,
 }: {
   filas: FilaInvitado[]
   privada: boolean
@@ -31,6 +36,7 @@ export function EquipoInicial({
   alAgregar: () => void
   alCambiar: (uid: number, cambio: Partial<Omit<FilaInvitado, 'uid'>>) => void
   alQuitar: (uid: number) => void
+  buscarPersonas: (texto: string) => Promise<PersonaSugerida[]>
 }) {
   return (
     <Tarjeta titulo="Acceso y equipo">
@@ -55,7 +61,7 @@ export function EquipoInicial({
           </span>
         </label>
         <p className="text-sm text-ink-muted">
-          Invita a otras personas con su rol: Colaborador puede hacerlo todo, Revisor edita el reporte y Observador solo
+          Invita a otras personas con su rol (escribe su nombre para buscarlas, o su email): Colaborador puede hacerlo todo, Revisor edita el reporte y Observador solo
           mira. Podrás cambiarlo después en los resultados.
         </p>
         {filas.map((fila, i) => {
@@ -63,13 +69,16 @@ export function EquipoInicial({
           const error = errores[fila.uid] ?? {}
           return (
             <div key={fila.uid} className="grid items-start gap-3 sm:grid-cols-[minmax(0,1fr)_12rem_auto]">
-              <Campo etiqueta={`Email de la persona ${n}`} error={error.email ?? error.permisos}>
-                <input
-                  type="email"
-                  value={fila.email}
-                  onChange={(e) => alCambiar(fila.uid, { email: e.target.value })}
-                  placeholder="persona@ejemplo.com"
-                  className={CLASES_CONTROL}
+              <Campo
+                etiqueta={`Nombre o email de la persona ${n}`}
+                error={error.email ?? error.usuario_id ?? error.permisos}
+              >
+                <SelectorPersona
+                  texto={fila.texto}
+                  persona={fila.persona}
+                  buscar={buscarPersonas}
+                  alCambiar={(texto, persona) => alCambiar(fila.uid, { texto, persona })}
+                  placeholder="Nombre o persona@ejemplo.com"
                 />
               </Campo>
               <Campo etiqueta={`Rol de la persona ${n}`} error={error.rol}>

@@ -398,13 +398,83 @@ describe('ResultadosPage team', () => {
     const { dependencias } = renderizar([])
     const seccion = await equipo()
 
-    await userEvent.type(within(seccion).getByLabelText('Email del usuario'), 'luis@nautic.test')
+    await userEvent.type(within(seccion).getByLabelText('Nombre o email del usuario'), 'luis@nautic.test')
     await userEvent.selectOptions(within(seccion).getByRole('combobox', { name: 'Rol' }), 'observador')
     await userEvent.click(within(seccion).getByRole('button', { name: 'Invitar' }))
 
     expect(dependencias.miembros.invitar).toHaveBeenCalledWith(7, { email: 'luis@nautic.test', rol: 'observador' })
+    // An email is typed by hand: users are only searched by name.
+    expect(dependencias.miembros.buscarUsuarios).not.toHaveBeenCalled()
     expect(await within(seccion).findByRole('listitem', { name: 'Luis Sosa' })).toBeInTheDocument()
-    expect(within(seccion).getByLabelText('Email del usuario')).toHaveValue('')
+    expect(within(seccion).getByLabelText('Nombre o email del usuario')).toHaveValue('')
+  })
+
+  it('suggests registered users by name, without emails, and invites the picked one by id', async () => {
+    const { dependencias } = renderizar([])
+    dependencias.miembros.buscarUsuarios.mockResolvedValue([
+      { id: 8, nombre: 'Marta Ruiz', cargo: 'Jefa de dique' },
+      { id: 9, nombre: 'Mario Paz', cargo: '' },
+    ])
+    const seccion = await equipo()
+    const campo = within(seccion).getByLabelText('Nombre o email del usuario')
+
+    await userEvent.type(campo, 'm')
+    expect(campo).toHaveAttribute('aria-expanded', 'false')
+    await userEvent.type(campo, 'ar')
+    const opciones = await within(seccion).findAllByRole('option', { name: /Marta Ruiz|Mario Paz/ })
+    expect(opciones.map((o) => o.textContent)).toEqual(['Marta RuizJefa de dique', 'Mario Paz'])
+    expect(dependencias.miembros.buscarUsuarios).toHaveBeenCalledTimes(1)
+    expect(dependencias.miembros.buscarUsuarios).toHaveBeenCalledWith('mar')
+
+    // Keyboard: the second suggestion, picked with Enter, does not submit the form.
+    await userEvent.keyboard('{ArrowDown}{ArrowDown}{Enter}')
+    expect(campo).toHaveValue('Mario Paz')
+    expect(campo).toHaveAttribute('aria-expanded', 'false')
+    expect(dependencias.miembros.invitar).not.toHaveBeenCalled()
+
+    await userEvent.click(within(seccion).getByRole('button', { name: 'Invitar' }))
+    expect(dependencias.miembros.invitar).toHaveBeenCalledWith(7, { usuarioId: 9, rol: 'colaborador' })
+    expect(await within(seccion).findByLabelText('Nombre o email del usuario')).toHaveValue('')
+  })
+
+  it('says nobody matches and how to invite them anyway', async () => {
+    const { dependencias } = renderizar([])
+    dependencias.miembros.buscarUsuarios.mockResolvedValue([])
+    const seccion = await equipo()
+    const campo = within(seccion).getByLabelText('Nombre o email del usuario')
+
+    await userEvent.type(campo, 'zoe')
+
+    expect(await within(seccion).findByRole('status')).toHaveTextContent(
+      'Nadie coincide con «zoe». Escribe su email completo; si aún no tiene cuenta, debe registrarse primero.',
+    )
+    expect(campo).toHaveAttribute('aria-expanded', 'false')
+    await userEvent.keyboard('{Escape}')
+    expect(within(seccion).queryByRole('status')).not.toBeInTheDocument()
+  })
+
+  it('drops the pick when the text is edited and ignores suggestions of an older search', async () => {
+    const { dependencias } = renderizar([])
+    const respuestas: ((v: { id: number; nombre: string; cargo: string }[]) => void)[] = []
+    dependencias.miembros.buscarUsuarios.mockImplementation(() => new Promise((r) => respuestas.push(r)))
+    const seccion = await equipo()
+    const campo = within(seccion).getByLabelText('Nombre o email del usuario')
+
+    await userEvent.type(campo, 'ma')
+    await waitFor(() => expect(respuestas).toHaveLength(1))
+    await userEvent.type(campo, 'r')
+    await waitFor(() => expect(respuestas).toHaveLength(2))
+    act(() => respuestas[1]([{ id: 8, nombre: 'Marta Ruiz', cargo: '' }]))
+    await within(seccion).findByRole('option', { name: 'Marta Ruiz' })
+    act(() => respuestas[0]([{ id: 3, nombre: 'Manuel Vega', cargo: '' }]))   // late answer to "ma"
+    expect(within(seccion).queryByRole('option', { name: 'Manuel Vega' })).not.toBeInTheDocument()
+
+    await userEvent.click(within(seccion).getByRole('option', { name: 'Marta Ruiz' }))
+    await userEvent.type(campo, 'x')
+    await userEvent.click(within(seccion).getByRole('button', { name: 'Invitar' }))
+
+    expect(dependencias.miembros.invitar).not.toHaveBeenCalled()
+    expect(campo).toHaveAccessibleDescription('Elige a alguien de la lista o escribe su email completo.')
   })
 
   it('shows why an invitation was rejected under the email', async () => {
@@ -414,10 +484,10 @@ describe('ResultadosPage team', () => {
     )
     const seccion = await equipo()
 
-    await userEvent.type(within(seccion).getByLabelText('Email del usuario'), 'nadie@nautic.test')
+    await userEvent.type(within(seccion).getByLabelText('Nombre o email del usuario'), 'nadie@nautic.test')
     await userEvent.click(within(seccion).getByRole('button', { name: 'Invitar' }))
 
-    expect(await within(seccion).findByLabelText('Email del usuario')).toHaveAccessibleDescription(
+    expect(await within(seccion).findByLabelText('Nombre o email del usuario')).toHaveAccessibleDescription(
       'No existe una cuenta con ese email.',
     )
   })

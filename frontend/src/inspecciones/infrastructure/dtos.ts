@@ -13,7 +13,7 @@ import type {
 } from '../domain/inspeccion'
 import type { BorradorReporte, CambiosReporte, TextosReporte } from '../domain/reporte'
 import type { DetallePorInstancia } from '../domain/detecciones'
-import type { CambiosMiembro, Miembro, PermisosMiembro, RolMiembro } from '../domain/miembros'
+import type { CambiosMiembro, Miembro, NuevoMiembro, PermisosMiembro, RolMiembro } from '../domain/miembros'
 import type { ModeloIA } from '../domain/modelo'
 
 // Wire shapes of the Django vision API (snake_case), mapped to the domain at the edge.
@@ -383,6 +383,13 @@ const CAMPO_PERMISO: Record<keyof PermisosMiembro, keyof PermisosMiembroDto> = {
   analizar: 'analizar',
   editarReporte: 'editar_reporte',
   editarInspeccion: 'editar_inspeccion',
+}
+
+/** An invitation names the user by email or by the id picked from the suggestions, never both. */
+export function aNuevoMiembroDto(datos: NuevoMiembro): Record<string, unknown> {
+  return 'usuarioId' in datos
+    ? { usuario_id: datos.usuarioId, rol: datos.rol }
+    : { email: datos.email.trim(), rol: datos.rol }
 }
 
 /** Only the given keys travel, so a role change does not resend permissions. */

@@ -53,6 +53,21 @@ describe('HttpMiembrosRepository', () => {
     expect(JSON.parse(String(init.body))).toEqual({ email: 'ana@nautic.test', rol: 'revisor' })
   })
 
+  it('invites a member picked from the suggestions by user id', async () => {
+    fetchMock.mockResolvedValue(respuesta(201, miembroDto))
+
+    await repo.invitar(7, { usuarioId: 4, rol: 'revisor' })
+
+    expect(JSON.parse(String(ultimaLlamada().init.body))).toEqual({ usuario_id: 4, rol: 'revisor' })
+  })
+
+  it('searches users to invite by name', async () => {
+    fetchMock.mockResolvedValue(respuesta(200, { resultados: [{ id: 4, nombre: 'Ana Ruiz', cargo: 'Inspectora' }] }))
+
+    expect(await repo.buscarUsuarios(' ana r ')).toEqual([{ id: 4, nombre: 'Ana Ruiz', cargo: 'Inspectora' }])
+    expect(ultimaLlamada().url).toBe('http://api.test/api/auth/usuarios/?q=ana+r')
+  })
+
   it('changes a role', async () => {
     fetchMock.mockResolvedValue(respuesta(200, miembroDto))
 

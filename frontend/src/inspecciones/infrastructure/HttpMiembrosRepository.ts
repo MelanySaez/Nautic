@@ -1,7 +1,7 @@
 import { ApiClient, type Fetcher } from '../../shared/http/apiClient'
 import type { MiembrosInspeccion } from '../application/puertos'
-import type { CambiosMiembro, Miembro, NuevoMiembro } from '../domain/miembros'
-import { aCambiosMiembroDto, aMiembro, type MiembroDto } from './dtos'
+import type { CambiosMiembro, Miembro, NuevoMiembro, PersonaSugerida } from '../domain/miembros'
+import { aCambiosMiembroDto, aMiembro, aNuevoMiembroDto, type MiembroDto } from './dtos'
 
 export class HttpMiembrosRepository implements MiembrosInspeccion {
   private readonly api: ApiClient
@@ -17,10 +17,7 @@ export class HttpMiembrosRepository implements MiembrosInspeccion {
 
   async invitar(inspeccionId: number, datos: NuevoMiembro): Promise<Miembro> {
     return aMiembro(
-      await this.api.post<MiembroDto>(`/api/vision/inspecciones/${inspeccionId}/miembros/`, {
-        email: datos.email.trim(),
-        rol: datos.rol,
-      }),
+      await this.api.post<MiembroDto>(`/api/vision/inspecciones/${inspeccionId}/miembros/`, aNuevoMiembroDto(datos)),
     )
   }
 
@@ -35,5 +32,12 @@ export class HttpMiembrosRepository implements MiembrosInspeccion {
 
   quitar(inspeccionId: number, miembroId: number): Promise<void> {
     return this.api.delete(`/api/vision/inspecciones/${inspeccionId}/miembros/${miembroId}/`)
+  }
+
+  async buscarUsuarios(texto: string): Promise<PersonaSugerida[]> {
+    const consulta = new URLSearchParams({ q: texto.trim() })
+    // The wire shape is already {id, nombre, cargo}: the server never sends emails here.
+    const { resultados } = await this.api.get<{ resultados: PersonaSugerida[] }>(`/api/auth/usuarios/?${consulta}`)
+    return resultados.map(({ id, nombre, cargo }) => ({ id, nombre, cargo }))
   }
 }
