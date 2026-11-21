@@ -89,6 +89,8 @@ describe('ResultadosPage', () => {
     const resumen = await screen.findByText(/^Equipo/, { selector: 'summary' })
     const plegable = resumen.closest('details')!
     expect(plegable).not.toHaveAttribute('open')
+    // A decorative arrow says it can be unfolded (down) or folded (up).
+    expect(resumen.querySelector('svg[aria-hidden="true"]')).not.toBeNull()
     // Above the summary and the photo results.
     const resumenInspeccion = screen.getByRole('region', { name: 'Resumen' })
     expect(plegable.compareDocumentPosition(resumenInspeccion) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()

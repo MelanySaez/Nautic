@@ -100,11 +100,15 @@ export function EquipoInspeccion({
       <details className="group rounded-lg border border-line bg-surface">
         <summary className="label-caps flex cursor-pointer items-center justify-between gap-4 px-4 py-3 text-ink-muted hover:text-ink">
           Equipo
-          {estado.tipo === 'listo' && (
-            <span className="text-ink-dim normal-case">
-              {estado.datos.length} {estado.datos.length === 1 ? 'miembro' : 'miembros'}
-            </span>
-          )}
+          <span className="flex items-center gap-3">
+            {estado.tipo === 'listo' && (
+              <span className="text-ink-dim normal-case">
+                {estado.datos.length} {estado.datos.length === 1 ? 'miembro' : 'miembros'}
+              </span>
+            )}
+            {/* Points down while folded and up once unfolded. */}
+            <Icon name="chevron" className="size-4 transition-transform group-open:rotate-180" />
+          </span>
         </summary>
         <div className="flex flex-col gap-4 border-t border-line p-4">
           <p className="flex items-center gap-2 text-sm">

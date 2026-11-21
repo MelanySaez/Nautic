@@ -10,6 +10,7 @@ const PATHS = {
   calendar: 'M4 6h16v15H4zM4 10h16M8 3v4m8-4v4',
   photos: 'M3 7h14v13H3zM7 3h14v13M7 16l3-4 3 3 2-2 2 3',
   back: 'M19 12H5m6-6-6 6 6 6',
+  chevron: 'm6 9 6 6 6-6',
   upload: 'M12 16V4m-5 5 5-5 5 5M4 16v4h16v-4',
   play: 'M7 4v16l13-8z',
   pin: 'M12 21s7-6.2 7-12a7 7 0 1 0-14 0c0 5.8 7 12 7 12Zm0-9a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z',
