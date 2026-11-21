@@ -20,7 +20,7 @@ import type {
   PermisosInspeccion,
   SeccionCasco,
 } from '../inspecciones/domain/inspeccion'
-import type { CambiosMiembro, Miembro, NuevoMiembro } from '../inspecciones/domain/miembros'
+import type { CambiosMiembro, Miembro, NuevoMiembro, PersonaSugerida } from '../inspecciones/domain/miembros'
 
 /** The logged-in user of page tests; leads the default inspection (`lider.id` 1). */
 export function unUsuario(overrides: Partial<Usuario> = {}): Usuario {
@@ -249,6 +249,7 @@ export function crearDependenciasFalsas() {
       ),
       actualizar: vi.fn(async (_inspeccionId: number, miembroId: number, _cambios: CambiosMiembro) => unMiembro({ id: miembroId })),
       quitar: vi.fn(async (_inspeccionId: number, _miembroId: number) => {}),
+      buscarUsuarios: vi.fn(async (_texto: string): Promise<PersonaSugerida[]> => []),
     },
     modelos: {
       listar: vi.fn(async () => [unModelo()]),

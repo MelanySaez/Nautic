@@ -1,5 +1,5 @@
 """
-Members of an inspection: the leader invites users by email, gives them a role
+Members of an inspection: the leader invites users by email or user id, gives them a role
 (Colaborador, Revisor, Observador) or adjusted permissions, and removes them.
 Everyone who can read the inspection can see who its members are.
 """
@@ -61,27 +61,46 @@ def _validar_permisos(data, base):
     return permisos, errores
 
 
+def _usuario_invitado(data):
+    """
+    Resolve who is invited: by ``email`` (typed by hand) or by ``usuario_id`` (picked from the
+    user search), exactly one of them. Returns (usuario|None, campo, mensaje|None), where
+    ``campo`` is the field any error belongs to.
+    """
+    Usuario = get_user_model()
+    if 'usuario_id' in data:
+        if 'email' in data:
+            return None, 'usuario_id', 'Envía email o usuario_id, no ambos.'
+        usuario_id = data.get('usuario_id')
+        # bool is an int subclass: True must not invite user #1.
+        if not isinstance(usuario_id, int) or isinstance(usuario_id, bool):
+            return None, 'usuario_id', 'Debe ser un número entero.'
+        usuario = Usuario.objects.filter(pk=usuario_id, is_active=True).first()
+        return usuario, 'usuario_id', None if usuario else 'No hay ninguna cuenta activa con este id.'
+    email = data.get('email')
+    if not isinstance(email, str) or not email.strip():
+        return None, 'email', 'Este campo es requerido.'
+    usuario = Usuario.objects.filter(email=email.strip().lower(), is_active=True).first()
+    return usuario, 'email', None if usuario else 'No hay ninguna cuenta activa con este email.'
+
+
 def validar_invitacion(data, lider_id, ya_es_miembro):
     """
-    Validate one invitation ``{email, rol, permisos?}`` for an inspection led by ``lider_id``.
+    Validate one invitation ``{email | usuario_id, rol, permisos?}`` for an inspection led by ``lider_id``.
     ``ya_es_miembro(usuario)`` says whether that user is already a member (or earlier in the same list).
     Returns (usuario|None, permisos|None, errores) with errores keyed by field.
     """
     if not hasattr(data, 'get'):
-        return None, None, {'email': ['Cada invitado debe ser un objeto {email, rol}.']}
+        return None, None, {'email': ['Cada invitado debe ser un objeto {email | usuario_id, rol}.']}
     permisos, errores = _validar_permisos(data, base=None)
-    email = data.get('email')
-    usuario = None
-    if not isinstance(email, str) or not email.strip():
-        errores['email'] = ['Este campo es requerido.']
-    else:
-        usuario = get_user_model().objects.filter(email=email.strip().lower(), is_active=True).first()
-        if usuario is None:
-            errores['email'] = ['No hay ninguna cuenta activa con este email.']
-        elif usuario.pk == lider_id:
-            errores['email'] = ['Es el líder de la inspección.']
+    usuario, campo, mensaje = _usuario_invitado(data)
+    if mensaje is None:
+        if usuario.pk == lider_id:
+            mensaje = 'Es el líder de la inspección.'
         elif ya_es_miembro(usuario):
-            errores['email'] = ['Ya es miembro de la inspección.']
+            mensaje = 'Ya es miembro de la inspección.'
+    if mensaje:
+        errores[campo] = [mensaje]
     return usuario, permisos, errores
 
 
@@ -92,7 +111,7 @@ def validar_equipo(valor, lider_id):
     (or ``miembros`` when the value is not a list), so the client can place each message.
     """
     if not isinstance(valor, list):
-        return [], {'miembros': ['Debe ser una lista de {email, rol}.']}
+        return [], {'miembros': ['Debe ser una lista de {email | usuario_id, rol}.']}
     # Bounded before any lookup: each entry queries an account, so an unbounded list
     # would let one request probe many emails.
     if len(valor) > MAX_INVITADOS_AL_CREAR:
@@ -125,11 +144,17 @@ def crear_miembros(inspeccion, equipo, agregado_por):
 @extend_schema(
     methods=['POST'], tags=['Visión IA'], summary='Invitar a un miembro',
     description=(
-        'Solo el líder. `{email, rol, permisos?}`: `rol` es `colaborador` (todos los permisos), `revisor` '
+        'Solo el líder. `{email | usuario_id, rol, permisos?}`: se invita por email o por el `id` que devuelve '
+        '`GET /api/auth/usuarios/` (uno de los dos); `rol` es `colaborador` (todos los permisos), `revisor` '
         '(editar el reporte) u `observador` (solo leer); `permisos` ajusta `subir_fotos`, `analizar`, '
         '`editar_reporte`, `editar_inspeccion` y deja el rol como `personalizado` si ya no coincide.'
     ),
-    request={'application/json': {'type': 'object', 'required': ['email', 'rol']}},
+    request={'application/json': {
+        'type': 'object', 'required': ['rol'],
+        'description': 'Exactamente uno de `email` o `usuario_id`; ninguno o ambos responden 400.',
+        'properties': {'email': {'type': 'string'}, 'usuario_id': {'type': 'integer'}, 'rol': {'type': 'string'},
+                       'permisos': {'type': 'object'}},
+    }},
     responses={201: OpenApiTypes.OBJECT, 400: OpenApiTypes.OBJECT, 403: OpenApiTypes.OBJECT},
 )
 @api_view(['GET', 'POST'])
@@ -157,8 +182,9 @@ def api_vision_miembros(request, inspeccion_id):
         # Query only after the failed savepoint has been rolled back.
         if not inspeccion.miembros.filter(usuario=usuario).exists():
             raise
+        campo = 'usuario_id' if 'usuario_id' in data else 'email'
         return Response({'error': 'Datos inválidos.', 'campos': {
-            'email': ['Ya es miembro de la inspección.'],
+            campo: ['Ya es miembro de la inspección.'],
         }}, status=400)
     return Response(_miembro_to_dict(miembro), status=201)
 

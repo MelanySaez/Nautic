@@ -13,9 +13,10 @@ import { Tarjeta } from '../../shared/ui/Tarjeta'
 import { mensajeDe } from '../../shared/ui/formato'
 import { ApiError } from '../../shared/http/apiClient'
 import { EquipoInicial, type ErroresFila, type FilaInvitado } from './EquipoInicial'
+import { invitadoDe, MENSAJE_ELIGE_PERSONA } from '../domain/miembros'
 import { idDeParametro } from './parametrosUrl'
 
-const CLAVE_MIEMBRO = /^miembros\.(\d+)\.(email|rol|permisos)$/
+const CLAVE_MIEMBRO = /^miembros\.(\d+)\.(email|usuario_id|rol|permisos)$/
 
 /**
  * Places server errors keyed `miembros.<i>.<campo>` on the UI rows. `<i>` is the position in
@@ -37,7 +38,8 @@ function erroresPorFila(campos: Record<string, string[]>, enviadas: number[]) {
 }
 
 export function NuevaInspeccionPage() {
-  const { buques, inspecciones } = useDependencias()
+  const { buques, inspecciones, miembros } = useDependencias()
+  const buscarPersonas = useCallback((texto: string) => miembros.buscarUsuarios(texto), [miembros])
   const navegar = useNavegar()
   const cargarBuques = useCallback(() => buques.listar(), [buques])
   const { estado: flota } = useRecurso(cargarBuques)
@@ -51,7 +53,6 @@ export function NuevaInspeccionPage() {
   const buqueUrlEnFlota = flota.tipo === 'listo' && flota.datos.some((b) => b.id === buqueUrl)
   const buqueId = eleccionBuque ?? (buqueUrlEnFlota ? String(buqueUrl) : '')
   const [nombre, setNombre] = useState('')
-  const [tomadoPor, setTomadoPor] = useState('')
   const [descripcion, setDescripcion] = useState('')
   const [errorBuque, setErrorBuque] = useState<string | null>(null)
   const [errorEnvio, setErrorEnvio] = useState<string | null>(null)
@@ -73,17 +74,21 @@ export function NuevaInspeccionPage() {
       return
     }
     setErrorEnvio(null)
-    setErroresInvitados({})
-    setEnviando(true)
     // Rows left blank are not invitations.
-    const enviadas = invitados.filter((f) => f.email.trim())
+    const enviadas = invitados.filter((f) => f.persona || f.texto.trim())
+    // A typed name nobody was picked for cannot be invited: say so on its row before sending.
+    const sinElegir = enviadas.filter((f) => !invitadoDe(f.texto, f.persona))
+    setErroresInvitados(Object.fromEntries(sinElegir.map((f) => [f.uid, { email: MENSAJE_ELIGE_PERSONA }])))
+    if (sinElegir.length) return
+    setEnviando(true)
     try {
       const creada = await inspecciones.crear({
         buqueId: Number(buqueId),
         nombre: nombre.trim(),
-        tomadoPor: tomadoPor.trim(),
         descripcion: descripcion.trim(),
-        ...(enviadas.length ? { miembros: enviadas.map((f) => ({ email: f.email.trim(), rol: f.rol })) } : {}),
+        ...(enviadas.length
+          ? { miembros: enviadas.map((f) => ({ ...invitadoDe(f.texto, f.persona)!, rol: f.rol })) }
+          : {}),
         ...(privada ? { privada: true } : {}),
       })
       navegar(zonaUrl === null ? `/vision/${creada.id}` : `/vision/${creada.id}?zona=${zonaUrl}`)
@@ -144,16 +149,6 @@ export function NuevaInspeccionPage() {
                 className={CLASES_CONTROL}
               />
             </Campo>
-            <Campo etiqueta="Inspector">
-              <input
-                value={tomadoPor}
-                onChange={(e) => setTomadoPor(e.target.value)}
-                placeholder="Nombre y apellido"
-                maxLength={255}
-                autoComplete="name"
-                className={CLASES_CONTROL}
-              />
-            </Campo>
             <Campo etiqueta="Descripción">
               <textarea
                 value={descripcion}
@@ -168,11 +163,12 @@ export function NuevaInspeccionPage() {
 
         <EquipoInicial
           filas={invitados}
+          buscarPersonas={buscarPersonas}
           errores={erroresInvitados}
           privada={privada}
           alCambiarPrivada={setPrivada}
           alAgregar={() => {
-            setInvitados((actual) => [...actual, { uid: siguienteUid, email: '', rol: 'colaborador' }])
+            setInvitados((actual) => [...actual, { uid: siguienteUid, texto: '', persona: null, rol: 'colaborador' }])
             setSiguienteUid(siguienteUid + 1)
           }}
           alCambiar={cambiarInvitado}

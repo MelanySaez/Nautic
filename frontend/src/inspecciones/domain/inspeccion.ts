@@ -93,7 +93,6 @@ export interface NuevaInspeccion {
   buqueId: number
   /** Optional: when blank the backend generates one. */
   nombre?: string
-  tomadoPor: string
   descripcion: string
   /** Team invited at creation; the backend creates nothing if any invitation is invalid. */
   miembros?: NuevoMiembro[]

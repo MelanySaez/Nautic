@@ -27,6 +27,13 @@ describe('NuevaInspeccionPage', () => {
     expect(selector).toHaveValue('')
   })
 
+  it('has no inspector field: the leader signs and the team is set in "Acceso y equipo"', async () => {
+    renderizar()
+    await screen.findByRole('option', { name: 'ARA Libertad · Fragata' })
+
+    expect(screen.queryByLabelText('Inspector')).not.toBeInTheDocument()
+  })
+
   it('creates the inspection with trimmed values and opens its photo upload', async () => {
     const { dependencias } = crearDependenciasFalsas()
     dependencias.inspecciones.crear.mockResolvedValue(unaInspeccion({ id: 42 }))
@@ -35,14 +42,12 @@ describe('NuevaInspeccionPage', () => {
 
     await userEvent.selectOptions(screen.getByLabelText('Buque'), '2')
     await userEvent.type(screen.getByLabelText('Nombre (opcional)'), ' Control anual 2026 ')
-    await userEvent.type(screen.getByLabelText('Inspector'), '  Juan Gómez ')
     await userEvent.type(screen.getByLabelText('Descripción'), ' Control de proa ')
     await userEvent.click(screen.getByRole('button', { name: 'Iniciar inspección' }))
 
     expect(dependencias.inspecciones.crear).toHaveBeenCalledWith({
       buqueId: 2,
       nombre: 'Control anual 2026',
-      tomadoPor: 'Juan Gómez',
       descripcion: 'Control de proa',
     })
     expect(router.state.location.pathname).toBe('/vision/42')
@@ -97,12 +102,12 @@ describe('NuevaInspeccionPage', () => {
     await userEvent.selectOptions(screen.getByLabelText('Buque'), '2')
 
     await userEvent.click(screen.getByRole('button', { name: 'Agregar persona' }))
-    await userEvent.type(screen.getByLabelText('Email de la persona 1'), ' ana@nautic.test ')
+    await userEvent.type(screen.getByLabelText('Nombre o email de la persona 1'), ' ana@nautic.test ')
     await userEvent.selectOptions(screen.getByLabelText('Rol de la persona 1'), 'revisor')
     await userEvent.click(screen.getByRole('button', { name: 'Agregar persona' }))
-    await userEvent.type(screen.getByLabelText('Email de la persona 2'), 'luis@nautic.test')
+    await userEvent.type(screen.getByLabelText('Nombre o email de la persona 2'), 'luis@nautic.test')
     await userEvent.click(screen.getByRole('button', { name: 'Agregar persona' }))
-    await userEvent.type(screen.getByLabelText('Email de la persona 3'), 'sobra@nautic.test')
+    await userEvent.type(screen.getByLabelText('Nombre o email de la persona 3'), 'sobra@nautic.test')
     await userEvent.click(screen.getByRole('button', { name: 'Quitar persona 3' }))
     await userEvent.click(screen.getByRole('button', { name: 'Agregar persona' }))   // left blank: ignored
     await userEvent.click(screen.getByRole('button', { name: 'Iniciar inspección' }))
@@ -116,6 +121,29 @@ describe('NuevaInspeccionPage', () => {
     }))
   })
 
+  it('invites a person picked from the suggestions by id and shows id errors on that row', async () => {
+    const { dependencias } = crearDependenciasFalsas()
+    dependencias.miembros.buscarUsuarios.mockResolvedValue([{ id: 8, nombre: 'Marta Ruiz', cargo: 'Jefa de dique' }])
+    dependencias.inspecciones.crear.mockRejectedValue(new ApiError(400, 'Datos inválidos.', {
+      'miembros.0.usuario_id': ['Ya es miembro de la inspección.'],
+    }))
+    renderizar(dependencias)
+    await screen.findByRole('option', { name: 'ARA Libertad · Fragata' })
+    await userEvent.selectOptions(screen.getByLabelText('Buque'), '2')
+    await userEvent.click(screen.getByRole('button', { name: 'Agregar persona' }))
+
+    await userEvent.type(screen.getByLabelText('Nombre o email de la persona 1'), 'mar')
+    await userEvent.click(await screen.findByRole('option', { name: /Marta Ruiz/ }))
+    await userEvent.click(screen.getByRole('button', { name: 'Iniciar inspección' }))
+
+    expect(dependencias.miembros.buscarUsuarios).toHaveBeenLastCalledWith('mar')
+    expect(dependencias.inspecciones.crear).toHaveBeenCalledWith(expect.objectContaining({
+      miembros: [{ usuarioId: 8, rol: 'colaborador' }],
+    }))
+    expect(await screen.findByText('Ya es miembro de la inspección.')).toBeInTheDocument()
+    expect(screen.getByLabelText('Nombre o email de la persona 1')).toHaveAttribute('aria-invalid', 'true')
+  })
+
   it('shows why an invited person was rejected next to that row and creates nothing', async () => {
     const { dependencias } = crearDependenciasFalsas()
     dependencias.inspecciones.crear.mockRejectedValue(new ApiError(400, 'Datos inválidos.', {
@@ -126,15 +154,15 @@ describe('NuevaInspeccionPage', () => {
     await userEvent.selectOptions(screen.getByLabelText('Buque'), '2')
     for (const email of ['ana@nautic.test', 'nadie@nautic.test']) {
       await userEvent.click(screen.getByRole('button', { name: 'Agregar persona' }))
-      const filas = screen.getAllByLabelText(/^Email de la persona/)
+      const filas = screen.getAllByLabelText(/^Nombre o email de la persona/)
       await userEvent.type(filas[filas.length - 1], email)
     }
 
     await userEvent.click(screen.getByRole('button', { name: 'Iniciar inspección' }))
 
     expect(await screen.findByText('No hay ninguna cuenta activa con este email.')).toBeInTheDocument()
-    expect(screen.getByLabelText('Email de la persona 2')).toHaveAttribute('aria-invalid', 'true')
-    expect(screen.getByLabelText('Email de la persona 1')).not.toHaveAttribute('aria-invalid')
+    expect(screen.getByLabelText('Nombre o email de la persona 2')).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByLabelText('Nombre o email de la persona 1')).not.toHaveAttribute('aria-invalid')
     expect(router.state.location.pathname).toBe('/vision')
   })
 
@@ -160,14 +188,14 @@ describe('NuevaInspeccionPage', () => {
     await screen.findByRole('option', { name: 'ARA Libertad · Fragata' })
     await userEvent.selectOptions(screen.getByLabelText('Buque'), '2')
     for (let i = 0; i < 3; i++) await userEvent.click(screen.getByRole('button', { name: 'Agregar persona' }))
-    await userEvent.type(screen.getByLabelText('Email de la persona 1'), 'ana@nautic.test')
-    await userEvent.type(screen.getByLabelText('Email de la persona 3'), 'luis@nautic.test')
+    await userEvent.type(screen.getByLabelText('Nombre o email de la persona 1'), 'ana@nautic.test')
+    await userEvent.type(screen.getByLabelText('Nombre o email de la persona 3'), 'luis@nautic.test')
 
     await userEvent.click(screen.getByRole('button', { name: 'Iniciar inspección' }))
 
     expect(await screen.findByText('Ya es miembro de la inspección.')).toBeInTheDocument()
-    expect(screen.getByLabelText('Email de la persona 3')).toHaveAttribute('aria-invalid', 'true')
-    expect(screen.getByLabelText('Email de la persona 2')).not.toHaveAttribute('aria-invalid')
+    expect(screen.getByLabelText('Nombre o email de la persona 3')).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByLabelText('Nombre o email de la persona 2')).not.toHaveAttribute('aria-invalid')
     expect(dependencias.inspecciones.crear).toHaveBeenCalledWith(expect.objectContaining({
       miembros: [{ email: 'ana@nautic.test', rol: 'colaborador' }, { email: 'luis@nautic.test', rol: 'colaborador' }],
     }))
