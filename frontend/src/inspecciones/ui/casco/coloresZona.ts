@@ -97,3 +97,12 @@ export function useColoresTema(): ReadonlyMap<VariableColor, string> {
 
   return colores
 }
+
+/**
+ * Border drawn around every hull zone, so neighbouring zones in the same state stay apart:
+ * the zone colour taken halfway to the theme ink (darker in light mode, lighter in dark mode).
+ */
+export function colorDivisor(colorZona: string, tinta: string): string {
+  return mezclarColores(colorZona, tinta, 0.5) ?? tinta
+}
+
