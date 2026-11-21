@@ -281,6 +281,35 @@ class MiembrosTests(BasePermisos):
             self.assertEqual(res.status_code, 400, datos)
             self.assertIn(campo, res.json()['campos'], datos)
 
+    def test_invita_por_id_de_usuario(self):
+        res = self._como(self.lider).post(self._url('miembros/'), {'usuario_id': self.extrano.id, 'rol': 'revisor'},
+                                          format='json')
+
+        self.assertEqual(res.status_code, 201, res.content)
+        miembro = InspeccionMiembro.objects.get(inspeccion=self.insp, usuario=self.extrano)
+        self.assertEqual(miembro.rol, 'revisor')
+        self.assertEqual(res.json()['usuario']['id'], self.extrano.id)
+
+    def test_errores_al_invitar_por_id(self):
+        inactivo = Usuario.objects.create_user('baja@x.com', None, nombre='Baja', is_active=False)
+        lider = self._como(self.lider)
+        casos = [
+            ({'usuario_id': 999999, 'rol': 'revisor'}, 'usuario_id'),
+            ({'usuario_id': inactivo.id, 'rol': 'revisor'}, 'usuario_id'),
+            ({'usuario_id': self.colaborador.id, 'rol': 'revisor'}, 'usuario_id'),  # already a member
+            ({'usuario_id': self.lider.id, 'rol': 'revisor'}, 'usuario_id'),        # the leader
+            ({'usuario_id': 'x', 'rol': 'revisor'}, 'usuario_id'),
+            ({'usuario_id': True, 'rol': 'revisor'}, 'usuario_id'),
+            ({'usuario_id': 0, 'rol': 'revisor'}, 'usuario_id'),
+            ({'usuario_id': 2 ** 70, 'rol': 'revisor'}, 'usuario_id'),   # beyond the primary key range
+            ({'usuario_id': self.extrano.id, 'email': 'otro@x.com', 'rol': 'revisor'}, 'usuario_id'),
+        ]
+        for datos, campo in casos:
+            res = lider.post(self._url('miembros/'), datos, format='json')
+            self.assertEqual(res.status_code, 400, datos)
+            self.assertEqual(list(res.json()['campos']), [campo], datos)
+        self.assertFalse(InspeccionMiembro.objects.filter(inspeccion=self.insp, usuario=self.extrano).exists())
+
     def test_solo_el_lider_gestiona_miembros(self):
         miembro = InspeccionMiembro.objects.get(inspeccion=self.insp, usuario=self.observador)
         for usuario in (self.colaborador, self.extrano):
@@ -349,6 +378,22 @@ class CrearConEquipoTests(BasePermisos):
         self.assertEqual(set(res.json()['campos']),
                          {'miembros.1.email', 'miembros.2.email', 'miembros.3.email', 'miembros.4.rol'})
         self.assertEqual(InspeccionCasco.objects.count(), antes)
+
+    def test_invita_por_id_al_crear_y_no_repite_a_la_misma_persona(self):
+        res = self._crear([
+            {'usuario_id': self.colaborador.id, 'rol': 'colaborador'},
+            {'email': 'revi@x.com', 'rol': 'revisor'},
+        ])
+        self.assertEqual(res.status_code, 201, res.content)
+        insp = InspeccionCasco.objects.get(pk=res.json()['id'])
+        self.assertEqual({m.usuario_id for m in insp.miembros.all()}, {self.colaborador.id, self.revisor.id})
+
+        repetido = self._crear([
+            {'email': 'cola@x.com', 'rol': 'colaborador'},
+            {'usuario_id': self.colaborador.id, 'rol': 'revisor'},
+        ])
+        self.assertEqual(repetido.status_code, 400)
+        self.assertEqual(list(repetido.json()['campos']), ['miembros.1.usuario_id'])
 
     def test_miembros_debe_ser_una_lista_de_objetos(self):
         for valor in ('cola@x.com', [1]):

@@ -161,8 +161,9 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": ["cuentas.autenticacion.Sesion"],
     # Every endpoint needs a session unless it opts out (login, registration, CSRF).
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
-    # Login and open registration, per IP (cache-backed: per process with the default LocMemCache).
-    "DEFAULT_THROTTLE_RATES": {"cuentas": "10/min"},
+    # Login and open registration, per IP; user search (invite autocomplete), per user.
+    # Cache-backed: per process with the default LocMemCache.
+    "DEFAULT_THROTTLE_RATES": {"cuentas": "10/min", "busqueda_usuarios": "60/min"},
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }
 

@@ -6,13 +6,15 @@ from django.core.validators import validate_email
 from django.db import IntegrityError, transaction
 from django.views.decorators.csrf import ensure_csrf_cookie
 from drf_spectacular.types import OpenApiTypes
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.decorators import api_view, authentication_classes, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.settings import api_settings
 from rest_framework.throttling import SimpleRateThrottle
+
+from .models import referencia_publica
 
 
 class _LimiteCuentas(SimpleRateThrottle):
@@ -182,3 +184,43 @@ def api_auth_yo(request):
     if not request.user.is_authenticated:
         return Response({'error': 'No has iniciado sesión.'}, status=401)
     return Response(usuario_to_dict(request.user))
+
+
+class _LimiteBusquedaUsuarios(_LimiteCuentas):
+    """Per-user limit for the user search (scope ``busqueda_usuarios``), so typing stays cheap to abuse-check."""
+    scope = 'busqueda_usuarios'
+
+    def get_cache_key(self, request, view):
+        return self.cache_format % {'scope': self.scope, 'ident': request.user.pk}
+
+
+BUSQUEDA_MIN = 2
+BUSQUEDA_MAX = 100
+MAX_SUGERENCIAS = 8
+
+
+@extend_schema(
+    tags=['Cuentas'], summary='Buscar usuarios para invitar',
+    description=(
+        f'Cuentas activas cuyo nombre contiene `q` ({BUSQUEDA_MIN}-{BUSQUEDA_MAX} caracteres, sin distinguir '
+        f'mayúsculas), sin incluir a quien busca. Nunca busca ni devuelve el email. Ordenadas por nombre, '
+        f'como mucho {MAX_SUGERENCIAS}. Limitado por usuario.'
+    ),
+    parameters=[OpenApiParameter('q', str, required=True)],
+    responses={200: OpenApiTypes.OBJECT, 400: OpenApiTypes.OBJECT, 401: OpenApiTypes.OBJECT,
+               429: OpenApiTypes.OBJECT},
+)
+@api_view(['GET'])
+@throttle_classes([_LimiteBusquedaUsuarios])
+def api_auth_usuarios(request):
+    q = request.query_params.get('q', '').strip()
+    if not BUSQUEDA_MIN <= len(q) <= BUSQUEDA_MAX:
+        return Response({'error': 'Datos inválidos.', 'campos': {
+            'q': [f'Debe tener entre {BUSQUEDA_MIN} y {BUSQUEDA_MAX} caracteres.'],
+        }}, status=400)
+    usuarios = (get_user_model().objects
+                .filter(is_active=True, nombre__icontains=q)
+                .exclude(pk=request.user.pk)
+                .order_by('nombre', 'id')[:MAX_SUGERENCIAS])
+    # Name and cargo only: other users' emails are private (see referencia_publica).
+    return Response({'resultados': [{**referencia_publica(u), 'cargo': u.cargo} for u in usuarios]})
