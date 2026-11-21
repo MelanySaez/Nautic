@@ -297,7 +297,6 @@ describe('HttpInspeccionesRepository', () => {
     const creada = await repo.crear({
       buqueId: 2,
       nombre: 'Control anual 2026',
-      tomadoPor: 'Juan Gómez',
       descripcion: 'Control anual',
     })
 
@@ -307,7 +306,6 @@ describe('HttpInspeccionesRepository', () => {
     expect(JSON.parse(String(init.body))).toEqual({
       buque_id: 2,
       nombre: 'Control anual 2026',
-      tomado_por: 'Juan Gómez',
       descripcion: 'Control anual',
     })
     expect(creada.id).toBe(7)
@@ -318,7 +316,6 @@ describe('HttpInspeccionesRepository', () => {
 
     await repo.crear({
       buqueId: 2,
-      tomadoPor: '',
       descripcion: '',
       miembros: [{ email: 'ana@nautic.test', rol: 'revisor' }],
     })
@@ -329,7 +326,7 @@ describe('HttpInspeccionesRepository', () => {
   it('sends privada only when the inspection is created private', async () => {
     fetchMock.mockResolvedValue(respuesta(201, inspeccionDto))
 
-    await repo.crear({ buqueId: 2, tomadoPor: '', descripcion: '', privada: true })
+    await repo.crear({ buqueId: 2, descripcion: '', privada: true })
 
     expect(JSON.parse(String(ultimaLlamada().init.body)).privada).toBe(true)
   })

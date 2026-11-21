@@ -51,7 +51,6 @@ export function NuevaInspeccionPage() {
   const buqueUrlEnFlota = flota.tipo === 'listo' && flota.datos.some((b) => b.id === buqueUrl)
   const buqueId = eleccionBuque ?? (buqueUrlEnFlota ? String(buqueUrl) : '')
   const [nombre, setNombre] = useState('')
-  const [tomadoPor, setTomadoPor] = useState('')
   const [descripcion, setDescripcion] = useState('')
   const [errorBuque, setErrorBuque] = useState<string | null>(null)
   const [errorEnvio, setErrorEnvio] = useState<string | null>(null)
@@ -81,7 +80,6 @@ export function NuevaInspeccionPage() {
       const creada = await inspecciones.crear({
         buqueId: Number(buqueId),
         nombre: nombre.trim(),
-        tomadoPor: tomadoPor.trim(),
         descripcion: descripcion.trim(),
         ...(enviadas.length ? { miembros: enviadas.map((f) => ({ email: f.email.trim(), rol: f.rol })) } : {}),
         ...(privada ? { privada: true } : {}),
@@ -141,16 +139,6 @@ export function NuevaInspeccionPage() {
                 onChange={(e) => setNombre(e.target.value)}
                 placeholder="Por ejemplo: Control anual 2026"
                 maxLength={255}
-                className={CLASES_CONTROL}
-              />
-            </Campo>
-            <Campo etiqueta="Inspector">
-              <input
-                value={tomadoPor}
-                onChange={(e) => setTomadoPor(e.target.value)}
-                placeholder="Nombre y apellido"
-                maxLength={255}
-                autoComplete="name"
                 className={CLASES_CONTROL}
               />
             </Campo>

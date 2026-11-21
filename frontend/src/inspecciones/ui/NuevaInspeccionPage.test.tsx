@@ -27,6 +27,13 @@ describe('NuevaInspeccionPage', () => {
     expect(selector).toHaveValue('')
   })
 
+  it('has no inspector field: the leader signs and the team is set in "Acceso y equipo"', async () => {
+    renderizar()
+    await screen.findByRole('option', { name: 'ARA Libertad · Fragata' })
+
+    expect(screen.queryByLabelText('Inspector')).not.toBeInTheDocument()
+  })
+
   it('creates the inspection with trimmed values and opens its photo upload', async () => {
     const { dependencias } = crearDependenciasFalsas()
     dependencias.inspecciones.crear.mockResolvedValue(unaInspeccion({ id: 42 }))
@@ -35,14 +42,12 @@ describe('NuevaInspeccionPage', () => {
 
     await userEvent.selectOptions(screen.getByLabelText('Buque'), '2')
     await userEvent.type(screen.getByLabelText('Nombre (opcional)'), ' Control anual 2026 ')
-    await userEvent.type(screen.getByLabelText('Inspector'), '  Juan Gómez ')
     await userEvent.type(screen.getByLabelText('Descripción'), ' Control de proa ')
     await userEvent.click(screen.getByRole('button', { name: 'Iniciar inspección' }))
 
     expect(dependencias.inspecciones.crear).toHaveBeenCalledWith({
       buqueId: 2,
       nombre: 'Control anual 2026',
-      tomadoPor: 'Juan Gómez',
       descripcion: 'Control de proa',
     })
     expect(router.state.location.pathname).toBe('/vision/42')

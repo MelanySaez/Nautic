@@ -80,7 +80,7 @@ export class HttpInspeccionesRepository implements InspeccionesRepository {
       buque_id: datos.buqueId,
       // Omitted when blank so the backend generates the default name.
       ...(datos.nombre?.trim() ? { nombre: datos.nombre.trim() } : {}),
-      tomado_por: datos.tomadoPor,
+      // tomado_por is omitted: the backend signs with the leader's name.
       descripcion: datos.descripcion,
       // Omitted when nobody is invited, so the request is unchanged for a solo inspection.
       ...(datos.miembros?.length ? { miembros: datos.miembros.map(({ email, rol }) => ({ email, rol })) } : {}),
