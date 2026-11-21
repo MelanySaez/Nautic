@@ -12,12 +12,17 @@ import { mensajeDe } from '../../shared/ui/formato'
 import type { InspeccionDetalle } from '../domain/inspeccion'
 import {
   ETIQUETA_ROL,
+  invitadoDe,
+  MENSAJE_ELIGE_PERSONA,
   PERMISOS_MIEMBRO,
   ROLES_PLANTILLA,
   type CambiosMiembro,
   type Miembro,
+  type NuevoMiembro,
+  type PersonaSugerida,
   type RolPlantilla,
 } from '../domain/miembros'
+import { SelectorPersona } from './SelectorPersona'
 
 /**
  * Who works on the inspection. The leader invites, edits and removes members and decides
@@ -33,6 +38,7 @@ export function EquipoInspeccion({
   const { inspecciones, miembros: repo } = useDependencias()
   const esLider = detalle.misPermisos.esLider
   const cargar = useCallback(() => repo.listar(detalle.id), [repo, detalle.id])
+  const buscarPersonas = useCallback((texto: string) => repo.buscarUsuarios(texto), [repo])
   const { estado, reintentar, actualizar } = useRecurso(cargar)
   const [ocupados, setOcupados] = useState<Set<number>>(new Set())
   const [error, setError] = useState<string | null>(null)
@@ -133,8 +139,9 @@ export function EquipoInspeccion({
 
           {esLider && (
             <FormularioInvitacion
-              alInvitar={async (email, rol) => {
-                const nuevo = await repo.invitar(detalle.id, { email, rol })
+              buscarPersonas={buscarPersonas}
+              alInvitar={async (datos) => {
+                const nuevo = await repo.invitar(detalle.id, datos)
                 actualizar((lista) => [...lista, nuevo])
               }}
             />
@@ -226,8 +233,15 @@ function FilaMiembro({
   )
 }
 
-function FormularioInvitacion({ alInvitar }: { alInvitar: (email: string, rol: RolPlantilla) => Promise<void> }) {
-  const [email, setEmail] = useState('')
+function FormularioInvitacion({
+  alInvitar,
+  buscarPersonas,
+}: {
+  alInvitar: (datos: NuevoMiembro) => Promise<void>
+  buscarPersonas: (texto: string) => Promise<PersonaSugerida[]>
+}) {
+  const [texto, setTexto] = useState('')
+  const [persona, setPersona] = useState<PersonaSugerida | null>(null)
   const [rol, setRol] = useState<RolPlantilla>('colaborador')
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -236,16 +250,22 @@ function FormularioInvitacion({ alInvitar }: { alInvitar: (email: string, rol: R
   async function enviar(evento: FormEvent) {
     evento.preventDefault()
     setError(null)
+    const invitado = invitadoDe(texto, persona)
+    if (!invitado) {
+      setCampos({ email: [MENSAJE_ELIGE_PERSONA] })
+      return
+    }
     setCampos(undefined)
     setEnviando(true)
     try {
-      await alInvitar(email, rol)
-      setEmail('')
+      await alInvitar({ ...invitado, rol })
+      setTexto('')
+      setPersona(null)
     } catch (e) {
       const deCampo = e instanceof ApiError ? e.campos : undefined
       setCampos(deCampo)
       // Field messages are shown next to their control; only the rest needs the general alert.
-      if (!deCampo?.email && !deCampo?.rol) setError(mensajeDe(e))
+      if (!deCampo?.email && !deCampo?.usuario_id && !deCampo?.rol) setError(mensajeDe(e))
     } finally {
       setEnviando(false)
     }
@@ -256,8 +276,20 @@ function FormularioInvitacion({ alInvitar }: { alInvitar: (email: string, rol: R
       <h3 className="label-caps text-ink-muted">Invitar miembro</h3>
       {error && <MensajeError mensaje={error} />}
       <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-start">
-        <Campo etiqueta="Email del usuario" error={campos?.email?.join(' ') ?? campos?.permisos?.join(' ')}>
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={CLASES_CONTROL} />
+        <Campo
+          etiqueta="Nombre o email del usuario"
+          error={(campos?.email ?? campos?.usuario_id ?? campos?.permisos)?.join(' ')}
+        >
+          <SelectorPersona
+            texto={texto}
+            persona={persona}
+            buscar={buscarPersonas}
+            alCambiar={(nuevoTexto, elegida) => {
+              setTexto(nuevoTexto)
+              setPersona(elegida)
+            }}
+            placeholder="Escribe un nombre o un email"
+          />
         </Campo>
         <Campo etiqueta="Rol" error={campos?.rol?.join(' ')}>
           <select value={rol} onChange={(e) => setRol(e.target.value as RolPlantilla)} className={CLASES_CONTROL}>
@@ -268,7 +300,7 @@ function FormularioInvitacion({ alInvitar }: { alInvitar: (email: string, rol: R
             ))}
           </select>
         </Campo>
-        <Boton type="submit" disabled={enviando || !email.trim()} className="sm:mt-7">
+        <Boton type="submit" disabled={enviando || !texto.trim()} className="sm:mt-7">
           {enviando ? 'Invitando…' : 'Invitar'}
         </Boton>
       </div>

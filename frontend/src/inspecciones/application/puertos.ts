@@ -10,7 +10,7 @@ import type {
   SeccionCasco,
 } from '../domain/inspeccion'
 import type { DetallePorInstancia } from '../domain/detecciones'
-import type { CambiosMiembro, Miembro, NuevoMiembro } from '../domain/miembros'
+import type { CambiosMiembro, Miembro, NuevoMiembro, PersonaSugerida } from '../domain/miembros'
 import type { ModeloIA } from '../domain/modelo'
 
 export interface ResultadoAnalisis {
@@ -52,6 +52,8 @@ export interface MiembrosInspeccion {
   invitar(inspeccionId: number, datos: NuevoMiembro): Promise<Miembro>
   actualizar(inspeccionId: number, miembroId: number, cambios: CambiosMiembro): Promise<Miembro>
   quitar(inspeccionId: number, miembroId: number): Promise<void>
+  /** Active users whose name contains `texto` (2+ characters), for the invite autocomplete. */
+  buscarUsuarios(texto: string): Promise<PersonaSugerida[]>
 }
 
 /** Catalog of AI models the backend can analyze with. */

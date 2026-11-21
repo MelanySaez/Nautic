@@ -39,9 +39,25 @@ export interface Miembro {
   fechaAgregado: string
 }
 
-export interface NuevoMiembro {
-  email: string
-  rol: RolPlantilla
+/** A registered user suggested while typing who to invite: name and cargo only, never the email. */
+export interface PersonaSugerida {
+  id: number
+  nombre: string
+  cargo: string
+}
+
+/** Who is invited: an email typed by hand, or a user picked from the suggestions. */
+export type Invitado = { email: string } | { usuarioId: number }
+
+export type NuevoMiembro = Invitado & { rol: RolPlantilla }
+
+export const MENSAJE_ELIGE_PERSONA = 'Elige a alguien de la lista o escribe su email completo.'
+
+/** The invitee of a person field: the picked user, else the typed email; null when it is neither. */
+export function invitadoDe(texto: string, persona: PersonaSugerida | null): Invitado | null {
+  if (persona) return { usuarioId: persona.id }
+  const email = texto.trim()
+  return email.includes('@') ? { email } : null
 }
 
 /** A role resets the permissions to its template; `permisos` then overrides single ones. */

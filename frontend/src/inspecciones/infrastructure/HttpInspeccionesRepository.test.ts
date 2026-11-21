@@ -317,10 +317,13 @@ describe('HttpInspeccionesRepository', () => {
     await repo.crear({
       buqueId: 2,
       descripcion: '',
-      miembros: [{ email: 'ana@nautic.test', rol: 'revisor' }],
+      miembros: [{ email: 'ana@nautic.test', rol: 'revisor' }, { usuarioId: 8, rol: 'observador' }],
     })
 
-    expect(JSON.parse(String(ultimaLlamada().init.body)).miembros).toEqual([{ email: 'ana@nautic.test', rol: 'revisor' }])
+    expect(JSON.parse(String(ultimaLlamada().init.body)).miembros).toEqual([
+      { email: 'ana@nautic.test', rol: 'revisor' },
+      { usuario_id: 8, rol: 'observador' },
+    ])
   })
 
   it('sends privada only when the inspection is created private', async () => {

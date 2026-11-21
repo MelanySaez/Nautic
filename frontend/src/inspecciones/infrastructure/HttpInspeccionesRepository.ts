@@ -18,6 +18,7 @@ import {
   aFoto,
   aInspeccion,
   aInspeccionDetalle,
+  aNuevoMiembroDto,
   aPagina,
   aSeccion,
   type DetallePorInstanciaDto,
@@ -83,7 +84,7 @@ export class HttpInspeccionesRepository implements InspeccionesRepository {
       // tomado_por is omitted: the backend signs with the leader's name.
       descripcion: datos.descripcion,
       // Omitted when nobody is invited, so the request is unchanged for a solo inspection.
-      ...(datos.miembros?.length ? { miembros: datos.miembros.map(({ email, rol }) => ({ email, rol })) } : {}),
+      ...(datos.miembros?.length ? { miembros: datos.miembros.map(aNuevoMiembroDto) } : {}),
       ...(datos.privada ? { privada: true } : {}),
     })
     return aInspeccion(dto)
