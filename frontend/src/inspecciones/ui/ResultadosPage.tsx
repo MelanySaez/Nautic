@@ -59,7 +59,6 @@ function Resultados({
   const zonaId = zonasConResultados.some((s) => s.id === zonaUrl) ? zonaUrl : null
   const visibles = zonaId === null ? analizadas : analizadas.filter((f) => f.seccion.id === zonaId)
   // Folded by default so the team section stays close; a zone in the URL means "show me these photos".
-  const [fotosAbiertas, setFotosAbiertas] = useState(zonaId !== null)
   const progreso = resumirProgreso(detalle.fotos)
   const sinAnalizar = progreso.pendientes + progreso.enProceso
   const maxima = severidadMaxima(analizadas)
@@ -126,6 +125,9 @@ function Resultados({
         </Modal>
       )}
 
+      {/* Team first and folded: the photo results below always stay open. */}
+      <EquipoInspeccion detalle={detalle} alCambiarDetalle={alActualizarDetalle} />
+
       <section aria-label="Resumen" className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <Indicador etiqueta="Severidad máxima">
           {maxima ? <InsigniaSeveridad severidad={maxima} /> : <span className="text-ink-dim">—</span>}
@@ -151,14 +153,10 @@ function Resultados({
           <p>Todavía no hay fotos analizadas.</p>
         </Vacio>
       ) : (
-        <details
-          open={fotosAbiertas}
-          onToggle={(e) => setFotosAbiertas(e.currentTarget.open)}
-          className="rounded-lg border border-line bg-surface"
-        >
-          <summary className="label-caps cursor-pointer px-4 py-3 text-ink-muted hover:text-ink">
+        <section aria-labelledby="titulo-resultados-foto" className="rounded-lg border border-line bg-surface">
+          <h2 id="titulo-resultados-foto" className="label-caps px-4 py-3 text-ink-muted">
             Resultados por foto ({analizadas.length})
-          </summary>
+          </h2>
           <div className="flex flex-col gap-4 border-t border-line p-4">
             <label className="flex items-center gap-3 self-start">
               <span className="label-caps text-ink-muted">Zona</span>
@@ -186,10 +184,8 @@ function Resultados({
               ))}
             </div>
           </div>
-        </details>
+        </section>
       )}
-
-      <EquipoInspeccion detalle={detalle} alCambiarDetalle={alActualizarDetalle} />
     </div>
   )
 }
