@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import { ApiError } from '../../shared/http/apiClient'
@@ -118,6 +118,33 @@ describe('NuevaInspeccionPage', () => {
         { email: 'ana@nautic.test', rol: 'revisor' },
         { email: 'luis@nautic.test', rol: 'colaborador' },
       ],
+    }))
+  })
+
+  it('invites a person with custom permissions, like when editing the team', async () => {
+    const { dependencias } = crearDependenciasFalsas()
+    dependencias.inspecciones.crear.mockResolvedValue(unaInspeccion({ id: 42 }))
+    renderizar(dependencias)
+    await screen.findByRole('option', { name: 'ARA Libertad · Fragata' })
+    await userEvent.selectOptions(screen.getByLabelText('Buque'), '2')
+    await userEvent.click(screen.getByRole('button', { name: 'Agregar persona' }))
+    await userEvent.type(screen.getByLabelText('Nombre o email de la persona 1'), 'ana@nautic.test')
+    const permisos = screen.getByRole('group', { name: 'Permisos de la persona 1' })
+
+    // A role shows its permissions; changing one makes the role "Personalizado".
+    await userEvent.selectOptions(screen.getByLabelText('Rol de la persona 1'), 'revisor')
+    expect(within(permisos).getByRole('checkbox', { name: 'Editar reporte' })).toBeChecked()
+    expect(within(permisos).getByRole('checkbox', { name: 'Analizar' })).not.toBeChecked()
+    await userEvent.click(within(permisos).getByRole('checkbox', { name: 'Analizar' }))
+    expect(screen.getByLabelText('Rol de la persona 1')).toHaveValue('personalizado')
+    await userEvent.click(screen.getByRole('button', { name: 'Iniciar inspección' }))
+
+    expect(dependencias.inspecciones.crear).toHaveBeenCalledWith(expect.objectContaining({
+      miembros: [{
+        email: 'ana@nautic.test',
+        rol: 'observador',
+        permisos: { subirFotos: false, analizar: true, editarReporte: true, editarInspeccion: false },
+      }],
     }))
   })
 

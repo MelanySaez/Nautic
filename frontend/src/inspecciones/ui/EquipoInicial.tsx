@@ -3,7 +3,16 @@ import { Campo } from '../../shared/ui/Campo'
 import { CLASES_CONTROL } from '../../shared/ui/clasesControl'
 import { Icon } from '../../shared/ui/Icon'
 import { Tarjeta } from '../../shared/ui/Tarjeta'
-import { ROLES_PLANTILLA, type PersonaSugerida, type RolPlantilla } from '../domain/miembros'
+import {
+  ETIQUETA_ROL,
+  PERMISOS_ROL,
+  rolDe,
+  ROLES_PLANTILLA,
+  type PermisosMiembro,
+  type PersonaSugerida,
+  type RolPlantilla,
+} from '../domain/miembros'
+import { CasillasPermisos } from './CasillasPermisos'
 import { SelectorPersona } from './SelectorPersona'
 
 export interface FilaInvitado {
@@ -12,7 +21,8 @@ export interface FilaInvitado {
   texto: string
   /** The user picked from the suggestions; null while the row holds typed text. */
   persona: PersonaSugerida | null
-  rol: RolPlantilla
+  /** Chosen with a role template, then adjustable one by one (a custom role). */
+  permisos: PermisosMiembro
 }
 
 /** Error messages of one row, by field (`email`, `usuario_id`, `rol`, `permisos`). */
@@ -62,7 +72,7 @@ export function EquipoInicial({
         </label>
         <p className="text-sm text-ink-muted">
           Invita a otras personas con su rol (escribe su nombre para buscarlas, o su email): Colaborador puede hacerlo todo, Revisor edita el reporte y Observador solo
-          mira. Podrás cambiarlo después en los resultados.
+          mira. Ajusta los permisos uno a uno para un rol personalizado. Podrás cambiarlo después en los resultados.
         </p>
         {filas.map((fila, i) => {
           const n = i + 1
@@ -83,8 +93,8 @@ export function EquipoInicial({
               </Campo>
               <Campo etiqueta={`Rol de la persona ${n}`} error={error.rol}>
                 <select
-                  value={fila.rol}
-                  onChange={(e) => alCambiar(fila.uid, { rol: e.target.value as RolPlantilla })}
+                  value={rolDe(fila.permisos)}
+                  onChange={(e) => alCambiar(fila.uid, { permisos: PERMISOS_ROL[e.target.value as RolPlantilla] })}
                   className={CLASES_CONTROL}
                 >
                   {ROLES_PLANTILLA.map(({ rol, etiqueta }) => (
@@ -92,6 +102,12 @@ export function EquipoInicial({
                       {etiqueta}
                     </option>
                   ))}
+                  {/* Reached by adjusting the permissions below, as in the team editor. */}
+                  {rolDe(fila.permisos) === 'personalizado' && (
+                    <option value="personalizado" disabled>
+                      {ETIQUETA_ROL.personalizado}
+                    </option>
+                  )}
                 </select>
               </Campo>
               <Boton
@@ -102,6 +118,13 @@ export function EquipoInicial({
               >
                 <Icon name="trash" className="size-4" />
               </Boton>
+              <div className="sm:col-span-3">
+                <CasillasPermisos
+                  leyenda={`Permisos de la persona ${n}`}
+                  permisos={fila.permisos}
+                  alCambiar={(permisos) => alCambiar(fila.uid, { permisos })}
+                />
+              </div>
             </div>
           )
         })}

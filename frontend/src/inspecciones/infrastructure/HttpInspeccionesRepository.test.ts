@@ -317,12 +317,23 @@ describe('HttpInspeccionesRepository', () => {
     await repo.crear({
       buqueId: 2,
       descripcion: '',
-      miembros: [{ email: 'ana@nautic.test', rol: 'revisor' }, { usuarioId: 8, rol: 'observador' }],
+      miembros: [
+        { email: 'ana@nautic.test', rol: 'revisor' },
+        {
+          usuarioId: 8,
+          rol: 'observador',
+          permisos: { subirFotos: false, analizar: true, editarReporte: true, editarInspeccion: false },
+        },
+      ],
     })
 
     expect(JSON.parse(String(ultimaLlamada().init.body)).miembros).toEqual([
       { email: 'ana@nautic.test', rol: 'revisor' },
-      { usuario_id: 8, rol: 'observador' },
+      {
+        usuario_id: 8,
+        rol: 'observador',
+        permisos: { subir_fotos: false, analizar: true, editar_reporte: true, editar_inspeccion: false },
+      },
     ])
   })
 

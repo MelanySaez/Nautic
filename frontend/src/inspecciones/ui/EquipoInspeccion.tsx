@@ -26,6 +26,7 @@ import {
   type PersonaSugerida,
   type RolPlantilla,
 } from '../domain/miembros'
+import { CasillasPermisos } from './CasillasPermisos'
 import { SelectorPersona } from './SelectorPersona'
 
 /**
@@ -223,20 +224,12 @@ function FilaMiembro({
               <Icon name="trash" className="size-4" />
             </button>
           </div>
-          <fieldset disabled={ocupado} className="m-0 flex flex-wrap gap-x-4 gap-y-1 border-0 p-0">
-            <legend className="sr-only">Permisos de {usuario.nombre}</legend>
-            {PERMISOS_MIEMBRO.map(({ clave, etiqueta }) => (
-              <label key={clave} className="flex items-center gap-1.5 text-sm has-disabled:opacity-50">
-                <input
-                  type="checkbox"
-                  checked={elegidos[clave]}
-                  onChange={(e) => setBorrador({ ...elegidos, [clave]: e.target.checked })}
-                  className="size-4 accent-accent"
-                />
-                {etiqueta}
-              </label>
-            ))}
-          </fieldset>
+          <CasillasPermisos
+            leyenda={`Permisos de ${usuario.nombre}`}
+            permisos={elegidos}
+            alCambiar={setBorrador}
+            deshabilitado={ocupado}
+          />
           {cambios && (
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-sm text-ink-muted">Cambios sin guardar</span>

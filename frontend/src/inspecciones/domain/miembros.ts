@@ -49,7 +49,8 @@ export interface PersonaSugerida {
 /** Who is invited: an email typed by hand, or a user picked from the suggestions. */
 export type Invitado = { email: string } | { usuarioId: number }
 
-export type NuevoMiembro = Invitado & { rol: RolPlantilla }
+/** `permisos`, when sent, overrides the role template one by one (a custom role). */
+export type NuevoMiembro = Invitado & { rol: RolPlantilla; permisos?: PermisosMiembro }
 
 export const MENSAJE_ELIGE_PERSONA = 'Elige a alguien de la lista o escribe su email completo.'
 
@@ -85,6 +86,15 @@ export function cambiosEntre(actuales: PermisosMiembro, nuevos: PermisosMiembro)
   const rol = rolDe(nuevos)
   if (rol !== 'personalizado') return { rol }
   return { permisos: Object.fromEntries(cambiados.map(({ clave }) => [clave, nuevos[clave]])) }
+}
+
+/**
+ * How to invite someone with these permissions: the role alone when they match a template,
+ * else the empty template plus every permission (the backend then derives `personalizado`).
+ */
+export function rolParaInvitar(permisos: PermisosMiembro): Pick<NuevoMiembro, 'rol' | 'permisos'> {
+  const rol = rolDe(permisos)
+  return rol === 'personalizado' ? { rol: 'observador', permisos } : { rol }
 }
 
 /** A role resets the permissions to its template; `permisos` then overrides single ones. */

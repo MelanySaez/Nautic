@@ -385,23 +385,24 @@ const CAMPO_PERMISO: Record<keyof PermisosMiembro, keyof PermisosMiembroDto> = {
   editarInspeccion: 'editar_inspeccion',
 }
 
+function aPermisosDto(permisos: Partial<PermisosMiembro>): Partial<PermisosMiembroDto> {
+  const dto: Partial<PermisosMiembroDto> = {}
+  for (const [clave, valor] of Object.entries(permisos) as [keyof PermisosMiembro, boolean | undefined][]) {
+    if (valor !== undefined) dto[CAMPO_PERMISO[clave]] = valor
+  }
+  return dto
+}
+
 /** An invitation names the user by email or by the id picked from the suggestions, never both. */
 export function aNuevoMiembroDto(datos: NuevoMiembro): Record<string, unknown> {
-  return 'usuarioId' in datos
-    ? { usuario_id: datos.usuarioId, rol: datos.rol }
-    : { email: datos.email.trim(), rol: datos.rol }
+  const quien = 'usuarioId' in datos ? { usuario_id: datos.usuarioId } : { email: datos.email.trim() }
+  return { ...quien, rol: datos.rol, ...(datos.permisos ? { permisos: aPermisosDto(datos.permisos) } : {}) }
 }
 
 /** Only the given keys travel, so a role change does not resend permissions. */
 export function aCambiosMiembroDto(cambios: CambiosMiembro): Record<string, unknown> {
   const dto: Record<string, unknown> = {}
   if (cambios.rol) dto.rol = cambios.rol
-  if (cambios.permisos) {
-    const permisos: Partial<PermisosMiembroDto> = {}
-    for (const [clave, valor] of Object.entries(cambios.permisos) as [keyof PermisosMiembro, boolean | undefined][]) {
-      if (valor !== undefined) permisos[CAMPO_PERMISO[clave]] = valor
-    }
-    dto.permisos = permisos
-  }
+  if (cambios.permisos) dto.permisos = aPermisosDto(cambios.permisos)
   return dto
 }

@@ -13,7 +13,7 @@ import { Tarjeta } from '../../shared/ui/Tarjeta'
 import { mensajeDe } from '../../shared/ui/formato'
 import { ApiError } from '../../shared/http/apiClient'
 import { EquipoInicial, type ErroresFila, type FilaInvitado } from './EquipoInicial'
-import { invitadoDe, MENSAJE_ELIGE_PERSONA } from '../domain/miembros'
+import { invitadoDe, MENSAJE_ELIGE_PERSONA, PERMISOS_ROL, rolParaInvitar } from '../domain/miembros'
 import { idDeParametro } from './parametrosUrl'
 
 const CLAVE_MIEMBRO = /^miembros\.(\d+)\.(email|usuario_id|rol|permisos)$/
@@ -87,7 +87,7 @@ export function NuevaInspeccionPage() {
         nombre: nombre.trim(),
         descripcion: descripcion.trim(),
         ...(enviadas.length
-          ? { miembros: enviadas.map((f) => ({ ...invitadoDe(f.texto, f.persona)!, rol: f.rol })) }
+          ? { miembros: enviadas.map((f) => ({ ...invitadoDe(f.texto, f.persona)!, ...rolParaInvitar(f.permisos) })) }
           : {}),
         ...(privada ? { privada: true } : {}),
       })
@@ -168,7 +168,7 @@ export function NuevaInspeccionPage() {
           privada={privada}
           alCambiarPrivada={setPrivada}
           alAgregar={() => {
-            setInvitados((actual) => [...actual, { uid: siguienteUid, texto: '', persona: null, rol: 'colaborador' }])
+            setInvitados((actual) => [...actual, { uid: siguienteUid, texto: '', persona: null, permisos: PERMISOS_ROL.colaborador }])
             setSiguienteUid(siguienteUid + 1)
           }}
           alCambiar={cambiarInvitado}
