@@ -11,14 +11,18 @@ import { Tarjeta } from '../../shared/ui/Tarjeta'
 import { mensajeDe } from '../../shared/ui/formato'
 import type { InspeccionDetalle } from '../domain/inspeccion'
 import {
+  cambiosEntre,
   ETIQUETA_ROL,
   invitadoDe,
   MENSAJE_ELIGE_PERSONA,
   PERMISOS_MIEMBRO,
+  PERMISOS_ROL,
+  rolDe,
   ROLES_PLANTILLA,
   type CambiosMiembro,
   type Miembro,
   type NuevoMiembro,
+  type PermisosMiembro,
   type PersonaSugerida,
   type RolPlantilla,
 } from '../domain/miembros'
@@ -45,13 +49,16 @@ export function EquipoInspeccion({
   const [cambiandoPrivacidad, setCambiandoPrivacidad] = useState(false)
   const idAyudaPrivada = useId()
 
-  async function conMiembroOcupado(id: number, accion: () => Promise<void>) {
+  /** Runs a change on one member, showing its error; resolves true when it worked. */
+  async function conMiembroOcupado(id: number, accion: () => Promise<void>): Promise<boolean> {
     setError(null)
     setOcupados((s) => new Set(s).add(id))
     try {
       await accion()
+      return true
     } catch (e) {
       setError(mensajeDe(e))
+      return false
     } finally {
       setOcupados((s) => {
         const copia = new Set(s)
@@ -130,7 +137,7 @@ export function EquipoInspeccion({
                     miembro={miembro}
                     editable={esLider}
                     ocupado={ocupados.has(miembro.id)}
-                    alCambiar={(cambios) => void cambiar(miembro, cambios)}
+                    alCambiar={(cambios) => cambiar(miembro, cambios)}
                     alQuitar={() => quitar(miembro)}
                   />
                 ))}
@@ -162,10 +169,20 @@ function FilaMiembro({
   miembro: Miembro
   editable: boolean
   ocupado: boolean
-  alCambiar: (cambios: CambiosMiembro) => void
+  alCambiar: (cambios: CambiosMiembro) => Promise<boolean>
   alQuitar: () => void
 }) {
   const { usuario, rol, permisos } = miembro
+  // Edits stay here until "Guardar cambios": nothing is sent while the leader is still choosing.
+  const [borrador, setBorrador] = useState<PermisosMiembro | null>(null)
+  const elegidos = borrador ?? permisos
+  const cambios = borrador ? cambiosEntre(permisos, borrador) : null
+  const rolElegido = borrador ? rolDe(borrador) : rol
+
+  async function guardar() {
+    if (cambios && (await alCambiar(cambios))) setBorrador(null)
+  }
+
   const concedidos = PERMISOS_MIEMBRO.filter(({ clave }) => permisos[clave]).map(({ etiqueta }) => etiqueta)
 
   return (
@@ -179,9 +196,9 @@ function FilaMiembro({
           <div className="flex items-center gap-2">
             <select
               aria-label={`Rol de ${usuario.nombre}`}
-              value={rol}
+              value={rolElegido}
               disabled={ocupado}
-              onChange={(e) => alCambiar({ rol: e.target.value as RolPlantilla })}
+              onChange={(e) => setBorrador(PERMISOS_ROL[e.target.value as RolPlantilla])}
               className={clasesControlCompacto}
             >
               {ROLES_PLANTILLA.map((r) => (
@@ -190,7 +207,7 @@ function FilaMiembro({
                 </option>
               ))}
               {/* Shown only as the current state: picking it would not mean any permission set. */}
-              {rol === 'personalizado' && (
+              {rolElegido === 'personalizado' && (
                 <option value="personalizado" disabled>
                   {ETIQUETA_ROL.personalizado}
                 </option>
@@ -212,14 +229,30 @@ function FilaMiembro({
               <label key={clave} className="flex items-center gap-1.5 text-sm has-disabled:opacity-50">
                 <input
                   type="checkbox"
-                  checked={permisos[clave]}
-                  onChange={(e) => alCambiar({ permisos: { [clave]: e.target.checked } })}
+                  checked={elegidos[clave]}
+                  onChange={(e) => setBorrador({ ...elegidos, [clave]: e.target.checked })}
                   className="size-4 accent-accent"
                 />
                 {etiqueta}
               </label>
             ))}
           </fieldset>
+          {cambios && (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm text-ink-muted">Cambios sin guardar</span>
+              <Boton
+                variante="secundario"
+                onClick={() => setBorrador(null)}
+                disabled={ocupado}
+                aria-label={`Descartar cambios de ${usuario.nombre}`}
+              >
+                Descartar
+              </Boton>
+              <Boton onClick={() => void guardar()} disabled={ocupado} aria-label={`Guardar cambios de ${usuario.nombre}`}>
+                {ocupado ? 'Guardando…' : 'Guardar cambios'}
+              </Boton>
+            </div>
+          )}
         </div>
       ) : (
         <div className="flex flex-col gap-1 text-sm sm:items-end">

@@ -60,6 +60,33 @@ export function invitadoDe(texto: string, persona: PersonaSugerida | null): Invi
   return email.includes('@') ? { email } : null
 }
 
+/** Permissions of each role template; mirrors `InspeccionMiembro.ROLES` in the backend. */
+export const PERMISOS_ROL: Record<RolPlantilla, PermisosMiembro> = {
+  colaborador: { subirFotos: true, analizar: true, editarReporte: true, editarInspeccion: true },
+  revisor: { subirFotos: false, analizar: false, editarReporte: true, editarInspeccion: false },
+  observador: { subirFotos: false, analizar: false, editarReporte: false, editarInspeccion: false },
+}
+
+/** The role a set of permissions means, as the backend derives it: a template or `personalizado`. */
+export function rolDe(permisos: PermisosMiembro): RolMiembro {
+  const coincide = (Object.keys(PERMISOS_ROL) as RolPlantilla[]).find((rol) =>
+    PERMISOS_MIEMBRO.every(({ clave }) => PERMISOS_ROL[rol][clave] === permisos[clave]),
+  )
+  return coincide ?? 'personalizado'
+}
+
+/**
+ * What to send to turn `actuales` into `nuevos`: the role alone when they match a template,
+ * else only the permissions that change. Null when nothing changes.
+ */
+export function cambiosEntre(actuales: PermisosMiembro, nuevos: PermisosMiembro): CambiosMiembro | null {
+  const cambiados = PERMISOS_MIEMBRO.filter(({ clave }) => actuales[clave] !== nuevos[clave])
+  if (cambiados.length === 0) return null
+  const rol = rolDe(nuevos)
+  if (rol !== 'personalizado') return { rol }
+  return { permisos: Object.fromEntries(cambiados.map(({ clave }) => [clave, nuevos[clave]])) }
+}
+
 /** A role resets the permissions to its template; `permisos` then overrides single ones. */
 export interface CambiosMiembro {
   rol?: RolPlantilla

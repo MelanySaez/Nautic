@@ -504,21 +504,62 @@ describe('ResultadosPage team', () => {
     )
   })
 
-  it('changes the role and single permissions of a member', async () => {
+  it('changes the role and single permissions of a member only after saving them', async () => {
     const { dependencias } = renderizar([])
     dependencias.miembros.listar.mockResolvedValue([unMiembro()])
     dependencias.miembros.actualizar
       .mockResolvedValueOnce(unMiembro({ rol: 'colaborador', permisos: { subirFotos: true, analizar: true, editarReporte: true, editarInspeccion: true } }))
       .mockResolvedValueOnce(unMiembro({ rol: 'personalizado', permisos: { subirFotos: false, analizar: true, editarReporte: true, editarInspeccion: true } }))
     const fila = await within(await equipo()).findByRole('listitem', { name: 'Ana Ruiz' })
+    const rol = within(fila).getByRole('combobox', { name: 'Rol de Ana Ruiz' })
+    expect(within(fila).queryByRole('button', { name: 'Guardar cambios de Ana Ruiz' })).not.toBeInTheDocument()
 
-    await userEvent.selectOptions(within(fila).getByRole('combobox', { name: 'Rol de Ana Ruiz' }), 'colaborador')
+    // Picking a role previews its permissions but sends nothing yet.
+    await userEvent.selectOptions(rol, 'colaborador')
+    expect(within(fila).getByRole('checkbox', { name: 'Subir fotos' })).toBeChecked()
+    expect(within(fila).getByText('Cambios sin guardar')).toBeInTheDocument()
+    expect(dependencias.miembros.actualizar).not.toHaveBeenCalled()
+
+    await userEvent.click(within(fila).getByRole('button', { name: 'Guardar cambios de Ana Ruiz' }))
     expect(dependencias.miembros.actualizar).toHaveBeenLastCalledWith(7, 9, { rol: 'colaborador' })
-    await waitFor(() => expect(within(fila).getByRole('checkbox', { name: 'Subir fotos' })).toBeChecked())
+    await waitFor(() => expect(within(fila).queryByText('Cambios sin guardar')).not.toBeInTheDocument())
 
+    // A single permission off a template makes the role "Personalizado" and travels alone.
     await userEvent.click(within(fila).getByRole('checkbox', { name: 'Subir fotos' }))
+    expect(rol).toHaveValue('personalizado')
+    expect(dependencias.miembros.actualizar).toHaveBeenCalledTimes(1)
+    await userEvent.click(within(fila).getByRole('button', { name: 'Guardar cambios de Ana Ruiz' }))
     expect(dependencias.miembros.actualizar).toHaveBeenLastCalledWith(7, 9, { permisos: { subirFotos: false } })
-    await waitFor(() => expect(within(fila).getByRole('combobox', { name: 'Rol de Ana Ruiz' })).toHaveValue('personalizado'))
+    await waitFor(() => expect(within(fila).queryByRole('button', { name: 'Guardar cambios de Ana Ruiz' })).not.toBeInTheDocument())
+  })
+
+  it('discards the unsaved role change of a member', async () => {
+    const { dependencias } = renderizar([])
+    dependencias.miembros.listar.mockResolvedValue([unMiembro()])
+    const fila = await within(await equipo()).findByRole('listitem', { name: 'Ana Ruiz' })
+
+    await userEvent.selectOptions(within(fila).getByRole('combobox', { name: 'Rol de Ana Ruiz' }), 'observador')
+    await userEvent.click(within(fila).getByRole('button', { name: 'Descartar cambios de Ana Ruiz' }))
+
+    expect(within(fila).getByRole('combobox', { name: 'Rol de Ana Ruiz' })).toHaveValue('revisor')
+    expect(within(fila).getByRole('checkbox', { name: 'Editar reporte' })).toBeChecked()
+    expect(within(fila).queryByText('Cambios sin guardar')).not.toBeInTheDocument()
+    expect(dependencias.miembros.actualizar).not.toHaveBeenCalled()
+  })
+
+  it('keeps the unsaved change when saving it fails', async () => {
+    const { dependencias } = renderizar([])
+    dependencias.miembros.listar.mockResolvedValue([unMiembro()])
+    dependencias.miembros.actualizar.mockRejectedValue(new ApiError(500, 'Error del servidor.'))
+    const seccion = await equipo()
+    const fila = await within(seccion).findByRole('listitem', { name: 'Ana Ruiz' })
+
+    await userEvent.selectOptions(within(fila).getByRole('combobox', { name: 'Rol de Ana Ruiz' }), 'observador')
+    await userEvent.click(within(fila).getByRole('button', { name: 'Guardar cambios de Ana Ruiz' }))
+
+    expect(await within(seccion).findByRole('alert')).toHaveTextContent('Error del servidor.')
+    expect(within(fila).getByRole('combobox', { name: 'Rol de Ana Ruiz' })).toHaveValue('observador')
+    expect(within(fila).getByText('Cambios sin guardar')).toBeInTheDocument()
   })
 
   it('removes a member after confirmation', async () => {
