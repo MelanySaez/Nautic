@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { Navigate, useLocation } from 'react-router'
+import { Navigate } from 'react-router'
 import { useDependencias } from '../../app/useDependencias'
 import { ApiError, type ErroresDeCampo } from '../../shared/http/apiClient'
 import { Boton } from '../../shared/ui/Boton'
@@ -12,20 +12,18 @@ import { mensajeDe } from '../../shared/ui/formato'
 import { MarcoCuenta } from './MarcoCuenta'
 import { mensajesDe } from './mensajes'
 import { useSesion } from './sesion'
-import type { DestinoLogin } from './SesionProvider'
 
 export function LoginPage() {
   const { cuentas } = useDependencias()
   const { usuario, iniciar } = useSesion()
-  const location = useLocation()
-  const destino = (location.state as DestinoLogin | null)?.desde ?? '/'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [campos, setCampos] = useState<ErroresDeCampo | undefined>()
 
-  if (usuario) return <Navigate to={destino} replace />
+  // Entering the app always opens the main view (the inspections), whatever page was open before.
+  if (usuario) return <Navigate to="/" replace />
 
   async function enviar(evento: FormEvent) {
     evento.preventDefault()
@@ -66,7 +64,7 @@ export function LoginPage() {
         </Boton>
         <p className="text-center text-sm text-ink-muted">
           ¿No tienes cuenta?{' '}
-          <Enlace to="/registro" state={location.state} className="font-semibold text-accent-ink hover:underline">
+          <Enlace to="/registro" className="font-semibold text-accent-ink hover:underline">
             Crear cuenta
           </Enlace>
         </p>

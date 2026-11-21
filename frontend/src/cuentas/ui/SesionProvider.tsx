@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { Navigate, Outlet, useLocation } from 'react-router'
+import { Navigate, Outlet } from 'react-router'
 import { useDependencias } from '../../app/useDependencias'
 import { Cargando, MensajeError } from '../../shared/ui/Estados'
 import { mensajeDe } from '../../shared/ui/formato'
@@ -7,11 +7,6 @@ import type { Usuario } from '../domain/usuario'
 import { SesionContext, useUsuarioActual, type Sesion } from './sesion'
 
 type EstadoSesion = { tipo: 'cargando' } | { tipo: 'error'; mensaje: string } | { tipo: 'lista'; usuario: Usuario | null }
-
-/** Location state of the login: where to return once authenticated. */
-export interface DestinoLogin {
-  desde?: string
-}
 
 /** Loads the current user once and drops it whenever any request answers 401. */
 export function SesionProvider({ children }: { children: ReactNode }) {
@@ -71,13 +66,9 @@ export function RaizSesion() {
   )
 }
 
-/** Guards the app routes: without a session, go to the login and come back afterwards. */
+/** Guards the app routes: without a session, go to the login (which then opens the main view). */
 export function RequiereSesion() {
   const usuario = useUsuarioActual()
-  const { pathname, search, hash } = useLocation()
-  if (!usuario) {
-    const destino: DestinoLogin = { desde: `${pathname}${search}${hash}` }
-    return <Navigate to="/login" replace state={destino} />
-  }
+  if (!usuario) return <Navigate to="/login" replace />
   return <Outlet />
 }

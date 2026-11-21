@@ -26,7 +26,7 @@ describe('session', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Cargando sesión…')
   })
 
-  it('redirects to the login without a session and returns to the intended page after logging in', async () => {
+  it('redirects to the login without a session and opens the inspections view after logging in', async () => {
     const { dependencias } = sinSesion()
     const router = renderizarRutas(rutas, dependencias, '/buques?q=brown')
 
@@ -37,8 +37,10 @@ describe('session', () => {
     await userEvent.type(screen.getByLabelText('Contraseña'), 'secreta123')
     await userEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }))
 
-    await waitFor(() => expect(router.state.location.pathname).toBe('/buques'))
-    expect(router.state.location.search).toBe('?q=brown')
+    // Always the main view, never the page that was open when the session was missing.
+    await waitFor(() => expect(router.state.location.pathname).toBe('/'))
+    expect(router.state.location.search).toBe('')
+    expect(await screen.findByRole('heading', { name: 'Inspecciones' })).toBeInTheDocument()
     expect(dependencias.cuentas.iniciarSesion).toHaveBeenCalledWith('maria@nautic.test', 'secreta123')
   })
 

@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { Navigate, useLocation } from 'react-router'
+import { Navigate } from 'react-router'
 import { useDependencias } from '../../app/useDependencias'
 import { ApiError, type ErroresDeCampo } from '../../shared/http/apiClient'
 import { Boton } from '../../shared/ui/Boton'
@@ -13,21 +13,19 @@ import type { DatosRegistro } from '../domain/usuario'
 import { MarcoCuenta } from './MarcoCuenta'
 import { mensajesDe } from './mensajes'
 import { useSesion } from './sesion'
-import type { DestinoLogin } from './SesionProvider'
 
 const VACIO: Required<DatosRegistro> = { nombre: '', email: '', cargo: '', password: '' }
 
 export function RegistroPage() {
   const { cuentas } = useDependencias()
   const { usuario, iniciar } = useSesion()
-  const location = useLocation()
-  const destino = (location.state as DestinoLogin | null)?.desde ?? '/'
   const [datos, setDatos] = useState(VACIO)
   const [enviando, setEnviando] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [campos, setCampos] = useState<ErroresDeCampo | undefined>()
 
-  if (usuario) return <Navigate to={destino} replace />
+  // Entering the app always opens the main view (the inspections), whatever page was open before.
+  if (usuario) return <Navigate to="/" replace />
 
   async function enviar(evento: FormEvent) {
     evento.preventDefault()
@@ -74,7 +72,7 @@ export function RegistroPage() {
           {enviando ? 'Creando cuenta…' : 'Crear cuenta'}
         </Boton>
         <p className="text-center text-sm text-ink-muted">
-          <Enlace to="/login" state={location.state} className="font-semibold text-accent-ink hover:underline">
+          <Enlace to="/login" className="font-semibold text-accent-ink hover:underline">
             Ya tengo cuenta
           </Enlace>
         </p>
