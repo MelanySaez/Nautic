@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react'
-import { useParams } from 'react-router'
+import { useLocation, useParams } from 'react-router'
 import { Enlace } from '../../shared/ui/Enlace'
 import { useDependencias } from '../../app/useDependencias'
 import { ApiError } from '../../shared/http/apiClient'
@@ -76,12 +76,20 @@ function Resultados({
     }
   }
 
+  // Back to the list the card was opened from (with its filters), else the vessel's inspections.
+  // The upload page is reached through "Editar inspección".
+  const estadoUbicacion = useLocation().state as { volverA?: unknown } | null
+  const volverA =
+    typeof estadoUbicacion?.volverA === 'string' && estadoUbicacion.volverA.startsWith('/inspecciones/')
+      ? estadoUbicacion.volverA
+      : undefined
+
   return (
     <div className="animar-entrada flex flex-col gap-6">
       <header className="flex flex-wrap items-center gap-3">
         <Enlace
-          to={`/vision/${detalle.id}`}
-          aria-label="Volver a la carga"
+          to={volverA ?? `/inspecciones/buque/${detalle.buqueId}`}
+          aria-label="Volver a las inspecciones"
           className="rounded p-1 text-ink-muted hover:text-ink"
         >
           <Icon name="back" className="size-6" />

@@ -279,6 +279,7 @@ export function ListaInspeccionesPage({ buqueId }: { buqueId: number }) {
                 puedeEliminar={!!usuario && (usuario.esAdmin || inspeccion.lider?.id === usuario.id)}
                 eliminando={eliminandoId === inspeccion.id}
                 alEliminar={() => eliminar(inspeccion)}
+                volverA={`${ubicacion.pathname}${ubicacion.search}`}
               />
             ))}
           </div>
