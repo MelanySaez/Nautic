@@ -75,22 +75,26 @@ function renderizar(fotos: Foto[], extra: Partial<InspeccionDetalle> = {}, ruta 
 }
 
 describe('ResultadosPage', () => {
-  it('folds the photo results by default so the team section is close, and unfolds them on demand', async () => {
+  it('always shows the photo results, without folding them', async () => {
     renderizar([CORROIDA, SOLO_CASCO])
 
-    const resumen = await screen.findByText('Resultados por foto (2)')
+    const titulo = await screen.findByRole('heading', { name: 'Resultados por foto (2)' })
+    expect(titulo.closest('details')).toBeNull()
+    expect(screen.getByLabelText('Zona')).toBeVisible()
+  })
+
+  it('puts the team section first, folded, and unfolds it on demand', async () => {
+    renderizar([CORROIDA])
+
+    const resumen = await screen.findByText(/^Equipo/, { selector: 'summary' })
     const plegable = resumen.closest('details')!
     expect(plegable).not.toHaveAttribute('open')
+    // Above the summary and the photo results.
+    const resumenInspeccion = screen.getByRole('region', { name: 'Resumen' })
+    expect(plegable.compareDocumentPosition(resumenInspeccion) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
 
     await userEvent.click(resumen)
     expect(plegable).toHaveAttribute('open')
-  })
-
-  it('unfolds the photo results when a zone comes in the URL', async () => {
-    const enProa = unaFoto({ id: 24, estado: 'completada', seccion: SECCION_PROA })
-    renderizar([CORROIDA, enProa], {}, `/inspecciones/7/resultados?zona=${SECCION_PROA.id}`)
-
-    expect((await screen.findByText(/^Resultados por foto/)).closest('details')).toHaveAttribute('open')
   })
 
   it('renames the inspection and shows the new name as the title', async () => {

@@ -7,7 +7,6 @@ import { Campo } from '../../shared/ui/Campo'
 import { CLASES_CONTROL, clasesControlCompacto } from '../../shared/ui/clasesControl'
 import { Cargando, MensajeError } from '../../shared/ui/Estados'
 import { Icon } from '../../shared/ui/Icon'
-import { Tarjeta } from '../../shared/ui/Tarjeta'
 import { mensajeDe } from '../../shared/ui/formato'
 import type { InspeccionDetalle } from '../domain/inspeccion'
 import {
@@ -97,8 +96,17 @@ export function EquipoInspeccion({
 
   return (
     <section aria-label="Equipo">
-      <Tarjeta titulo="Equipo">
-        <div className="flex flex-col gap-4">
+      {/* Folded by default so the photo results stay close to the top. */}
+      <details className="group rounded-lg border border-line bg-surface">
+        <summary className="label-caps flex cursor-pointer items-center justify-between gap-4 px-4 py-3 text-ink-muted hover:text-ink">
+          Equipo
+          {estado.tipo === 'listo' && (
+            <span className="text-ink-dim normal-case">
+              {estado.datos.length} {estado.datos.length === 1 ? 'miembro' : 'miembros'}
+            </span>
+          )}
+        </summary>
+        <div className="flex flex-col gap-4 border-t border-line p-4">
           <p className="flex items-center gap-2 text-sm">
             <Icon name="user" className="size-4 text-ink-dim" />
             {detalle.lider ? `Líder: ${detalle.lider.nombre}` : 'Sin líder asignado'}
@@ -155,7 +163,7 @@ export function EquipoInspeccion({
             />
           )}
         </div>
-      </Tarjeta>
+      </details>
     </section>
   )
 }
