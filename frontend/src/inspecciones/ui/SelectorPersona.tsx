@@ -52,8 +52,9 @@ export function SelectorPersona({
           setResultado({ consulta, personas })
           setActiva(-1)
         },
-        // Suggestions are a convenience: on failure the user can still type an email.
-        () => vigente && setResultado({ consulta, personas: [] }),
+        // Suggestions are a convenience: on failure (throttled, offline) nothing is shown, and
+        // never the "nadie coincide" notice, which would wrongly say the person has no account.
+        () => {},
       )
     }, ESPERA_MS)
     return () => {

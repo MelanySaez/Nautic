@@ -453,6 +453,18 @@ describe('ResultadosPage team', () => {
     expect(within(seccion).queryByRole('status')).not.toBeInTheDocument()
   })
 
+  it('does not claim nobody matches when the search fails', async () => {
+    const { dependencias } = renderizar([])
+    dependencias.miembros.buscarUsuarios.mockRejectedValue(new ApiError(429, 'Demasiadas solicitudes.'))
+    const seccion = await equipo()
+
+    await userEvent.type(within(seccion).getByLabelText('Nombre o email del usuario'), 'zoe')
+
+    await waitFor(() => expect(dependencias.miembros.buscarUsuarios).toHaveBeenCalledWith('zoe'))
+    await new Promise((resolver) => setTimeout(resolver, 50))
+    expect(within(seccion).queryByRole('status')).not.toBeInTheDocument()
+  })
+
   it('drops the pick when the text is edited and ignores suggestions of an older search', async () => {
     const { dependencias } = renderizar([])
     const respuestas: ((v: { id: number; nombre: string; cargo: string }[]) => void)[] = []
