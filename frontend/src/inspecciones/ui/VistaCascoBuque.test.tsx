@@ -208,7 +208,9 @@ describe('VistaCascoBuque colours', () => {
       estado: 'completada',
       detecciones: [unaDeteccion({ clase: 'pitting', etiqueta: 'Picaduras', severidad: 'high' })],
     })
-    zonasRecientes.mockResolvedValue([{ ...ZONAS[0], fotos: [analizada] }, ...ZONAS.slice(1)])
+    // The reload is held open to check that the previous zones stay on screen meanwhile.
+    let responder: (zonas: typeof ZONAS) => void = () => {}
+    zonasRecientes.mockReturnValue(new Promise((resolver) => (responder = resolver)))
     act(() =>
       falsas.emitirEvento({
         tipo: 'foto-actualizada',
@@ -228,8 +230,12 @@ describe('VistaCascoBuque colours', () => {
       }),
     )
 
+    await waitFor(() => expect(zonasRecientes).toHaveBeenCalledTimes(2))
+    expect(screen.queryByText('Cargando zonas…')).not.toBeInTheDocument()
+    expect(await zona('FWD-BTM')).toHaveTextContent('Sin analizar')
+
+    act(() => responder([{ ...ZONAS[0], fotos: [analizada] }, ...ZONAS.slice(1)]))
     await waitFor(async () => expect(await zona('FWD-BTM')).toHaveTextContent('Alta'))
-    expect(zonasRecientes).toHaveBeenCalledTimes(2)
     expect(zonasRecientes).toHaveBeenLastCalledWith(1)
   })
 
