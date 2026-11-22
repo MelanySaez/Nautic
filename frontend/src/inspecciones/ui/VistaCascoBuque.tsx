@@ -5,7 +5,7 @@ import { CODIGOS_ZONA, ubicarSecciones, type CodigoZona } from '../../buques/dom
 import { arquetipoDeBuque } from '../../buques/domain/tiposBuque'
 import type { EstadoRecurso } from '../../shared/hooks/useRecurso'
 import { Boton } from '../../shared/ui/Boton'
-import { CLASES_CONTROL } from '../../shared/ui/clasesControl'
+import { clasesControlCompacto } from '../../shared/ui/clasesControl'
 import { Cargando, MensajeError } from '../../shared/ui/Estados'
 import { formatearFecha } from '../../shared/ui/formato'
 import type { Foto, Inspeccion, InspeccionDetalle, SeccionCasco } from '../domain/inspeccion'
@@ -77,6 +77,7 @@ function SelectorInspeccion({
   alCargarMas: () => void
 }) {
   const id = useId()
+  const elegida = inspecciones.find((i) => i.id === elegidaId)
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-3">
@@ -87,7 +88,9 @@ function SelectorInspeccion({
           id={id}
           value={elegidaId}
           onChange={(e) => alElegir(Number(e.target.value))}
-          className={`${CLASES_CONTROL} w-auto min-w-0 max-w-full`}
+          // Half the strip (full width on phones); a longer name ends in an ellipsis, in full on hover.
+          title={elegida?.nombre}
+          className={`${clasesControlCompacto} w-full min-w-0 truncate sm:w-1/2`}
         >
           {inspecciones.map((inspeccion, i) => (
             <option key={inspeccion.id} value={inspeccion.id}>

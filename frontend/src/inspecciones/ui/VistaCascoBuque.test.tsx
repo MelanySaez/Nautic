@@ -165,6 +165,7 @@ describe('VistaCascoBuque colours', () => {
     expect(await zona('MID-BTM')).toHaveTextContent('Crítica')
     const selector = screen.getByRole('combobox', { name: 'Colores según la inspección' })
     expect(selector).toHaveValue('7')
+    expect(selector).toHaveAttribute('title', 'Control 2026')
     expect(within(selector).getAllByRole('option').map((o) => o.textContent)).toEqual([
       'Control 2026 · 01 nov 2026 (más reciente)',
       'Control 2025 · 01 nov 2025',
@@ -185,6 +186,7 @@ describe('VistaCascoBuque colours', () => {
     expect(await zona('FWD-BTM')).toHaveTextContent('Sin fotos')
     expect(dependencias.inspecciones.obtener).toHaveBeenLastCalledWith(5)
     expect(screen.getByRole('combobox', { name: 'Colores según la inspección' })).toHaveValue('5')
+    expect(screen.getByRole('combobox', { name: 'Colores según la inspección' })).toHaveAttribute('title', 'Control 2025')
   })
 
   it('keeps the selected zone when another inspection is picked', async () => {
