@@ -28,6 +28,7 @@ from .inference import modelo_por_defecto, run_inference, severidad_por_clase
 from .models import DeteccionFoto, FotoInspeccion, NivelSeveridad, resumen_detecciones, subir_severidad_max
 from .pubsub import publicar_evento
 from .taxonomia import enriquecer_detecciones
+from .cola import despachar_cola
 from .ratelimit import track_concurrent_end
 
 logger = logging.getLogger(__name__)
@@ -142,6 +143,11 @@ def _notificar(foto: FotoInspeccion) -> None:
 # Dead Letter Queue
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _liberar(foto_id: int) -> None:
+    """Libera el lugar de la foto y lo pasa a la siguiente foto encolada de la misma IP."""
+    despachar_cola(track_concurrent_end(foto_id))
+
+
 @shared_task(name="vision.dead_letter", ignore_result=True)
 def dead_letter(
     foto_id: int,
@@ -194,13 +200,13 @@ def procesar_foto(self, foto_id: int):
         foto = FotoInspeccion.objects.get(pk=foto_id)
     except FotoInspeccion.DoesNotExist:
         logger.warning("FotoInspeccion %s no existe; tarea abortada.", foto_id)
-        track_concurrent_end(foto_id)
+        _liberar(foto_id)
         return
 
     # Idempotencia: re-deliveries por acks_late no deben reprocesar lo ya hecho
     if foto.estado == FotoInspeccion.Estado.COMPLETADA:
         logger.info("Foto %s ya completada; tarea ignorada.", foto_id)
-        track_concurrent_end(foto_id)
+        _liberar(foto_id)
         return
 
     foto.estado = FotoInspeccion.Estado.EN_PROCESO
@@ -272,7 +278,7 @@ def procesar_foto(self, foto_id: int):
             foto_id, foto.tiempo_inferencia_ms, foto.severidad, len(raw_detections),
         )
         _notificar(foto)
-        track_concurrent_end(foto_id)  # éxito: liberar slot
+        _liberar(foto_id)  # éxito: liberar slot y continuar la cola
 
     except Exception as exc:
         logger.exception("Error procesando foto %s", foto_id)
@@ -293,7 +299,7 @@ def procesar_foto(self, foto_id: int):
         is_retryable = isinstance(exc, (IOError, OSError))
         is_final = not is_retryable or self.request.retries >= _MAX_RETRIES
         if is_final:
-            track_concurrent_end(foto_id)
+            _liberar(foto_id)
             try:
                 dead_letter.apply_async(
                     args=[foto_id, type(exc).__name__, str(exc)[:500], self.request.id],

@@ -38,6 +38,7 @@ from cuentas.models import referencia_publica
 from .permisos import LIDER, exigir, permisos_de, puede_ver, visibles_para
 from .views_miembros import crear_miembros, validar_equipo
 from .pubsub import publicar_evento, suscribirse
+from .cola import despachar_cola
 from .ratelimit import check_upload_rate, get_client_ip, track_concurrent_start
 from .secciones import seccion_to_dict
 from .taxonomia import color_clase, enriquecer_detecciones, info_clase, listar_taxonomia, version_taxonomia
@@ -893,7 +894,9 @@ def api_vision_foto_detalle(request, foto_id):
     foto.estado = FotoInspeccion.Estado.PENDIENTE
     foto.error_detalle = None
     foto.modelo_id = modelo
-    foto.save(update_fields=['estado', 'error_detalle', 'modelo_id'])
+    # Launched now: it no longer waits in an analysis queue.
+    foto.cola_ip = None
+    foto.save(update_fields=['estado', 'error_detalle', 'modelo_id', 'cola_ip'])
     _disparar_procesamiento(foto.id)
     return Response(_foto_to_dict(foto, request), status=202)
 
@@ -981,10 +984,12 @@ def _cache_detecciones(respuesta, etag):
         'Cuerpo opcional: `{"modelo": "<id>"}` (ids en GET /api/vision/modelos/); sin él se '
         'usa el modelo por defecto del servidor (`VISION_MODEL_ID`). El modelo se guarda en '
         'cada foto (`modelo`). Un modelo desconocido o no disponible devuelve 400 y no se '
-        'encola ni cambia nada.'
+        'encola ni cambia nada. Las fotos que superan el límite de tareas concurrentes '
+        '(`VISION_RATE_LIMIT_MAX_CONCURRENT`) quedan en cola y el worker las lanza solo a '
+        'medida que se liberan lugares: `{"iniciadas": n, "omitidas_por_limite": en_cola}`.'
     ),
     request=_SCHEMA_MODELO,
-    responses={202: OpenApiTypes.OBJECT, 400: OpenApiTypes.OBJECT, 429: OpenApiTypes.OBJECT},
+    responses={202: OpenApiTypes.OBJECT, 400: OpenApiTypes.OBJECT},
 )
 @api_view(['POST'])
 def api_vision_analizar_inspeccion(request, inspeccion_id):
@@ -1008,22 +1013,28 @@ def api_vision_analizar_inspeccion(request, inspeccion_id):
     ip = get_client_ip(request)
     dispatched = 0
     skipped = 0
-    for foto in fotos:
-        ok, _ = track_concurrent_start(ip, foto.id)
-        if not ok:
-            skipped += 1
-            continue
-        # The worker reads the model from the photo: persist it before enqueueing.
+    for foto in fotos.order_by('id'):
+        # The worker reads the model from the photo: persist it before enqueueing,
+        # also for queued photos, which are analyzed later with this model.
         foto.modelo_id = modelo
-        foto.save(update_fields=['modelo_id'])
-        _disparar_procesamiento(foto.id)
-        dispatched += 1
+        ok, _ = track_concurrent_start(ip, foto.id)
+        if ok:
+            foto.cola_ip = None
+            foto.save(update_fields=['modelo_id', 'cola_ip'])
+            _disparar_procesamiento(foto.id)
+            dispatched += 1
+        else:
+            # Over the concurrency limit: it waits in this IP's queue, and the worker
+            # launches it when a slot frees up (vision/cola.py).
+            foto.cola_ip = ip
+            foto.save(update_fields=['modelo_id', 'cola_ip'])
+            skipped += 1
 
-    if dispatched == 0:
-        return Response(
-            {'error': f'Límite de tareas concurrentes alcanzado. {skipped} foto(s) en espera.'},
-            status=429,
-        )
+    if skipped:
+        # A slot may have freed up while the queue was being written.
+        lanzadas = despachar_cola(ip)
+        dispatched += lanzadas
+        skipped -= lanzadas
     return Response({'iniciadas': dispatched, 'omitidas_por_limite': skipped}, status=202)
 
 

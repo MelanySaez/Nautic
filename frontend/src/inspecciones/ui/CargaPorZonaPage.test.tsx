@@ -173,7 +173,7 @@ describe('CargaPorZonaPage', () => {
 
     expect(dependencias.inspecciones.analizar).toHaveBeenCalledWith(7, 'yolo-seg')
     expect(await screen.findByRole('status')).toHaveTextContent(
-      'Análisis iniciado para 1 foto. 1 en espera por límite de tareas concurrentes.',
+      'Análisis iniciado para 1 foto. 1 en cola: se analizará sola cuando termine otra.',
     )
   })
 

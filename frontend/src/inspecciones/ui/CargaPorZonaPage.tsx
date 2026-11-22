@@ -36,7 +36,11 @@ export function CargaPorZonaPage({ inspeccionId }: { inspeccionId: number }) {
 
 function textoAnalisis(iniciadas: number, omitidas: number): string {
   const base = `Análisis iniciado para ${iniciadas} ${iniciadas === 1 ? 'foto' : 'fotos'}.`
-  return omitidas > 0 ? `${base} ${omitidas} en espera por límite de tareas concurrentes.` : base
+  // Over the concurrency limit the server queues them and launches each one as a slot frees up.
+  if (omitidas === 0) return base
+  return omitidas === 1
+    ? `${base} 1 en cola: se analizará sola cuando termine otra.`
+    : `${base} ${omitidas} en cola: se analizarán solas a medida que terminen las anteriores.`
 }
 
 /** A rejected model comes back as a field error; everything else keeps its own message. */

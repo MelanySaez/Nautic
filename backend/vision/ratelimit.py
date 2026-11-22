@@ -95,10 +95,12 @@ def track_concurrent_start(ip: str, foto_id: int) -> tuple[bool, str | None]:
         return True, None  # fail-open
 
 
-def track_concurrent_end(foto_id: int) -> None:
+def track_concurrent_end(foto_id: int) -> str | None:
     """
     Registra el fin de procesamiento de una foto.
     Llamar desde la tarea Celery al terminar (éxito, error final, o skip).
+    Devuelve la IP que la pidió (para continuar su cola, ver ``vision/cola.py``),
+    o None si no se conoce.
     No lanza excepción — falla silenciosamente para no interrumpir el worker.
     """
     try:
@@ -108,5 +110,7 @@ def track_concurrent_end(foto_id: int) -> None:
         if ip:
             client.srem(_KEY_ACTIVE.format(ip=ip), str(foto_id))
             client.delete(ip_map_key)
+        return ip or None
     except Exception:
         logger.exception("Rate limit error (concurrent end) foto=%s", foto_id)
+        return None

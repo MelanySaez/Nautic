@@ -28,6 +28,8 @@ class _Base(TestCase):
         self.concurrencia = self._parchear(
             'vision.views.track_concurrent_start', return_value=(True, None)
         )
+        # Queued photos are drained by vision.cola (test_cola_analisis), never against real Redis here.
+        self._parchear('vision.views.despachar_cola', return_value=0)
         # Every catalog model is available unless a test says otherwise.
         self.motivo = self._parchear('vision.views.motivo_no_disponible', return_value=None)
 
@@ -212,7 +214,9 @@ class AnalizarConModeloTests(_Base):
         hecha.refresh_from_db()
         self.assertEqual(hecha.modelo_id, 'yolo-seg')
 
-    def test_fotos_omitidas_por_el_limite_no_cambian_de_modelo(self):
+    def test_fotos_en_cola_por_el_limite_guardan_el_modelo_elegido(self):
+        # They wait in the queue and the worker analyzes them later with this model
+        # (see test_cola_analisis).
         primera, segunda = self._foto(), self._foto()
         self.concurrencia.side_effect = [(True, None), (False, 'limite')]
 
@@ -223,17 +227,7 @@ class AnalizarConModeloTests(_Base):
         primera.refresh_from_db()
         segunda.refresh_from_db()
         self.assertEqual(primera.modelo_id, 'rtdetr')
-        self.assertIsNone(segunda.modelo_id)
-
-    def test_limite_alcanzado_sigue_siendo_429(self):
-        foto = self._foto()
-        self.concurrencia.return_value = (False, 'limite')
-
-        res = self._analizar({'modelo': 'rtdetr'})
-
-        self.assertEqual(res.status_code, 429)
-        foto.refresh_from_db()
-        self.assertIsNone(foto.modelo_id)
+        self.assertEqual(segunda.modelo_id, 'rtdetr')
 
     def test_inspeccion_inexistente_es_404(self):
         res = self.client.post('/api/vision/inspecciones/999999/analizar/', {}, format='json')
