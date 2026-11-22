@@ -1,5 +1,6 @@
 import { Campo } from '../../shared/ui/Campo'
 import { CLASES_CONTROL } from '../../shared/ui/clasesControl'
+import { Selector } from '../../shared/ui/Selector'
 import { Tarjeta } from '../../shared/ui/Tarjeta'
 import { GRUPOS_TECNICOS } from '../domain/fichaTecnica'
 import { CampoImagen } from './CampoImagen'
@@ -8,20 +9,19 @@ import { GrupoNumerico } from './GrupoNumerico'
 import { TIPOS_BUQUE, tipoBuqueDe } from '../domain/tiposBuque'
 import type { Errores, Valores } from './formularioBuque'
 
-const ETAPAS_SUGERIDAS = ['Activo', 'En construcción']
+/** Stages offered in the form; the first one is the backend default for a new vessel. */
+const ETAPAS = ['Activo', 'En construcción']
 
 /** General data and technical-sheet measures, shared by the create and edit forms. */
 export function CamposBuque({
   valores,
   errores,
   alCambiar,
-  ayudaEtapa,
   imagen,
 }: {
   valores: Valores
   errores: Errores
   alCambiar: (clave: string, valor: string) => void
-  ayudaEtapa?: string
   /** The image picker: the stored image URL and what the user chose (see `CampoImagen`). */
   imagen: {
     actual: string | null
@@ -32,6 +32,10 @@ export function CamposBuque({
   // A stored type matches the catalogue ignoring case and accents; free text from before it does not.
   const tipoActual = tipoBuqueDe(valores.tipo)
   const fueraDeCatalogo = valores.tipo.trim() !== '' && tipoActual === null
+  // A blank stage (new vessel) shows the default without sending it; one stored before the
+  // list stays selectable until another one is chosen.
+  const etapa = valores.etapa.trim() === '' ? ETAPAS[0] : valores.etapa
+  const etapaFueraDeLista = !ETAPAS.includes(etapa)
 
   return (
     <>
@@ -46,11 +50,7 @@ export function CamposBuque({
             />
           </Campo>
           <Campo etiqueta="Tipo" error={errores.tipo}>
-            <select
-              value={tipoActual?.nombre ?? valores.tipo}
-              onChange={(e) => alCambiar('tipo', e.target.value)}
-              className={CLASES_CONTROL}
-            >
+            <Selector value={tipoActual?.nombre ?? valores.tipo} onChange={(e) => alCambiar('tipo', e.target.value)}>
               <option value="" disabled>
                 Selecciona un tipo
               </option>
@@ -63,22 +63,18 @@ export function CamposBuque({
                   {tipo.nombre}
                 </option>
               ))}
-            </select>
+            </Selector>
           </Campo>
-          <Campo etiqueta="Etapa" error={errores.etapa} ayuda={ayudaEtapa}>
-            <input
-              value={valores.etapa}
-              onChange={(e) => alCambiar('etapa', e.target.value)}
-              maxLength={255}
-              list="etapas-buque"
-              className={CLASES_CONTROL}
-            />
+          <Campo etiqueta="Etapa" error={errores.etapa}>
+            <Selector value={etapa} onChange={(e) => alCambiar('etapa', e.target.value)}>
+              {etapaFueraDeLista && <option value={etapa}>{etapa} (fuera de la lista)</option>}
+              {ETAPAS.map((opcion) => (
+                <option key={opcion} value={opcion}>
+                  {opcion}
+                </option>
+              ))}
+            </Selector>
           </Campo>
-          <datalist id="etapas-buque">
-            {ETAPAS_SUGERIDAS.map((etapa) => (
-              <option key={etapa} value={etapa} />
-            ))}
-          </datalist>
           <Campo etiqueta="Descripción" error={errores.descripcion}>
             <textarea
               value={valores.descripcion}

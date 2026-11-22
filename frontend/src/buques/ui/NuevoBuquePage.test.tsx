@@ -42,6 +42,22 @@ describe('NuevoBuquePage', () => {
     expect(document.querySelector('canvas, svg[aria-label^="Silueta"]')).toBeNull()
   })
 
+  it('offers the stages as a list like the type, with Activo chosen and not sent unless changed', async () => {
+    const { dependencias } = crearDependenciasFalsas()
+    dependencias.buques.crear.mockResolvedValue(unDetalleBuque({ id: 9 }))
+    renderizar(dependencias)
+
+    const etapa = screen.getByRole('combobox', { name: 'Etapa' })
+    expect(etapa.tagName).toBe('SELECT')
+    expect(within(etapa).getAllByRole('option').map((opcion) => opcion.textContent)).toEqual(['Activo', 'En construcción'])
+    expect(etapa).toHaveValue('Activo')
+
+    await rellenarRequeridos()
+    await userEvent.click(screen.getByRole('button', { name: 'Crear buque' }))
+
+    expect(dependencias.buques.crear).toHaveBeenCalledWith({ nombre: 'ARC Caribe', tipo: 'Fragata' })
+  })
+
   it('requires choosing a type before calling the port', async () => {
     const { dependencias } = renderizar()
     await userEvent.type(screen.getByLabelText('Nombre'), 'ARC Caribe')
@@ -121,7 +137,7 @@ describe('NuevoBuquePage', () => {
     const { router } = renderizar(dependencias)
 
     await rellenarRequeridos()
-    await userEvent.type(screen.getByLabelText('Etapa'), 'En construcción')
+    await userEvent.selectOptions(screen.getByLabelText('Etapa'), 'En construcción')
     await userEvent.type(screen.getByLabelText('Eslora total (m)'), '110.5')
     await userEvent.type(screen.getByLabelText('Autonomía (h)'), '120')
     await userEvent.click(screen.getByRole('button', { name: 'Crear buque' }))

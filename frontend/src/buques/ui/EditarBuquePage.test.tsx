@@ -81,15 +81,40 @@ describe('EditarBuquePage', () => {
     expect(router.state.location.pathname).toBe('/buques/7')
   })
 
-  it('requires name and stage before calling the port', async () => {
+  it('requires a name before calling the port', async () => {
     const { dependencias } = renderizar()
 
     await userEvent.clear(await screen.findByLabelText('Nombre'))
-    await userEvent.clear(screen.getByLabelText('Etapa'))
     await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
 
-    expect(screen.getAllByText('Este campo es requerido.')).toHaveLength(2)
+    expect(screen.getAllByText('Este campo es requerido.')).toHaveLength(1)
     expect(dependencias.buques.actualizar).not.toHaveBeenCalled()
+  })
+
+  it('changes the stage from its list and sends only that', async () => {
+    const dependencias = conBuque()
+    renderizar('/buques/7/editar', dependencias)
+
+    const etapa = await screen.findByRole('combobox', { name: 'Etapa' })
+    expect(etapa).toHaveValue('Activo')
+    await userEvent.selectOptions(etapa, 'En construcción')
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+
+    expect(dependencias.buques.actualizar).toHaveBeenCalledWith(7, { etapa: 'En construcción' })
+  })
+
+  it('keeps a stage from before the list until another one is chosen', async () => {
+    const dependencias = conBuque()
+    dependencias.buques.obtener.mockResolvedValue(unDetalleBuque({ ...BUQUE, etapa: 'En reparación' }))
+    renderizar('/buques/7/editar', dependencias)
+
+    const etapa = await screen.findByRole('combobox', { name: 'Etapa' })
+    expect(etapa).toHaveValue('En reparación')
+    expect(within(etapa).getByRole('option', { selected: true })).toHaveTextContent('En reparación (fuera de la lista)')
+    await userEvent.type(screen.getByLabelText('Puntal (m)'), '1')
+    await userEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+
+    expect(dependencias.buques.actualizar).toHaveBeenCalledWith(7, { puntalM: 81 })
   })
 
   it('shows each server error under its field', async () => {
