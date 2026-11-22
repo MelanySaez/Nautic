@@ -1,5 +1,5 @@
 import { useMemo, useState, type DragEvent } from 'react'
-import { useParams } from 'react-router'
+import { useLocation, useParams } from 'react-router'
 import { Enlace } from '../../shared/ui/Enlace'
 import { ApiError } from '../../shared/http/apiClient'
 import { useDependencias } from '../../app/useDependencias'
@@ -18,6 +18,7 @@ import { useIdEnUrl } from './parametrosUrl'
 import { SelectorModelo } from './SelectorModelo'
 import { useInspeccionEnVivo, type DatosInspeccion } from './useInspeccionEnVivo'
 import { useModelos } from './useModelos'
+import { destinoDeVuelta } from './volverA'
 
 /** Route entry: keys the page by id so switching inspections starts from a clean state. */
 export function CargaPorZonaRuta() {
@@ -47,6 +48,12 @@ function mensajeAnalisis(error: unknown): string {
 function CargaPorZona({ datos, aplicar }: { datos: DatosInspeccion; aplicar: (evento: EventoInspeccion) => void }) {
   const { inspecciones } = useDependencias()
   const { detalle, secciones } = datos
+  // Back to the page that opened the upload (e.g. the results), else the vessel's inspections.
+  // `origen` is where that page itself goes back to, handed back to it.
+  const estadoUbicacion = useLocation().state as { volverA?: unknown; origen?: unknown } | null
+  const volverA = destinoDeVuelta(estadoUbicacion?.volverA) ?? `/inspecciones/buque/${detalle.buqueId}`
+  const origen = destinoDeVuelta(estadoUbicacion?.origen)
+  const estadoDeVuelta = origen ? { volverA: origen } : undefined
   const { subirFotos: puedeSubir, analizar: puedeAnalizar } = detalle.misPermisos
   // The active zone lives in `?zona=<seccionId>`; an id that is not a section of this vessel selects nothing.
   const [zonaId, fijarZonaId] = useIdEnUrl('zona')
@@ -156,7 +163,7 @@ function CargaPorZona({ datos, aplicar }: { datos: DatosInspeccion; aplicar: (ev
   return (
     <div className="animar-entrada flex flex-col gap-6">
       <header className="flex flex-wrap items-center gap-3">
-        <Enlace to="/" aria-label="Volver al listado" className="rounded p-1 text-ink-muted hover:text-ink">
+        <Enlace to={volverA} state={estadoDeVuelta} aria-label="Volver" className="rounded p-1 text-ink-muted hover:text-ink">
           <Icon name="back" className="size-6" />
         </Enlace>
         <div className="min-w-0 flex-1">
@@ -305,7 +312,10 @@ function CargaPorZona({ datos, aplicar }: { datos: DatosInspeccion; aplicar: (ev
           alCambiar={setEleccionModelo}
         />
         <div className="flex gap-3">
-          <EnlaceBoton to={`/vision/${detalle.id}/resultados`} variante="secundario" className="flex-1 sm:flex-none">
+          <EnlaceBoton
+            to={`/vision/${detalle.id}/resultados`}
+            state={estadoDeVuelta}
+            variante="secundario" className="flex-1 sm:flex-none">
             Ver resultados
           </EnlaceBoton>
           {puedeAnalizar && (

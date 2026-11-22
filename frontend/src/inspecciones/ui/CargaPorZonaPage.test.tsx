@@ -29,11 +29,16 @@ function preparar() {
   return falsas
 }
 
-function renderizar(dependencias = preparar().dependencias, ruta = '/vision/7') {
+function renderizar(
+  dependencias = preparar().dependencias,
+  ruta: string | { pathname: string; state?: unknown } = '/vision/7',
+) {
   const router = renderizarRutas(
     [
       { path: '/vision/:id', element: <CargaPorZonaRuta /> },
       { path: '/vision/:id/resultados', element: <p>Resultados</p> },
+      { path: '/inspecciones/:id/resultados', element: <p>Resultados</p> },
+      { path: '/inspecciones/buque/:id', element: <p>Inspecciones del buque</p> },
       { path: '/', element: <p>Listado</p> },
     ],
     dependencias,
@@ -318,6 +323,46 @@ describe('CargaPorZonaPage', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Reintentar' }))
 
     expect(await screen.findByRole('heading', { name: 'ARA Libertad' })).toBeInTheDocument()
+  })
+})
+
+describe('CargaPorZonaPage back link', () => {
+  it('goes back to the results it was opened from, which keep going back to their own list', async () => {
+    const { router } = renderizar(undefined, {
+      pathname: '/vision/7',
+      state: { volverA: '/inspecciones/7/resultados', origen: '/inspecciones/buque/4?q=control' },
+    })
+
+    const volver = await screen.findByRole('link', { name: 'Volver' })
+    expect(volver).toHaveAttribute('href', '/inspecciones/7/resultados')
+    await userEvent.click(volver)
+
+    expect(router.state.location.pathname).toBe('/inspecciones/7/resultados')
+    expect(router.state.location.state).toEqual({ volverA: '/inspecciones/buque/4?q=control' })
+  })
+
+  it("goes back to the vessel's inspections when opened without an origin", async () => {
+    renderizar()
+
+    expect(await screen.findByRole('link', { name: 'Volver' })).toHaveAttribute('href', '/inspecciones/buque/4')
+  })
+
+  it('ignores an origin outside the inspection pages', async () => {
+    renderizar(undefined, { pathname: '/vision/7', state: { volverA: '//otro.sitio/phish' } })
+
+    expect(await screen.findByRole('link', { name: 'Volver' })).toHaveAttribute('href', '/inspecciones/buque/4')
+  })
+
+  it('opens the results keeping where they go back to', async () => {
+    const { router } = renderizar(undefined, {
+      pathname: '/vision/7',
+      state: { volverA: '/inspecciones/7/resultados', origen: '/inspecciones/buque/4?q=control' },
+    })
+
+    await userEvent.click(await screen.findByRole('link', { name: 'Ver resultados' }))
+
+    expect(router.state.location.pathname).toBe('/vision/7/resultados')
+    expect(router.state.location.state).toEqual({ volverA: '/inspecciones/buque/4?q=control' })
   })
 })
 

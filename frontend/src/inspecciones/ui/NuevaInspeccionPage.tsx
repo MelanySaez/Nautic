@@ -15,6 +15,7 @@ import { ApiError } from '../../shared/http/apiClient'
 import { EquipoInicial, type ErroresFila, type FilaInvitado } from './EquipoInicial'
 import { invitadoDe, MENSAJE_ELIGE_PERSONA, PERMISOS_ROL, rolParaInvitar } from '../domain/miembros'
 import { idDeParametro } from './parametrosUrl'
+import { destinoDeVuelta } from './volverA'
 
 const CLAVE_MIEMBRO = /^miembros\.(\d+)\.(email|usuario_id|rol|permisos)$/
 
@@ -46,8 +47,7 @@ export function NuevaInspeccionPage() {
   // Deep links (e.g. from the 3D hull view) may name the vessel and the zone to start with.
   const [parametros] = useSearchParams()
   // Back to the view that opened the form (e.g. a vessel's 3D hull); only inspection pages count.
-  const origen = (useLocation().state as { volverA?: unknown } | null)?.volverA
-  const volverA = typeof origen === 'string' && origen.startsWith('/inspecciones/') ? origen : '/'
+  const volverA = destinoDeVuelta((useLocation().state as { volverA?: unknown } | null)?.volverA) ?? '/'
   const buqueUrl = idDeParametro(parametros, 'buque')
   const zonaUrl = idDeParametro(parametros, 'zona')
 
