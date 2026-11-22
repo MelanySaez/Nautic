@@ -67,7 +67,10 @@ function preparar() {
   return falsas
 }
 
-function renderizar(dependencias = preparar().dependencias, ruta = RUTA) {
+function renderizar(
+  dependencias = preparar().dependencias,
+  ruta: string | { pathname: string; search?: string; state?: unknown } = RUTA,
+) {
   const router = renderizarRutas(
     [
       { path: '/inspecciones/buque/:id', element: <ListaInspeccionesRuta /> },
@@ -313,6 +316,34 @@ describe('VistaCascoBuque zones', () => {
     expect(router.state.location.pathname).toBe('/vision')
     expect(router.state.location.search).toBe('?buque=1&zona=12')
     expect(router.state.location.state).toEqual({ volverA: '/inspecciones/buque/1?vista=3d&zona=12' })
+  })
+
+  it('goes back from the list filtered by a zone to the 3D view with that zone, then to the vessels', async () => {
+    const { router } = renderizar(preparar().dependencias, {
+      pathname: '/inspecciones/buque/1',
+      search: '?vista=3d&zona=12',
+      state: { buqueNombre: 'ARA Libertad', volverA: '/?q=libert' },
+    })
+    await zonasDelCasco()
+    await userEvent.click(within(panel()).getByRole('button', { name: 'Ver inspecciones de esta sección' }))
+    expect(router.state.location.search).toBe('?seccion=12')
+
+    await userEvent.click(screen.getByRole('link', { name: 'Volver a la vista 3D' }))
+
+    expect(router.state.location.search).toBe('?vista=3d&zona=12')
+    expect(screen.getByRole('link', { name: 'Volver a las embarcaciones' })).toHaveAttribute('href', '/?q=libert')
+  })
+
+  it('keeps the way back to the vessels when switching views and picking zones', async () => {
+    const { router } = renderizar(preparar().dependencias, {
+      pathname: '/inspecciones/buque/1',
+      state: { buqueNombre: 'ARA Libertad', volverA: '/?q=libert' },
+    })
+    await userEvent.click(await screen.findByRole('button', { name: 'Vista 3D' }))
+    await userEvent.click(await zona('KEEL'))
+
+    expect(router.state.location.search).toBe('?vista=3d&zona=13')
+    expect(screen.getByRole('link', { name: 'Volver a las embarcaciones' })).toHaveAttribute('href', '/?q=libert')
   })
 
   it('shows the list filtered by the zone and lets the filter go', async () => {

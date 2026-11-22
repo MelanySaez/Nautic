@@ -22,6 +22,9 @@ const RETARDO_TEXTO_MS = 300
 const CAMPOS_CON_CONTROL = ['q', 'desde', 'hasta', 'severidad_min', 'relacion']
 const VISTA_3D = '3d'
 
+/** Navigation state of the page: from the vessel list, and the 3D zone a section filter came from. */
+type EstadoPagina = { buqueNombre?: string; volverA?: string; volverAZona?: number }
+
 /** Route entry: keys the page by vessel so switching vessels starts from a clean state. */
 export function ListaInspeccionesRuta() {
   const { id } = useParams()
@@ -54,7 +57,13 @@ export function ListaInspeccionesPage({ buqueId }: { buqueId: number }) {
   const ubicacion = useLocation()
   // The new inspection form goes back here, with the current view and filters.
   const volverAqui = { volverA: `${ubicacion.pathname}${ubicacion.search}` }
-  const desdeLista = ubicacion.state as { buqueNombre?: string; volverA?: string } | null
+  const desdeLista = ubicacion.state as EstadoPagina | null
+  // Changing the query must not lose the way back to the vessels (or the name for the title).
+  const conservado = { buqueNombre: desdeLista?.buqueNombre, volverA: desdeLista?.volverA }
+  // Opened from a 3D zone ("Ver inspecciones de esta sección"): back returns to that zone while
+  // the list still shows its section.
+  const zonaDeVuelta =
+    desdeLista?.volverAZona !== undefined && desdeLista.volverAZona === filtroUrl.seccionId ? desdeLista.volverAZona : null
   const nombreConocido = buque.tipo === 'listo' ? buque.datos.nombre : desdeLista?.buqueNombre
   const nombreBuque = nombreConocido ?? 'Embarcación'
   const [texto, setTexto] = useState(parametros.get('q') ?? '')
@@ -70,8 +79,10 @@ export function ListaInspeccionesPage({ buqueId }: { buqueId: number }) {
 
   // The debounce timer fires later than the render that created it, so it reads the latest setter.
   const ultimoSetParametros = useRef(setParametros)
+  const ultimoEstado = useRef(desdeLista)
   useEffect(() => {
     ultimoSetParametros.current = setParametros
+    ultimoEstado.current = desdeLista
   })
   const temporizador = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   useEffect(() => () => clearTimeout(temporizador.current), [])
@@ -84,7 +95,7 @@ export function ListaInspeccionesPage({ buqueId }: { buqueId: number }) {
         else siguientes.delete(nombre)
         return siguientes
       },
-      { replace: true },
+      { replace: true, state: ultimoEstado.current },
     )
   }
 
@@ -98,24 +109,26 @@ export function ListaInspeccionesPage({ buqueId }: { buqueId: number }) {
   }
 
   function mostrar3d(activar: boolean) {
-    setParametros((previos) => conParametro(conParametro(previos, 'zona', null), 'vista', activar ? VISTA_3D : null))
+    setParametros((previos) => conParametro(conParametro(previos, 'zona', null), 'vista', activar ? VISTA_3D : null), {
+      state: conservado,
+    })
   }
 
   function elegirZona(seccionId: number | null) {
-    setParametros((previos) => conParametro(previos, 'zona', seccionId), { replace: true })
+    setParametros((previos) => conParametro(previos, 'zona', seccionId), { replace: true, state: conservado })
   }
 
   function verInspeccionesDeSeccion(seccionId: number) {
     setParametros((previos) => {
       const siguientes = conParametro(conParametro(previos, 'vista', null), 'zona', null)
       return conParametro(siguientes, 'seccion', seccionId)
-    })
+    }, { state: { ...conservado, volverAZona: seccionId } })
   }
 
   function limpiar() {
     clearTimeout(temporizador.current)
     setTexto('')
-    setParametros({}, { replace: true })
+    setParametros({}, { replace: true, state: conservado })
   }
 
   const campos = estado.tipo === 'error' ? estado.campos : undefined
@@ -157,8 +170,13 @@ export function ListaInspeccionesPage({ buqueId }: { buqueId: number }) {
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div className="flex min-w-0 items-start gap-3">
           <Enlace
-            to={desdeLista?.volverA ?? '/'}
-            aria-label="Volver a las embarcaciones"
+            to={
+              zonaDeVuelta === null
+                ? (desdeLista?.volverA ?? '/')
+                : `${ubicacion.pathname}?${new URLSearchParams({ vista: VISTA_3D, zona: String(zonaDeVuelta) })}`
+            }
+            state={zonaDeVuelta === null ? undefined : conservado}
+            aria-label={zonaDeVuelta === null ? 'Volver a las embarcaciones' : 'Volver a la vista 3D'}
             className="mt-1 rounded p-1 text-ink-muted hover:text-ink">
             <Icon name="back" className="size-6" />
           </Enlace>
