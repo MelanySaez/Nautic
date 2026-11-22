@@ -163,7 +163,7 @@ describe('VistaCascoBuque colours', () => {
     const { dependencias } = renderizar()
 
     expect(await zona('MID-BTM')).toHaveTextContent('Crítica')
-    const selector = screen.getByRole('combobox', { name: 'Colores según la inspección' })
+    const selector = screen.getByRole('combobox', { name: 'Inspección:' })
     expect(selector).toHaveValue('7')
     expect(selector).toHaveAttribute('title', 'Control 2026')
     expect(within(selector).getAllByRole('option').map((o) => o.textContent)).toEqual([
@@ -179,21 +179,21 @@ describe('VistaCascoBuque colours', () => {
     const { dependencias } = renderizar()
     expect(await zona('MID-BTM')).toHaveTextContent('Crítica')
 
-    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Colores según la inspección' }), '5')
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Inspección:' }), '5')
 
     await waitFor(async () => expect(await zona('KEEL')).toHaveTextContent('Baja'))
     expect(await zona('MID-BTM')).toHaveTextContent('Sin fotos')
     expect(await zona('FWD-BTM')).toHaveTextContent('Sin fotos')
     expect(dependencias.inspecciones.obtener).toHaveBeenLastCalledWith(5)
-    expect(screen.getByRole('combobox', { name: 'Colores según la inspección' })).toHaveValue('5')
-    expect(screen.getByRole('combobox', { name: 'Colores según la inspección' })).toHaveAttribute('title', 'Control 2025')
+    expect(screen.getByRole('combobox', { name: 'Inspección:' })).toHaveValue('5')
+    expect(screen.getByRole('combobox', { name: 'Inspección:' })).toHaveAttribute('title', 'Control 2025')
   })
 
   it('keeps the selected zone when another inspection is picked', async () => {
     const { router } = renderizar(preparar().dependencias, `${RUTA}&zona=13`)
     await zonasDelCasco()
 
-    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Colores según la inspección' }), '5')
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Inspección:' }), '5')
 
     await waitFor(() => expect(panel()).toHaveTextContent('Baja'))
     expect(within(panel()).getByRole('heading', { name: 'Quilla' })).toBeInTheDocument()
@@ -211,7 +211,7 @@ describe('VistaCascoBuque colours', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Cargar más inspecciones' }))
 
-    const selector = screen.getByRole('combobox', { name: 'Colores según la inspección' })
+    const selector = screen.getByRole('combobox', { name: 'Inspección:' })
     await waitFor(() => expect(within(selector).getAllByRole('option')).toHaveLength(3))
     expect(within(selector).getAllByRole('option')[2]).toHaveTextContent('Control 2024 · 01 nov 2024')
     expect(dependencias.inspecciones.buscar).toHaveBeenLastCalledWith({ buqueId: 1 }, 'c2')
@@ -252,7 +252,7 @@ describe('VistaCascoBuque colours', () => {
     renderizar(dependencias)
 
     expect(await screen.findByText('Este buque aún no tiene inspecciones.')).toBeInTheDocument()
-    expect(screen.queryByRole('combobox', { name: 'Colores según la inspección' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('combobox', { name: 'Inspección:' })).not.toBeInTheDocument()
     for (const boton of within(await zonasDelCasco()).getAllByRole('button')) expect(boton).toHaveTextContent('Sin fotos')
     expect(dependencias.inspecciones.obtener).not.toHaveBeenCalled()
   })

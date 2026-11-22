@@ -82,7 +82,7 @@ function SelectorInspeccion({
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-3">
         <label htmlFor={id} className="text-sm text-ink-muted">
-          Colores según la inspección
+          Inspección:
         </label>
         <select
           id={id}
