@@ -230,6 +230,16 @@ describe('ListaInspeccionesPage', () => {
     expect(router.state.location.pathname).toBe('/inspecciones/42/resultados')
   })
 
+  it('opens the results remembering the filtered list to come back to', async () => {
+    const { dependencias } = crearDependenciasFalsas()
+    dependencias.inspecciones.buscar.mockResolvedValue(unaPagina([unaInspeccion({ id: 42, nombre: 'Control anual' })]))
+    const { router } = renderizar(dependencias, `${RUTA}?q=control`)
+
+    await userEvent.click(await screen.findByRole('link', { name: 'Abrir inspección Control anual' }))
+
+    expect(router.state.location.state).toEqual({ volverA: `${RUTA}?q=control` })
+  })
+
   it('deletes an inspection after confirmation', async () => {
     const { dependencias } = crearDependenciasFalsas()
     dependencias.inspecciones.buscar.mockResolvedValue(unaPagina([unaInspeccion({ id: 42 })]))

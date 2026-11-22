@@ -290,7 +290,8 @@ export function crearDependenciasFalsas() {
 export function renderizarRutas(
   rutas: RouteObject[],
   dependencias: Dependencias,
-  rutaInicial: string,
+  /** A path, or a location with `state` (e.g. where the page should go back to). */
+  rutaInicial: string | { pathname: string; search?: string; state?: unknown },
   usuario: Usuario = unUsuario(),
 ) {
   const router = createMemoryRouter(rutas, { initialEntries: [rutaInicial] })

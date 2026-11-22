@@ -9,10 +9,13 @@ export function TarjetaInspeccion({
   puedeEliminar,
   eliminando,
   alEliminar,
+  volverA,
   className = '',
 }: {
   inspeccion: Inspeccion
   className?: string
+  /** Where the results page's back arrow should return (the list, with its filters). */
+  volverA?: string
   /** Only the leader (or an admin) may delete it. */
   puedeEliminar: boolean
   eliminando: boolean
@@ -30,6 +33,7 @@ export function TarjetaInspeccion({
           <h3 className="truncate text-xl font-semibold tracking-tight">
             <Enlace
               to={`/inspecciones/${id}/resultados`}
+              state={volverA ? { volverA } : undefined}
               aria-label={`Abrir inspección ${nombre}`}
               className="after:absolute after:inset-0 focus-visible:outline-none"
             >

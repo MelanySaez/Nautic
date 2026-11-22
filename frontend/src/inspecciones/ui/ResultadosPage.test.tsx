@@ -56,7 +56,11 @@ const SOLO_CASCO = unaFoto({
   detecciones: [unaDeteccion({ clase: 'ship_hull', etiqueta: 'Casco del buque', tipo: 'componente', severidad: null })],
 })
 
-function renderizar(fotos: Foto[], extra: Partial<InspeccionDetalle> = {}, ruta = '/vision/7/resultados') {
+function renderizar(
+  fotos: Foto[],
+  extra: Partial<InspeccionDetalle> = {},
+  ruta: string | { pathname: string; state?: unknown } = '/vision/7/resultados',
+) {
   const falsas = crearDependenciasFalsas()
   falsas.dependencias.inspecciones.obtener.mockResolvedValue(unDetalle({ id: 7, buqueNombre: 'ARA Libertad', fotos, ...extra }))
   falsas.dependencias.inspecciones.listarSecciones.mockResolvedValue([SECCION_QUILLA, SECCION_PROA])
@@ -67,6 +71,7 @@ function renderizar(fotos: Foto[], extra: Partial<InspeccionDetalle> = {}, ruta 
       { path: '/inspecciones/:id/resultados', element: <ResultadosRuta /> },
       { path: '/vision/:id', element: <p>Carga de fotos</p> },
       { path: '/inspecciones/:id/reporte', element: <p>Editor del reporte</p> },
+      { path: '/inspecciones/buque/:id', element: <p>Inspecciones del buque</p> },
     ],
     falsas.dependencias,
     ruta,
@@ -75,6 +80,25 @@ function renderizar(fotos: Foto[], extra: Partial<InspeccionDetalle> = {}, ruta 
 }
 
 describe('ResultadosPage', () => {
+  it('goes back to the inspections of its vessel, not to the photo upload', async () => {
+    const { router } = renderizar([CORROIDA], { buqueId: 5 })
+
+    await userEvent.click(await screen.findByRole('link', { name: 'Volver a las inspecciones' }))
+
+    expect(router.state.location.pathname).toBe('/inspecciones/buque/5')
+  })
+
+  it('goes back to the filtered list it was opened from', async () => {
+    const { router } = renderizar([CORROIDA], { buqueId: 5 }, {
+      pathname: '/inspecciones/7/resultados',
+      state: { volverA: '/inspecciones/buque/5?q=prueba' },
+    })
+
+    await userEvent.click(await screen.findByRole('link', { name: 'Volver a las inspecciones' }))
+
+    expect(`${router.state.location.pathname}${router.state.location.search}`).toBe('/inspecciones/buque/5?q=prueba')
+  })
+
   it('always shows the photo results, without folding them', async () => {
     renderizar([CORROIDA, SOLO_CASCO])
 
