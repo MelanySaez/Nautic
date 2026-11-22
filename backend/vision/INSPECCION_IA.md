@@ -222,11 +222,11 @@ Dos controles por IP respaldados por contadores Redis. Ambos **fallan abiertos**
 | Control | Dónde aplica | Límite (env) | Respuesta al superarlo |
 |---|---|---|---|
 | Uploads por minuto (ventana de 60 s) | `POST .../fotos/` | `VISION_RATE_LIMIT_UPLOADS_PER_MINUTE` (20) | `429` |
-| Fotos activas simultáneas | `POST /fotos/<id>/` y `POST .../analizar/` | `VISION_RATE_LIMIT_MAX_CONCURRENT` (10) | `429` (o parcial, ver abajo) |
+| Fotos activas simultáneas | `POST /fotos/<id>/` y `POST .../analizar/` | `VISION_RATE_LIMIT_MAX_CONCURRENT` (10) | `429` en `/fotos/<id>/`; en `analizar/` las sobrantes quedan en cola (ver abajo) |
 
 `track_concurrent_start(ip, foto_id)` se llama desde la vista al disparar; `track_concurrent_end(foto_id)` desde el worker al terminar (éxito, error final o skip). El mapeo `foto → IP` vive en Redis con TTL de 2 h.
 
-En `POST .../analizar/` el límite se aplica foto por foto: la respuesta `202` devuelve `{"iniciadas": N, "omitidas_por_limite": M}`. Solo devuelve `429` si no se pudo disparar ninguna.
+En `POST .../analizar/` el límite se aplica foto por foto: la respuesta `202` devuelve `{"iniciadas": N, "omitidas_por_limite": M}`, donde M son las que quedaron en cola. Las fotos que no entran quedan **en cola** (`FotoInspeccion.cola_ip` = IP que las pidió, ya con su `modelo_id`): cada vez que el worker libera un lugar (éxito, error final o skip), `vision/cola.despachar_cola(ip)` lanza las encoladas de esa IP por orden de id mientras haya lugar, reclamando cada una con `select_for_update(skip_locked=True)` para que dos workers nunca lancen la misma. Funciona con el navegador cerrado. Si Redis pierde el mapeo `foto → IP`, la cola espera a un nuevo `POST .../analizar/` (las fotos siguen `pendiente`).
 
 La IP real se extrae respetando `X-Forwarded-For` (primer valor) para funcionar detrás de nginx/proxies.
 
@@ -451,7 +451,7 @@ El frontend React anterior fue eliminado del repositorio. El nuevo vivirá en `f
 **Contrato que el backend ofrece a cualquier cliente:**
 
 - Carga inicial por REST (`GET /api/vision/inspecciones/<id>/`) y deltas por SSE (`foto-created`, `foto-updated`, `foto-deleted`).
-- Límite de concurrencia por IP: `VISION_RATE_LIMIT_MAX_CONCURRENT` (`backend/config/settings.py`). Si el cliente quiere avisar antes del `429`, debe mantener su propia constante en sincronía con ese valor.
+- Límite de concurrencia por IP: `VISION_RATE_LIMIT_MAX_CONCURRENT` (`backend/config/settings.py`). El reintento individual responde `429` al superarlo; el análisis en bloque encola las sobrantes.
 - El análisis no arranca al subir: el cliente lo dispara con `POST .../analizar/` o `POST /fotos/<id>/`.
 - Documentación OpenAPI en `/api/docs/`.
 

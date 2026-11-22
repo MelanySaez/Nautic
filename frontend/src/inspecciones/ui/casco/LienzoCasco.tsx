@@ -20,7 +20,7 @@ import { BufferAttribute, BufferGeometry, Color, DoubleSide, type MeshStandardMa
 import { generarCasco, type CascoGenerado } from '../../../buques/domain/casco/geometria'
 import type { Malla, Vec3 } from '../../../buques/domain/casco/malla'
 import type { CodigoZona } from '../../../buques/domain/casco/zonas'
-import { mezclarColores, useColoresTema, variableDeZona } from './coloresZona'
+import { colorDivisor, mezclarColores, useColoresTema, variableDeZona } from './coloresZona'
 import { PRESENTACION_ESTADO_ZONA } from './estadosZona'
 import type { PropsLienzoCasco } from './lienzoCasco'
 import {
@@ -49,6 +49,7 @@ import {
 const MEZCLA_NEUTRA = 0.2
 /** Used only when a token cannot be read. */
 const GRIS_RESPALDO = '#8a94a6'
+const TINTA_RESPALDO = '#191c1e'
 const ACENTO_RESPALDO = '#06b6d4'
 /** Hover highlight: a white glow on top of the zone colour. */
 const BRILLO_RESALTE = 0.28
@@ -155,6 +156,7 @@ function MallaCasco({
   duracionColor,
   resaltada = false,
   contorno = null,
+  divisor = null,
   eventos,
 }: {
   geometria: BufferGeometry
@@ -164,6 +166,8 @@ function MallaCasco({
   resaltada?: boolean
   /** Colour of the selection outline; none when not selected. */
   contorno?: string | null
+  /** Colour of the thin border every zone keeps, so zones in the same state stay apart. */
+  divisor?: string | null
   eventos: EventosMalla
 }) {
   const material = useColorAnimado(color, colorInicial, duracionColor)
@@ -181,7 +185,11 @@ function MallaCasco({
         polygonOffsetFactor={1}
         polygonOffsetUnits={1}
       />
-      {contorno && <Edges threshold={20} color={contorno} lineWidth={3} />}
+      {contorno ? (
+        <Edges threshold={20} color={contorno} lineWidth={3} />
+      ) : (
+        divisor && <Edges threshold={20} color={divisor} lineWidth={1} />
+      )}
     </mesh>
   )
 }
@@ -440,6 +448,7 @@ export default function LienzoCasco({
                   duracionColor={duracionColor}
                   resaltada={encima === codigo}
                   contorno={seleccionada === codigo ? acento : null}
+                  divisor={colorDivisor(colores.get(variable) ?? sinFotos, colores.get('--c-ink') ?? TINTA_RESPALDO)}
                   eventos={eventosDeZona(codigo)}
                 />
               )

@@ -146,7 +146,6 @@ export function NuevoBuquePage() {
           valores={valores}
           errores={errores}
           alCambiar={cambiar}
-          ayudaEtapa="Si lo dejas vacío se registra como Activo."
           imagen={{ actual: null, eleccion: imagen, alCambiar: cambiarImagen }}
         />
 

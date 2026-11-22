@@ -208,6 +208,17 @@ describe('ListaInspeccionesPage', () => {
 
     expect(router.state.location.pathname).toBe('/vision')
     expect(router.state.location.search).toBe('?buque=1')
+    // The form's back link returns to this list, filters included.
+    expect(router.state.location.state).toEqual({ volverA: '/inspecciones/buque/1' })
+  })
+
+  it('makes the new inspection form go back to the 3D view it was opened from', async () => {
+    const { router } = renderizar(undefined, `${RUTA}?vista=3d`)
+
+    await userEvent.click((await screen.findAllByRole('link', { name: /Nueva inspección/ }))[0])
+
+    expect(router.state.location.pathname).toBe('/vision')
+    expect(router.state.location.state).toEqual({ volverA: '/inspecciones/buque/1?vista=3d' })
   })
 
   it('passes the vessel to the new inspection form from the header and the empty state', async () => {

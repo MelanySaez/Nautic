@@ -99,6 +99,30 @@ describe('ResultadosPage', () => {
     expect(`${router.state.location.pathname}${router.state.location.search}`).toBe('/inspecciones/buque/5?q=prueba')
   })
 
+  it('makes the photo upload go back to these results, keeping where the results go back to', async () => {
+    const { router } = renderizar([CORROIDA], { buqueId: 5 }, {
+      pathname: '/inspecciones/7/resultados',
+      state: { volverA: '/inspecciones/buque/5?q=prueba' },
+    })
+
+    await userEvent.click(await screen.findByRole('link', { name: 'Editar inspección' }))
+
+    expect(router.state.location.pathname).toBe('/vision/7')
+    expect(router.state.location.state).toEqual({
+      volverA: '/inspecciones/7/resultados',
+      origen: '/inspecciones/buque/5?q=prueba',
+    })
+  })
+
+  it('makes the photo upload go back to these results from the pending photos link too', async () => {
+    const { router } = renderizar([unaFoto({ id: 9, estado: 'pendiente', seccion: SECCION_QUILLA })])
+
+    await userEvent.click(await screen.findByRole('link', { name: /sin analizar · ir a la carga/ }))
+
+    expect(router.state.location.pathname).toBe('/vision/7')
+    expect(router.state.location.state).toEqual({ volverA: '/vision/7/resultados' })
+  })
+
   it('always shows the photo results, without folding them', async () => {
     renderizar([CORROIDA, SOLO_CASCO])
 

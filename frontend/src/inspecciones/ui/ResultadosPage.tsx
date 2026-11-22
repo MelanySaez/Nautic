@@ -18,6 +18,7 @@ import { useIdEnUrl } from './parametrosUrl'
 import { TarjetaResultado } from './TarjetaResultado'
 import { useModelos } from './useModelos'
 import { useInspeccionEnVivo, type DatosInspeccion } from './useInspeccionEnVivo'
+import { destinoDeVuelta } from './volverA'
 
 /** Route entry: keys the page by id so switching inspections starts from a clean state. */
 export function ResultadosRuta() {
@@ -78,11 +79,10 @@ function Resultados({
 
   // Back to the list the card was opened from (with its filters), else the vessel's inspections.
   // The upload page is reached through "Editar inspección".
-  const estadoUbicacion = useLocation().state as { volverA?: unknown } | null
-  const volverA =
-    typeof estadoUbicacion?.volverA === 'string' && estadoUbicacion.volverA.startsWith('/inspecciones/')
-      ? estadoUbicacion.volverA
-      : undefined
+  const ubicacion = useLocation()
+  const volverA = destinoDeVuelta((ubicacion.state as { volverA?: unknown } | null)?.volverA)
+  // The upload page goes back here, and hands this page its own way back when it returns.
+  const aLaCarga = { volverA: `${ubicacion.pathname}${ubicacion.search}`, ...(volverA ? { origen: volverA } : {}) }
 
   return (
     <div className="animar-entrada flex flex-col gap-6">
@@ -117,7 +117,9 @@ function Resultados({
           <EnlaceBoton variante="secundario" to={`/inspecciones/${detalle.id}/reporte`}>
             Reporte
           </EnlaceBoton>
-          <EnlaceBoton to={`/vision/${detalle.id}`}>Editar inspección</EnlaceBoton>
+          <EnlaceBoton to={`/vision/${detalle.id}`} state={aLaCarga}>
+            Editar inspección
+          </EnlaceBoton>
         </div>
       </header>
 
@@ -150,6 +152,7 @@ function Resultados({
       {sinAnalizar > 0 && (
         <Enlace
           to={`/vision/${detalle.id}`}
+          state={aLaCarga}
           className="label-caps self-start rounded border border-info/30 bg-info-bg px-3 py-2 text-info hover:border-accent"
         >
           {sinAnalizar} {sinAnalizar === 1 ? 'foto' : 'fotos'} sin analizar · ir a la carga

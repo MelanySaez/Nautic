@@ -28,9 +28,9 @@ const RUTA = '/inspecciones/buque/1?vista=3d'
 const FONDO_PROA: SeccionCasco = { id: 11, codigo: 'FWD-BTM', nombre: 'Fondo - Proa', descripcion: 'Fondo plano de proa', orden: 1 }
 const FONDO_CENTRO: SeccionCasco = { id: 12, codigo: 'MID-BTM', nombre: 'Fondo - Centro', descripcion: 'Fondo plano central', orden: 2 }
 const QUILLA: SeccionCasco = { id: 13, codigo: 'KEEL', nombre: 'Quilla', descripcion: '', orden: 19 }
-const LASTRE: SeccionCasco = { id: 14, codigo: 'SEC-01', nombre: 'Tanque de lastre', descripcion: '', orden: 24 }
-// Not in the standard order on purpose: the hull list follows the standard codes.
-const SECCIONES = [QUILLA, LASTRE, FONDO_CENTRO, FONDO_PROA]
+// Standard codes only (custom sections disable the 3D view), and not in the standard order on
+// purpose: the hull list follows the standard codes.
+const SECCIONES = [QUILLA, FONDO_CENTRO, FONDO_PROA]
 
 const RECIENTE = unaInspeccion({ id: 7, nombre: 'Control 2026', fechaCreacion: '2026-11-01T10:00:00Z' })
 const ANTERIOR = unaInspeccion({ id: 5, nombre: 'Control 2025', fechaCreacion: '2025-11-01T10:00:00Z' })
@@ -67,7 +67,10 @@ function preparar() {
   return falsas
 }
 
-function renderizar(dependencias = preparar().dependencias, ruta = RUTA) {
+function renderizar(
+  dependencias = preparar().dependencias,
+  ruta: string | { pathname: string; search?: string; state?: unknown } = RUTA,
+) {
   const router = renderizarRutas(
     [
       { path: '/inspecciones/buque/:id', element: <ListaInspeccionesRuta /> },
@@ -136,7 +139,7 @@ describe('VistaCascoBuque layout', () => {
   it('puts the hull first, with the section list folded under it and no side list', async () => {
     renderizar()
 
-    const plegable = await screen.findByRole('group', { name: 'Lista de secciones (4)' })
+    const plegable = await screen.findByRole('group', { name: 'Lista de secciones (3)' })
     expect(plegable).not.toHaveAttribute('open')
     expect(screen.queryByRole('heading', { name: 'Secciones del casco' })).not.toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Zona seleccionada' })).toHaveTextContent(
@@ -159,14 +162,64 @@ describe('VistaCascoBuque layout', () => {
 })
 
 describe('VistaCascoBuque colours', () => {
-  it('colours the zones with the most recent inspection and names it', async () => {
+  it('colours the zones with the most recent inspection, selected in the inspection picker', async () => {
     const { dependencias } = renderizar()
 
     expect(await zona('MID-BTM')).toHaveTextContent('Crítica')
-    expect(screen.getByText(/Colores según la última inspección:/)).toHaveTextContent('Control 2026')
+    const selector = screen.getByRole('combobox', { name: 'Inspección:' })
+    expect(selector).toHaveValue('7')
+    expect(selector).toHaveAttribute('title', 'Control 2026')
+    expect(within(selector).getAllByRole('option').map((o) => o.textContent)).toEqual([
+      'Control 2026 · 01 nov 2026 (más reciente)',
+      'Control 2025 · 01 nov 2025',
+    ])
     expect(dependencias.inspecciones.buscar).toHaveBeenCalledWith({ buqueId: 1 })
     expect(dependencias.inspecciones.obtener).toHaveBeenCalledWith(7)
     expect(dependencias.inspecciones.obtener).not.toHaveBeenCalledWith(5)
+  })
+
+  it('recolours the hull with the inspection the user picks', async () => {
+    const { dependencias } = renderizar()
+    expect(await zona('MID-BTM')).toHaveTextContent('Crítica')
+
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Inspección:' }), '5')
+
+    await waitFor(async () => expect(await zona('KEEL')).toHaveTextContent('Baja'))
+    expect(await zona('MID-BTM')).toHaveTextContent('Sin fotos')
+    expect(await zona('FWD-BTM')).toHaveTextContent('Sin fotos')
+    expect(dependencias.inspecciones.obtener).toHaveBeenLastCalledWith(5)
+    expect(screen.getByRole('combobox', { name: 'Inspección:' })).toHaveValue('5')
+    expect(screen.getByRole('combobox', { name: 'Inspección:' })).toHaveAttribute('title', 'Control 2025')
+  })
+
+  it('keeps the selected zone when another inspection is picked', async () => {
+    const { router } = renderizar(preparar().dependencias, `${RUTA}&zona=13`)
+    await zonasDelCasco()
+
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Inspección:' }), '5')
+
+    await waitFor(() => expect(panel()).toHaveTextContent('Baja'))
+    expect(within(panel()).getByRole('heading', { name: 'Quilla' })).toBeInTheDocument()
+    expect(router.state.location.search).toBe('?vista=3d&zona=13')
+  })
+
+  it('loads older inspections into the picker on demand', async () => {
+    const { dependencias } = preparar()
+    const VIEJA = unaInspeccion({ id: 2, nombre: 'Control 2024', fechaCreacion: '2024-11-01T10:00:00Z' })
+    dependencias.inspecciones.buscar.mockImplementation(async (_filtro, cursor) =>
+      cursor === 'c2' ? unaPagina([VIEJA]) : unaPagina([RECIENTE, ANTERIOR], { siguiente: 'c2', hayMas: true }),
+    )
+    renderizar(dependencias)
+    expect(await zona('MID-BTM')).toHaveTextContent('Crítica')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Cargar más inspecciones' }))
+
+    const selector = screen.getByRole('combobox', { name: 'Inspección:' })
+    await waitFor(() => expect(within(selector).getAllByRole('option')).toHaveLength(3))
+    expect(within(selector).getAllByRole('option')[2]).toHaveTextContent('Control 2024 · 01 nov 2024')
+    expect(dependencias.inspecciones.buscar).toHaveBeenLastCalledWith({ buqueId: 1 }, 'c2')
+    expect(screen.queryByRole('button', { name: 'Cargar más inspecciones' })).not.toBeInTheDocument()
+    expect(selector).toHaveValue('7')
   })
 
   it('updates the zone states live while photos are analyzed', async () => {
@@ -202,6 +255,7 @@ describe('VistaCascoBuque colours', () => {
     renderizar(dependencias)
 
     expect(await screen.findByText('Este buque aún no tiene inspecciones.')).toBeInTheDocument()
+    expect(screen.queryByRole('combobox', { name: 'Inspección:' })).not.toBeInTheDocument()
     for (const boton of within(await zonasDelCasco()).getAllByRole('button')) expect(boton).toHaveTextContent('Sin fotos')
     expect(dependencias.inspecciones.obtener).not.toHaveBeenCalled()
   })
@@ -222,15 +276,6 @@ describe('VistaCascoBuque zones', () => {
     expect(await zona('MID-BTM')).toHaveTextContent('1 foto')
     expect(await zona('FWD-BTM')).toHaveTextContent('Sin analizar')
     expect(await zona('KEEL')).toHaveTextContent('Sin fotos')
-  })
-
-  it('lists a custom section apart, as not placed on the hull', async () => {
-    renderizar()
-    await zonasDelCasco()
-
-    const aparte = screen.getByRole('group', { name: 'Secciones sin ubicación en el casco' })
-    expect(within(aparte).getAllByRole('button')).toHaveLength(1)
-    expect(within(aparte).getByRole('button', { name: /^SEC-01 · Tanque de lastre/ })).toHaveTextContent('Sin fotos')
   })
 
   it('opens the two-option menu of the selected zone; selecting it again closes it', async () => {
@@ -270,6 +315,35 @@ describe('VistaCascoBuque zones', () => {
 
     expect(router.state.location.pathname).toBe('/vision')
     expect(router.state.location.search).toBe('?buque=1&zona=12')
+    expect(router.state.location.state).toEqual({ volverA: '/inspecciones/buque/1?vista=3d&zona=12' })
+  })
+
+  it('goes back from the list filtered by a zone to the 3D view with that zone, then to the vessels', async () => {
+    const { router } = renderizar(preparar().dependencias, {
+      pathname: '/inspecciones/buque/1',
+      search: '?vista=3d&zona=12',
+      state: { buqueNombre: 'ARA Libertad', volverA: '/?q=libert' },
+    })
+    await zonasDelCasco()
+    await userEvent.click(within(panel()).getByRole('button', { name: 'Ver inspecciones de esta sección' }))
+    expect(router.state.location.search).toBe('?seccion=12')
+
+    await userEvent.click(screen.getByRole('link', { name: 'Volver a la vista 3D' }))
+
+    expect(router.state.location.search).toBe('?vista=3d&zona=12')
+    expect(screen.getByRole('link', { name: 'Volver a las embarcaciones' })).toHaveAttribute('href', '/?q=libert')
+  })
+
+  it('keeps the way back to the vessels when switching views and picking zones', async () => {
+    const { router } = renderizar(preparar().dependencias, {
+      pathname: '/inspecciones/buque/1',
+      state: { buqueNombre: 'ARA Libertad', volverA: '/?q=libert' },
+    })
+    await userEvent.click(await screen.findByRole('button', { name: 'Vista 3D' }))
+    await userEvent.click(await zona('KEEL'))
+
+    expect(router.state.location.search).toBe('?vista=3d&zona=13')
+    expect(screen.getByRole('link', { name: 'Volver a las embarcaciones' })).toHaveAttribute('href', '/?q=libert')
   })
 
   it('shows the list filtered by the zone and lets the filter go', async () => {
@@ -288,17 +362,6 @@ describe('VistaCascoBuque zones', () => {
     expect(router.state.location.search).toBe('')
     await waitFor(() => expect(dependencias.inspecciones.buscar).toHaveBeenLastCalledWith({ buqueId: 1 }))
     expect(screen.queryByText(/^Sección:/)).not.toBeInTheDocument()
-  })
-
-  it('selects a section that is not placed on the hull the same way', async () => {
-    const { router } = renderizar()
-    await zonasDelCasco()
-
-    await userEvent.click(screen.getByRole('button', { name: /^SEC-01 · / }))
-
-    expect(router.state.location.search).toBe('?vista=3d&zona=14')
-    expect(within(panel()).getByRole('heading', { name: 'Tanque de lastre' })).toBeInTheDocument()
-    expect(conteos(panel())).toEqual({ Fotos: '0', Analizadas: '0', Hallazgos: '0' })
   })
 })
 

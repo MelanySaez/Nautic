@@ -5,10 +5,14 @@ import { ApiError } from '../../shared/http/apiClient'
 import { crearDependenciasFalsas, renderizarRutas, unaInspeccion, unBuque } from '../../test/dobles'
 import { NuevaInspeccionPage } from './NuevaInspeccionPage'
 
-function renderizar(dependencias = crearDependenciasFalsas().dependencias, ruta = '/vision') {
+function renderizar(
+  dependencias = crearDependenciasFalsas().dependencias,
+  ruta: string | { pathname: string; search?: string; state?: unknown } = '/vision',
+) {
   const router = renderizarRutas(
     [
       { path: '/', element: <p>Listado</p> },
+      { path: '/inspecciones/buque/:id', element: <p>Inspecciones del buque</p> },
       { path: '/vision', element: <NuevaInspeccionPage /> },
       { path: '/vision/:id', element: <p>Carga de fotos</p> },
     ],
@@ -17,6 +21,34 @@ function renderizar(dependencias = crearDependenciasFalsas().dependencias, ruta 
   )
   return { router, dependencias }
 }
+
+describe('NuevaInspeccionPage back link', () => {
+  it('goes back to the vessel view it was opened from', async () => {
+    const { router } = renderizar(undefined, {
+      pathname: '/vision',
+      search: '?buque=1&zona=12',
+      state: { volverA: '/inspecciones/buque/1?vista=3d&zona=12' },
+    })
+
+    const volver = screen.getByRole('link', { name: 'Volver' })
+    expect(volver).toHaveAttribute('href', '/inspecciones/buque/1?vista=3d&zona=12')
+    await userEvent.click(volver)
+    expect(router.state.location.pathname).toBe('/inspecciones/buque/1')
+    expect(router.state.location.search).toBe('?vista=3d&zona=12')
+  })
+
+  it('goes back to the inspections list when opened without an origin', () => {
+    renderizar()
+
+    expect(screen.getByRole('link', { name: 'Volver' })).toHaveAttribute('href', '/')
+  })
+
+  it('ignores an origin outside the inspections pages', () => {
+    renderizar(undefined, { pathname: '/vision', state: { volverA: '//otro.sitio/phish' } })
+
+    expect(screen.getByRole('link', { name: 'Volver' })).toHaveAttribute('href', '/')
+  })
+})
 
 describe('NuevaInspeccionPage', () => {
   it('offers the fleet vessels to choose from', async () => {

@@ -2,7 +2,7 @@ import { act, renderHook } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { CodigoZona } from '../../../buques/domain/casco/zonas'
 import type { EstadoZona } from '../../domain/resumenZonas'
-import { mezclarColores, leerColores, observarTema, useColoresTema, VARIABLES_COLOR, variableDeZona } from './coloresZona'
+import { VARIABLES_COLOR, colorDivisor, leerColores, mezclarColores, observarTema, useColoresTema, variableDeZona } from './coloresZona'
 import { ESTADOS_ZONA, PRESENTACION_ESTADO_ZONA } from './estadosZona'
 
 const ESTADOS = new Map<CodigoZona, EstadoZona>([
@@ -131,3 +131,15 @@ describe('useColoresTema', () => {
     expect(result.current).toBe(antes)
   })
 })
+
+describe('colorDivisor', () => {
+  it('darkens the zone colour halfway towards the ink, so the border shows on any zone colour', () => {
+    expect(colorDivisor('#ffffff', '#000000')).toBe('#808080')
+    expect(colorDivisor('#e8a400', '#191c1e')).toBe(mezclarColores('#e8a400', '#191c1e', 0.5))
+  })
+
+  it('falls back to the ink when the zone colour cannot be mixed', () => {
+    expect(colorDivisor('rgb(1, 2, 3)', '#191c1e')).toBe('#191c1e')
+  })
+})
+

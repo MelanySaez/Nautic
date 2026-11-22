@@ -264,7 +264,7 @@ El modelo se elige al **analizar**, no al subir ni por inspección:
 
 1. `GET /api/vision/modelos/` lista el catálogo de `core_engine` (`available_models()`) en su orden. `por_defecto` marca `VISION_MODEL_ID`; `disponible` viene de la API pública `core_engine.vision.models_availability()` (nautic_core v3.1): es `true` sólo si los pesos del modelo existen en `NAUTIC_WEIGHTS_DIR` y los módulos Python que declara el modelo son importables. La comprobación no carga ningún framework ni pesos, y los requisitos los define `core_engine` (este repositorio ya no mantiene su propio mapa). Si falta algo, `motivo_no_disponible()` arma un mensaje en español con los nombres de los pesos y módulos faltantes y el `install_hint` de `core_engine` (por ejemplo `Faltan los pesos del modelo en el servidor: maskrcnn-0.2.0.pt.`); nunca incluye rutas del servidor.
 2. `POST /api/vision/inspecciones/<id>/analizar/` con `{"modelo": "<id>"}` (JSON o formulario) valida el id **antes de tocar nada**: desconocido → `400 {"error": "Datos inválidos.", "campos": {"modelo": [...]}}`; no disponible → `400 {"error": "Modelo no disponible.", "campos": {"modelo": [...]}}` (mensaje sin rutas del servidor; el detalle va al log). Sin `modelo` se usa `VISION_MODEL_ID`, que también se valida.
-3. Con el id válido, cada foto encolada guarda `modelo_id` antes de encolarse (las omitidas por el límite de concurrencia no cambian) y el worker llama `run_inference(..., model_id=foto.modelo_id)`; una foto con `modelo_id` nulo (anterior a esta función) usa el modelo por defecto.
+3. Con el id válido, cada foto encolada guarda `modelo_id` antes de encolarse (también las que quedan en cola por el límite de concurrencia) y el worker llama `run_inference(..., model_id=foto.modelo_id)`; una foto con `modelo_id` nulo (anterior a esta función) usa el modelo por defecto.
 4. El reintento `POST /api/vision/fotos/<id>/` acepta el mismo `modelo` opcional; sin él conserva el `modelo_id` de la foto.
 
 El modelo viaja como `modelo` en el dict de la foto (REST) y en los eventos SSE `foto-created` / `foto-updated`. Al completarse el análisis, `procesar_foto` guarda además `modelo_version` y `taxonomia_version` (claves `model_version` / `taxonomy_version` del resultado de `analyze()`, que `run_inference` conserva) y se exponen con esos nombres en el dict de la foto y en `foto-updated`; si `core_engine` no los reporta quedan en `null`, y un reintento los sobrescribe con los del nuevo análisis. Las fotos anteriores a la migración `0005` no se rellenan. Fuera de alcance: re-analizar con otro modelo una foto ya `completada`.
@@ -433,8 +433,9 @@ Clave mapeo:      rl:foto_ip:{foto_id}   TTL: 7200s
 - `track_concurrent_end(foto_id)` → lee IP del mapeo, elimina del set, borra mapeo
 - Aplicado en:
   - `api_vision_foto_detalle` POST (análisis individual)
-  - `api_vision_analizar_inspeccion` POST (bulk — despacha hasta slots disponibles, retorna `omitidas_por_limite`)
-- El worker llama `track_concurrent_end` al finalizar la tarea (éxito, error final o skip)
+  - `api_vision_analizar_inspeccion` POST (bulk — despacha hasta slots disponibles y deja el resto en cola; `omitidas_por_limite` = encoladas; siempre `202`)
+- El worker llama `track_concurrent_end` al finalizar la tarea (éxito, error final o skip), que devuelve la IP, y continúa su cola.
+- Las fotos que no entran quedan **en cola** (`FotoInspeccion.cola_ip` = IP que las pidió, ya con su `modelo_id`): cada vez que el worker libera un lugar (éxito, error final o skip), `vision/cola.despachar_cola(ip)` lanza las encoladas de esa IP por orden de id mientras haya lugar, reclamando cada una con `select_for_update(skip_locked=True)` para que dos workers nunca lancen la misma. Funciona con el navegador cerrado. Si Redis pierde el mapeo `foto → IP`, la cola espera a un nuevo `POST .../analizar/` (las fotos siguen `pendiente`).
 
 ### Extracción de IP real
 

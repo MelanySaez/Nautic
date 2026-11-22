@@ -249,6 +249,10 @@ class FotoInspeccion(models.Model):
     # Id del modelo de core_engine con el que se analizó (o se va a analizar)
     # la foto. Se fija al disparar el análisis; null mientras nunca se pidió.
     modelo_id = models.CharField(max_length=50, blank=True, null=True)
+    # IP that asked for the analysis while its concurrency slots were full: the photo
+    # waits in that IP's queue and the worker launches it when a slot frees up
+    # (``vision/cola.py``). Null when the photo is not queued.
+    cola_ip = models.CharField(max_length=64, blank=True, null=True)
     # Versions reported by core_engine's analyze() for the last completed
     # analysis: weights/model version and detection-taxonomy version. They let
     # a weights or taxonomy update be traced per photo. Null for photos analyzed
