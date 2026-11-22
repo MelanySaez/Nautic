@@ -1,5 +1,5 @@
 import { useCallback, useState, type FormEvent } from 'react'
-import { useSearchParams } from 'react-router'
+import { useLocation, useSearchParams } from 'react-router'
 import { useNavegar } from '../../shared/hooks/useNavegar'
 import { Enlace } from '../../shared/ui/Enlace'
 import { useDependencias } from '../../app/useDependencias'
@@ -45,6 +45,9 @@ export function NuevaInspeccionPage() {
   const { estado: flota } = useRecurso(cargarBuques)
   // Deep links (e.g. from the 3D hull view) may name the vessel and the zone to start with.
   const [parametros] = useSearchParams()
+  // Back to the view that opened the form (e.g. a vessel's 3D hull); only inspection pages count.
+  const origen = (useLocation().state as { volverA?: unknown } | null)?.volverA
+  const volverA = typeof origen === 'string' && origen.startsWith('/inspecciones/') ? origen : '/'
   const buqueUrl = idDeParametro(parametros, 'buque')
   const zonaUrl = idDeParametro(parametros, 'zona')
 
@@ -109,7 +112,7 @@ export function NuevaInspeccionPage() {
   return (
     <div className="mx-auto flex max-w-2xl flex-col gap-6">
       <header className="flex items-center gap-3">
-        <Enlace to="/" aria-label="Volver al listado" className="rounded p-1 text-ink-muted hover:text-ink">
+        <Enlace to={volverA} aria-label="Volver" className="rounded p-1 text-ink-muted hover:text-ink">
           <Icon name="back" className="size-6" />
         </Enlace>
         <h1 className="flex-1 text-2xl font-semibold tracking-tight md:text-3xl">Nueva inspección</h1>

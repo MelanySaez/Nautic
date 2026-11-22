@@ -312,6 +312,7 @@ describe('VistaCascoBuque zones', () => {
 
     expect(router.state.location.pathname).toBe('/vision')
     expect(router.state.location.search).toBe('?buque=1&zona=12')
+    expect(router.state.location.state).toEqual({ volverA: '/inspecciones/buque/1?vista=3d&zona=12' })
   })
 
   it('shows the list filtered by the zone and lets the filter go', async () => {

@@ -1,3 +1,4 @@
+import { useLocation } from 'react-router'
 import { Boton, EnlaceBoton } from '../../../shared/ui/Boton'
 import { Icon } from '../../../shared/ui/Icon'
 import { PRESENTACION_ESTADO_ZONA } from './estadosZona'
@@ -40,6 +41,8 @@ function ZonaElegida({
   buqueId: number
   alVerInspecciones: (seccionId: number) => void
 }) {
+  // The new inspection form goes back to this view, with the zone still selected.
+  const ubicacion = useLocation()
   const { texto, insignia } = PRESENTACION_ESTADO_ZONA[resumen.estado]
   const conteos: Array<[string, number]> = [
     ['Fotos', resumen.fotos],
@@ -68,7 +71,10 @@ function ZonaElegida({
       </dl>
 
       <div role="group" aria-label="Acciones de la zona" className="flex flex-wrap gap-2">
-        <EnlaceBoton to={`/vision?buque=${buqueId}&zona=${seccion.id}`}>
+        <EnlaceBoton
+          to={`/vision?buque=${buqueId}&zona=${seccion.id}`}
+          state={{ volverA: `${ubicacion.pathname}${ubicacion.search}` }}
+        >
           <Icon name="plus" className="size-4" />
           Nueva inspección en esta sección
         </EnlaceBoton>

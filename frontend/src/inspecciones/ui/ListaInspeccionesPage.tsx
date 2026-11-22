@@ -52,6 +52,8 @@ export function ListaInspeccionesPage({ buqueId }: { buqueId: number }) {
   )
   // The vessel list passes the name along so the title is there from the first frame of the transition.
   const ubicacion = useLocation()
+  // The new inspection form goes back here, with the current view and filters.
+  const volverAqui = { volverA: `${ubicacion.pathname}${ubicacion.search}` }
   const desdeLista = ubicacion.state as { buqueNombre?: string; volverA?: string } | null
   const nombreConocido = buque.tipo === 'listo' ? buque.datos.nombre : desdeLista?.buqueNombre
   const nombreBuque = nombreConocido ?? 'Embarcación'
@@ -200,7 +202,7 @@ export function ListaInspeccionesPage({ buqueId }: { buqueId: number }) {
               Este buque usa secciones propias: la vista 3D no está disponible.
             </p>
           )}
-          <EnlaceBoton to={`/vision?buque=${buqueId}`}>
+          <EnlaceBoton to={`/vision?buque=${buqueId}`} state={volverAqui}>
             <Icon name="plus" className="size-4" />
             Nueva inspección
           </EnlaceBoton>
@@ -262,7 +264,7 @@ export function ListaInspeccionesPage({ buqueId }: { buqueId: number }) {
             ) : (
               <>
                 <p>Este buque todavía no tiene inspecciones.</p>
-                <EnlaceBoton to={`/vision?buque=${buqueId}`} variante="accion">
+                <EnlaceBoton to={`/vision?buque=${buqueId}`} state={volverAqui} variante="accion">
                   Nueva inspección
                 </EnlaceBoton>
               </>
