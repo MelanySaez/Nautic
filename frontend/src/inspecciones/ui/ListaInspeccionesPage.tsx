@@ -188,7 +188,8 @@ export function ListaInspeccionesPage({ buqueId }: { buqueId: number }) {
                   aria-describedby={vista3d && !disponible3d ? idNo3d : undefined}
                   onClick={() => !activa && mostrar3d(vista3d)}
                   className={`label-caps flex items-center gap-2 rounded-sm px-3 py-2 ${
-                    activa ? 'bg-surface-2 text-ink' : 'text-ink-muted hover:text-ink'
+                    // Filled with the accent: surface-2 on white was barely visible in light mode.
+                    activa ? 'bg-accent text-on-accent shadow-sm' : 'text-ink-muted hover:bg-surface-2 hover:text-ink'
                   } disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:text-ink-muted`}
                 >
                   <Icon name={icono} className="size-4" />
