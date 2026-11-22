@@ -16,7 +16,7 @@ import logging
 from django.db import transaction
 
 from .models import FotoInspeccion
-from .ratelimit import track_concurrent_end, track_concurrent_start
+from .ratelimit import foto_activa, track_concurrent_end, track_concurrent_start
 
 logger = logging.getLogger(__name__)
 
@@ -30,21 +30,32 @@ def _lanzar(foto_id: int) -> None:
 
 def _reclamar_siguiente(ip: str) -> FotoInspeccion | None:
     """Saca de la cola la foto pendiente más antigua de ``ip`` si hay un lugar libre."""
-    with transaction.atomic():
-        foto = (
-            FotoInspeccion.objects.select_for_update(skip_locked=True)
-            .filter(cola_ip=ip, estado=FotoInspeccion.Estado.PENDIENTE)
-            .order_by("id")
-            .first()
-        )
-        if foto is None:
-            return None
-        ok, _ = track_concurrent_start(ip, foto.id)
-        if not ok:
-            return None
-        foto.cola_ip = None
-        foto.save(update_fields=["cola_ip"])
-        return foto
+    while True:
+        with transaction.atomic():
+            foto = (
+                FotoInspeccion.objects.select_for_update(skip_locked=True)
+                .filter(cola_ip=ip, estado=FotoInspeccion.Estado.PENDIENTE)
+                .order_by("id")
+                .first()
+            )
+            if foto is None:
+                return None
+            foto.cola_ip = None
+            if foto_activa(foto.id):
+                # Already launched (still `pendiente` until the worker picks it up):
+                # it only leaves the queue, it is never launched twice.
+                foto.save(update_fields=["cola_ip"])
+                continue
+            ok, _ = track_concurrent_start(ip, foto.id)
+            if not ok:
+                return None
+            try:
+                foto.save(update_fields=["cola_ip"])
+            except Exception:
+                # The slot was taken in Redis: give it back before the rollback.
+                track_concurrent_end(foto.id)
+                raise
+            return foto
 
 
 def despachar_cola(ip) -> int:

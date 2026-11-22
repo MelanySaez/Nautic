@@ -95,6 +95,19 @@ def track_concurrent_start(ip: str, foto_id: int) -> tuple[bool, str | None]:
         return True, None  # fail-open
 
 
+def foto_activa(foto_id: int) -> bool:
+    """
+    True si la foto ya tiene un lugar tomado (lanzada y sin terminar). Una foto
+    lanzada sigue ``pendiente`` hasta que el worker la toma, así que el estado solo
+    no distingue "en marcha" de "nunca lanzada". Falla a False si Redis no responde.
+    """
+    try:
+        return bool(get_redis().exists(_KEY_IP_MAP.format(foto_id=foto_id)))
+    except Exception:
+        logger.exception("Rate limit error (active check) foto=%s", foto_id)
+        return False
+
+
 def track_concurrent_end(foto_id: int) -> str | None:
     """
     Registra el fin de procesamiento de una foto.

@@ -45,6 +45,9 @@ class AnalizarEncolaTests(_Base):
         self.concurrencia = self._parchear('vision.views.track_concurrent_start')
         # The queue drain the view runs at the end finds no free slot either.
         self._parchear('vision.cola.track_concurrent_start', return_value=(False, 'limite'))
+        # No photo is in flight unless a test says so.
+        self.activa = self._parchear('vision.views.foto_activa', return_value=False)
+        self._parchear('vision.cola.foto_activa', return_value=False)
 
     def _analizar(self, payload=None):
         return self.client.post(
@@ -97,6 +100,33 @@ class AnalizarEncolaTests(_Base):
         foto.refresh_from_db()
         self.assertIsNone(foto.cola_ip)
 
+    def test_pulsar_otra_vez_no_encola_ni_relanza_las_fotos_ya_lanzadas(self):
+        # Launched photos stay `pendiente` until the worker picks them up.
+        lanzada, nueva = self._foto(), self._foto()
+        self.activa.side_effect = lambda foto_id: foto_id == lanzada.id
+        self.concurrencia.return_value = (False, 'limite')
+
+        res = self._analizar()
+
+        self.assertEqual(res.status_code, 202)
+        self.assertEqual(res.json(), {'iniciadas': 0, 'omitidas_por_limite': 1})
+        self.disparar.assert_not_called()
+        self.assertEqual([c.args[1] for c in self.concurrencia.call_args_list], [nueva.id])
+        lanzada.refresh_from_db()
+        nueva.refresh_from_db()
+        self.assertIsNone(lanzada.cola_ip)
+        self.assertEqual(nueva.cola_ip, IP)
+
+    def test_el_conteo_no_cuenta_lanzamientos_de_otras_inspecciones(self):
+        self._foto()
+        self.concurrencia.return_value = (False, 'limite')
+        # The drain at the end launched three queued photos (other inspections of the same IP).
+        self._parchear('vision.views.despachar_cola', return_value=3)
+
+        res = self._analizar()
+
+        self.assertEqual(res.json(), {'iniciadas': 1, 'omitidas_por_limite': 0})
+
     def test_reintentar_una_foto_la_saca_de_la_cola(self):
         foto = self._foto(estado=FotoInspeccion.Estado.ERROR, cola_ip=IP)
         self.concurrencia.return_value = (True, None)
@@ -114,6 +144,28 @@ class DespacharColaTests(_Base):
         super().setUp()
         self.lanzar = self._parchear('vision.cola._lanzar')
         self.concurrencia = self._parchear('vision.cola.track_concurrent_start', return_value=(True, None))
+        self.activa = self._parchear('vision.cola.foto_activa', return_value=False)
+
+    def test_una_foto_encolada_que_ya_esta_en_marcha_sale_de_la_cola_sin_relanzarse(self):
+        en_marcha, siguiente = self._foto(cola_ip=IP), self._foto(cola_ip=IP)
+        self.activa.side_effect = lambda foto_id: foto_id == en_marcha.id
+
+        self.assertEqual(despachar_cola(IP), 1)
+
+        self.lanzar.assert_called_once_with(siguiente.id)
+        self.assertEqual([c.args[1] for c in self.concurrencia.call_args_list], [siguiente.id])
+        en_marcha.refresh_from_db()
+        self.assertIsNone(en_marcha.cola_ip)
+
+    def test_si_falla_al_guardar_libera_el_lugar_tomado(self):
+        foto = self._foto(cola_ip=IP)
+        fin = self._parchear('vision.cola.track_concurrent_end')
+
+        with mock.patch.object(FotoInspeccion, 'save', side_effect=RuntimeError('db caída')):
+            self.assertEqual(despachar_cola(IP), 0)
+
+        fin.assert_called_once_with(foto.id)
+        self.lanzar.assert_not_called()
 
     def test_lanza_las_encoladas_de_esa_ip_por_orden_mientras_haya_lugar(self):
         primera, segunda, tercera = (self._foto(cola_ip=IP) for _ in range(3))
@@ -200,6 +252,15 @@ class WorkerDespachaColaTests(TestCase):
 
         self.fin.assert_called_once_with(self.foto.id)
         self.despachar.assert_called_once_with(IP)
+
+    def test_un_reintento_por_error_de_lectura_no_libera_ni_continua_la_cola(self):
+        with mock.patch('vision.tasks.run_inference', side_effect=OSError('disco')):
+            with mock.patch.object(procesar_foto, 'retry', side_effect=OSError('reintento')):
+                with self.assertRaises(OSError):
+                    procesar_foto.apply(args=[self.foto.id], retries=0).get()
+
+        self.fin.assert_not_called()
+        self.despachar.assert_not_called()
 
     def test_una_foto_ya_completada_tambien_continua_la_cola(self):
         self.foto.estado = FotoInspeccion.Estado.COMPLETADA

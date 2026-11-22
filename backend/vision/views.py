@@ -39,7 +39,7 @@ from .permisos import LIDER, exigir, permisos_de, puede_ver, visibles_para
 from .views_miembros import crear_miembros, validar_equipo
 from .pubsub import publicar_evento, suscribirse
 from .cola import despachar_cola
-from .ratelimit import check_upload_rate, get_client_ip, track_concurrent_start
+from .ratelimit import check_upload_rate, foto_activa, get_client_ip, track_concurrent_start
 from .secciones import seccion_to_dict
 from .taxonomia import color_clase, enriquecer_detecciones, info_clase, listar_taxonomia, version_taxonomia
 from .tasks import procesar_foto
@@ -1014,6 +1014,10 @@ def api_vision_analizar_inspeccion(request, inspeccion_id):
     dispatched = 0
     skipped = 0
     for foto in fotos.order_by('id'):
+        # Launched by an earlier press and not picked up by the worker yet (it stays
+        # `pendiente`): neither launch it again nor queue it.
+        if foto_activa(foto.id):
+            continue
         # The worker reads the model from the photo: persist it before enqueueing,
         # also for queued photos, which are analyzed later with this model.
         foto.modelo_id = modelo
@@ -1032,7 +1036,9 @@ def api_vision_analizar_inspeccion(request, inspeccion_id):
 
     if skipped:
         # A slot may have freed up while the queue was being written.
-        lanzadas = despachar_cola(ip)
+        # The drain may also launch queued photos of other inspections of this IP:
+        # count at most the ones this request queued.
+        lanzadas = min(despachar_cola(ip), skipped)
         dispatched += lanzadas
         skipped -= lanzadas
     return Response({'iniciadas': dispatched, 'omitidas_por_limite': skipped}, status=202)
